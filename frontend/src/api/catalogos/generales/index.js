@@ -1,0 +1,10 @@
+// APIs de catálogos generales
+export * from './agentesApi'
+export * from './agenciasApi'
+export * from './clientesApi'
+export * from './comercializadorasApi'
+export * from './difusorasApi'
+export * from './empresasApi'
+export * from './girosApi'
+export * from './presupuestosApi'
+export * from './productosApi'

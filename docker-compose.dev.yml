@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  db:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    container_name: programador-musical-db
+    environment:
+      POSTGRES_DB: programador-musical
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - programador-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: programador-musical-backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/programador-musical
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - API_V1_STR=/api/v1
+      - PROJECT_NAME=Programador Musical
+      - BACKEND_CORS_ORIGINS=["http://localhost", "http://localhost:3000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+    depends_on:
+      - db
+    networks:
+      - programador-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: programador-musical-frontend
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - programador-network
+    command: npm run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  programador-network:
+    driver: bridge
