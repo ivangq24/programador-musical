@@ -3,7 +3,7 @@ import apiClient from '../client'
 // Obtener difusoras con filtros
 export const getDifusoras = async (params = {}) => {
   try {
-    const response = await apiClient.get('/catalogos/difusoras/', { params })
+    const response = await apiClient.get('/catalogos/general/difusoras', { params })
     return response.data
   } catch (error) {
     console.error('Error fetching difusoras:', error)
@@ -14,7 +14,7 @@ export const getDifusoras = async (params = {}) => {
 // Obtener una difusora específica
 export const getDifusora = async (difusoraId) => {
   try {
-    const response = await apiClient.get(`/catalogos/difusoras/${difusoraId}`)
+    const response = await apiClient.get(`/catalogos/general/difusoras/${difusoraId}`)
     return response.data
   } catch (error) {
     console.error('Error fetching difusora:', error)
@@ -25,7 +25,7 @@ export const getDifusora = async (difusoraId) => {
 // Crear nueva difusora
 export const createDifusora = async (difusoraData) => {
   try {
-    const response = await apiClient.post('/catalogos/difusoras/', difusoraData)
+    const response = await apiClient.post('/catalogos/general/difusoras', difusoraData)
     return response.data
   } catch (error) {
     console.error('Error creating difusora:', error)
@@ -36,7 +36,7 @@ export const createDifusora = async (difusoraData) => {
 // Actualizar difusora
 export const updateDifusora = async (difusoraId, difusoraData) => {
   try {
-    const response = await apiClient.put(`/catalogos/difusoras/${difusoraId}`, difusoraData)
+    const response = await apiClient.put(`/catalogos/general/difusoras/${difusoraId}`, difusoraData)
     return response.data
   } catch (error) {
     console.error('Error updating difusora:', error)
@@ -47,7 +47,7 @@ export const updateDifusora = async (difusoraId, difusoraData) => {
 // Eliminar difusora
 export const deleteDifusora = async (difusoraId) => {
   try {
-    const response = await apiClient.delete(`/catalogos/difusoras/${difusoraId}`)
+    const response = await apiClient.delete(`/catalogos/general/difusoras/${difusoraId}`)
     return response.data
   } catch (error) {
     console.error('Error deleting difusora:', error)
@@ -58,7 +58,7 @@ export const deleteDifusora = async (difusoraId) => {
 // Obtener estadísticas de difusoras
 export const getDifusorasStats = async () => {
   try {
-    const response = await apiClient.get('/catalogos/difusoras/stats/summary')
+    const response = await apiClient.get('/catalogos/general/difusoras/stats')
     return response.data
   } catch (error) {
     console.error('Error fetching difusoras stats:', error)

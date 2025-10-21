@@ -10,25 +10,25 @@ export const politicasApi = {
 
   // Obtener política por ID
   getById: async (id) => {
-    const response = await apiClient.get(`/politicas/${id}`);
+    const response = await apiClient.get(`/programacion/politicas/${id}`);
     return response.data;
   },
 
   // Crear nueva política
   create: async (politicaData) => {
-    const response = await apiClient.post('/politicas', politicaData);
+    const response = await apiClient.post('/programacion/politicas/', politicaData);
     return response.data;
   },
 
   // Actualizar política
   update: async (id, politicaData) => {
-    const response = await apiClient.put(`/politicas/${id}`, politicaData);
+    const response = await apiClient.put(`/programacion/politicas/${id}`, politicaData);
     return response.data;
   },
 
   // Eliminar política
   delete: async (id) => {
-    const response = await apiClient.delete(`/politicas/${id}`);
+    const response = await apiClient.delete(`/programacion/politicas/${id}`);
     return response.data;
   }
 };

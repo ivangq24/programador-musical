@@ -74,28 +74,3 @@ class Clasificacion(ClasificacionBase):
     class Config:
         from_attributes = True
 
-# Usuario schemas
-class UsuarioBase(BaseModel):
-    username: str
-    email: str
-    nombre: str
-    apellido: Optional[str] = None
-    grupo_id: Optional[int] = None
-    activo: bool = True
-
-class UsuarioCreate(UsuarioBase):
-    pass
-
-class UsuarioUpdate(UsuarioBase):
-    username: Optional[str] = None
-    email: Optional[str] = None
-    nombre: Optional[str] = None
-    activo: Optional[bool] = None
-
-class Usuario(UsuarioBase):
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

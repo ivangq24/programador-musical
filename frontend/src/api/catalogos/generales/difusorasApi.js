@@ -1,5 +1,5 @@
 // API para Difusoras
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 // Función helper para hacer peticiones HTTP
 const apiRequest = async (endpoint, options = {}) => {
@@ -37,19 +37,19 @@ export const getDifusoras = async (params = {}) => {
   if (params.activa !== undefined) queryParams.append('activa', params.activa);
   
   const queryString = queryParams.toString();
-  const endpoint = `/catalogos/difusoras${queryString ? `?${queryString}` : ''}`;
+  const endpoint = `/catalogos/general/difusoras${queryString ? `?${queryString}` : ''}`;
   
   return apiRequest(endpoint);
 };
 
 // Obtener una difusora específica por ID
 export const getDifusoraById = async (id) => {
-  return apiRequest(`/catalogos/difusoras/${id}`);
+  return apiRequest(`/catalogos/general/difusoras/${id}`);
 };
 
 // Crear una nueva difusora
 export const createDifusora = async (difusoraData) => {
-  return apiRequest('/catalogos/difusoras/', {
+  return apiRequest('/catalogos/general/difusoras/', {
     method: 'POST',
     body: JSON.stringify(difusoraData),
   });
@@ -57,7 +57,7 @@ export const createDifusora = async (difusoraData) => {
 
 // Actualizar una difusora existente
 export const updateDifusora = async (id, difusoraData) => {
-  return apiRequest(`/catalogos/difusoras/${id}`, {
+  return apiRequest(`/catalogos/general/difusoras/${id}`, {
     method: 'PUT',
     body: JSON.stringify(difusoraData),
   });
@@ -65,14 +65,14 @@ export const updateDifusora = async (id, difusoraData) => {
 
 // Eliminar una difusora
 export const deleteDifusora = async (id) => {
-  return apiRequest(`/catalogos/difusoras/${id}`, {
+  return apiRequest(`/catalogos/general/difusoras/${id}`, {
     method: 'DELETE',
   });
 };
 
 // Obtener estadísticas de difusoras
 export const getDifusorasStats = async () => {
-  return apiRequest('/catalogos/difusoras/stats');
+  return apiRequest('/catalogos/general/difusoras/stats');
 };
 
 // Función para exportar difusoras a CSV

@@ -13,11 +13,10 @@ import {
   Settings,
   RotateCcw
 } from 'lucide-react'
-import { getCategoriasCanciones, guardarCategoriasPolitica, obtenerCategoriasPolitica } from '../../../../api/canciones'
+import { getCategoriasCanciones, guardarCategoriasPolitica, obtenerCategoriasPolitica } from '../../../../api/canciones/index'
 
-export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1 }) {
+export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, categoriasSeleccionadas, setCategoriasSeleccionadas }) {
   const [esquemaOrden, setEsquemaOrden] = useState('horas-categorias') // 'horas-categorias' o 'categorias-horas'
-  const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState([])
   const [categoriasDisponibles, setCategoriasDisponibles] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -35,26 +34,47 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1 }) {
   const loadCategorias = async () => {
     setLoading(true)
     try {
+      console.log('🔍 Cargando categorías desde la API...')
       // Cargar categorías disponibles desde la API
       const response = await getCategoriasCanciones()
+      console.log('📊 Respuesta completa de la API:', response)
+      console.log('📊 Categorías recibidas:', response.categorias)
+      console.log('📊 Total de categorías:', response.categorias?.length || 0)
+      
       const categorias = response.categorias.map((nombre, index) => ({
         id: index + 1,
         nombre: nombre,
         activa: true
       }))
       
+      console.log('📊 Categorías formateadas:', categorias)
       setCategoriasDisponibles(categorias)
       
       // Cargar categorías ya seleccionadas para esta política
+      console.log('🔍 Cargando categorías guardadas para política ID:', politicaId)
       const categoriasGuardadas = await obtenerCategoriasPolitica(politicaId)
-      if (categoriasGuardadas.categorias && categoriasGuardadas.categorias.length > 0) {
-        // Mapear las categorías guardadas al formato esperado
-        const categoriasSeleccionadasFormateadas = categoriasGuardadas.categorias.map((nombre, index) => {
-          const categoriaDisponible = categorias.find(c => c.nombre === nombre)
-          return categoriaDisponible || { id: index + 1000, nombre: nombre, activa: true }
-        })
-        setCategoriasSeleccionadas(categoriasSeleccionadasFormateadas)
-        console.log('Categorías cargadas desde la DB:', categoriasSeleccionadasFormateadas)
+      console.log('📊 Categorías guardadas:', categoriasGuardadas)
+      
+      // Solo cargar desde la DB si no hay categorías seleccionadas en el estado del padre
+      if (categoriasSeleccionadas.length === 0) {
+        if (categoriasGuardadas.categorias && categoriasGuardadas.categorias.length > 0) {
+          // Mapear SOLO las categorías guardadas que están disponibles
+          const categoriasSeleccionadasFormateadas = categoriasGuardadas.categorias
+            .map(nombre => categorias.find(c => c.nombre === nombre))
+            .filter(Boolean) // Eliminar las que no se encontraron (como "Jazz")
+          
+          console.log('📊 Categorías guardadas originales:', categoriasGuardadas.categorias)
+          console.log('📊 Categorías seleccionadas formateadas (solo disponibles):', categoriasSeleccionadasFormateadas)
+          console.log('📊 Categorías disponibles para comparar:', categorias)
+          
+          setCategoriasSeleccionadas(categoriasSeleccionadasFormateadas)
+          console.log('✅ Categorías seleccionadas cargadas desde la DB (solo disponibles):', categoriasSeleccionadasFormateadas)
+        } else {
+          console.log('ℹ️ No hay categorías guardadas para esta política - limpiando estado')
+          setCategoriasSeleccionadas([])
+        }
+      } else {
+        console.log('ℹ️ Ya hay categorías seleccionadas en el estado del padre - manteniendo estado actual')
       }
     } catch (error) {
       console.error('Error loading categorías:', error)
@@ -71,12 +91,38 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1 }) {
 
 
   const handleCategoriaToggle = (categoria) => {
+    console.log('🔍 handleCategoriaToggle - Categoría:', categoria);
+    console.log('🔍 handleCategoriaToggle - Estado actual:', categoriasSeleccionadas);
+    
     setCategoriasSeleccionadas(prev => {
-      if (prev.some(c => c.id === categoria.id)) {
-        return prev.filter(c => c.id !== categoria.id)
+      // Verificar si está seleccionada considerando tanto strings como objetos
+      const isSelected = prev.some(c => {
+        if (typeof c === 'string') {
+          return c === categoria.nombre;
+        } else {
+          return c.id === categoria.id;
+        }
+      });
+      console.log('🔍 handleCategoriaToggle - ¿Está seleccionada?', isSelected);
+      
+      let newState;
+      if (isSelected) {
+        // Remover tanto si es string como si es objeto
+        newState = prev.filter(c => {
+          if (typeof c === 'string') {
+            return c !== categoria.nombre;
+          } else {
+            return c.id !== categoria.id;
+          }
+        });
+        console.log('🔍 handleCategoriaToggle - Removiendo categoría');
       } else {
-        return [...prev, categoria]
+        newState = [...prev, categoria];
+        console.log('🔍 handleCategoriaToggle - Agregando categoría');
       }
+      
+      console.log('🔍 handleCategoriaToggle - Nuevo estado:', newState);
+      return newState;
     })
   }
 
@@ -149,70 +195,129 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1 }) {
     <div className="space-y-6">
 
 
-      {/* Contenido Principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Horas */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center mb-4">
-            <h4 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              <span>Horas</span>
-            </h4>
-          </div>
-          
-          <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
-            <div className="grid grid-cols-6 gap-2 p-3">
-              {horasFijas.map((hora) => (
-                <div
-                  key={hora.id}
-                  className="p-2 rounded-lg border-2 border-gray-200 bg-gray-50 text-center"
-                >
-                  <div className="text-sm font-semibold text-gray-700">{hora.nombre}</div>
-                </div>
-              ))}
+      {/* Nuevo diseño mejorado */}
+      <div className="space-y-6">
+        {/* Header con información */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Configuración de Orden de Asignación</h3>
+              <p className="text-gray-600">Selecciona las categorías musicales que se utilizarán en la programación</p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-blue-600">{categoriasDisponibles.length}</div>
+              <div className="text-sm text-gray-600">Categorías disponibles</div>
             </div>
           </div>
         </div>
 
-        {/* Categorías */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-              <Tag className="w-5 h-5 text-green-600" />
-              <span>Categorías</span>
-            </h4>
+        {/* Panel de categorías mejorado */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <Tag className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900">Categorías Musicales</h4>
+                  <p className="text-sm text-gray-600">Selecciona las categorías que deseas incluir</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{categoriasSeleccionadas.length}</div>
+                  <div className="text-xs text-gray-600">Seleccionadas</div>
+                </div>
+                <button
+                  onClick={() => setCategoriasSeleccionadas([])}
+                  className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                >
+                  Limpiar todo
+                </button>
+                <button
+                  onClick={() => setCategoriasSeleccionadas([...categoriasDisponibles])}
+                  className="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+                >
+                  Seleccionar todo
+                </button>
+              </div>
+            </div>
           </div>
           
-          <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg">
+          <div className="p-6">
             {loading ? (
-              <div className="flex items-center justify-center p-8">
+              <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
                 <span className="ml-3 text-gray-600">Cargando categorías...</span>
               </div>
             ) : (
-              <div className="space-y-2 p-3">
-                {categoriasDisponibles.map((categoria) => (
-                <button
-                  key={categoria.id}
-                  onClick={() => handleCategoriaToggle(categoria)}
-                  className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-left ${
-                    categoriasSeleccionadas.some(c => c.id === categoria.id)
-                      ? 'border-green-500 bg-green-50 text-green-700 shadow-sm'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{categoria.nombre}</span>
-                    {categoriasSeleccionadas.some(c => c.id === categoria.id) && (
-                      <Check className="w-4 h-4 text-green-600" />
-                    )}
-                  </div>
-                </button>
-                ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {/* Mostrar categorías disponibles */}
+                {categoriasDisponibles.map((categoria) => {
+                  // Si categoriasSeleccionadas contiene strings, comparar por nombre
+                  // Si contiene objetos, comparar por ID
+                  const isSelected = categoriasSeleccionadas.some(c => {
+                    if (typeof c === 'string') {
+                      return c === categoria.nombre;
+                    } else {
+                      return c.id === categoria.id;
+                    }
+                  });
+                  console.log(`🔍 Categoría ${categoria.nombre} (ID: ${categoria.id}) - ¿Está seleccionada?`, isSelected);
+                  console.log(`🔍 categoriasSeleccionadas:`, categoriasSeleccionadas);
+                  
+                  return (
+                    <button
+                      key={categoria.id}
+                      onClick={() => handleCategoriaToggle(categoria)}
+                      className={`group relative p-4 rounded-xl border-2 transition-all duration-200 text-left hover:shadow-md ${
+                        isSelected
+                          ? 'border-green-500 bg-green-50 text-green-700 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          isSelected
+                            ? 'bg-green-500'
+                            : 'bg-gray-300'
+                        }`}></div>
+                        <span className="font-medium text-sm">{categoria.nombre}</span>
+                      </div>
+                      {isSelected && (
+                        <Check className="w-4 h-4 text-green-600" />
+                      )}
+                    </div>
+                  </button>
+                  );
+                })}
+                
+                {/* Mostrar categorías seleccionadas que no están en disponibles (temporales) */}
+                {categoriasSeleccionadas
+                  .filter(cat => cat.temporal && !categoriasDisponibles.some(c => c.nombre === cat.nombre))
+                  .map((categoria) => (
+                    <button
+                      key={categoria.id}
+                      onClick={() => handleCategoriaToggle(categoria)}
+                      className="group relative p-4 rounded-xl border-2 border-orange-500 bg-orange-50 text-orange-700 shadow-sm transition-all duration-200 text-left hover:shadow-md"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                          <span className="font-medium text-sm">{categoria.nombre}</span>
+                          <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded-full">
+                            No disponible
+                          </span>
+                        </div>
+                        <Check className="w-4 h-4 text-orange-600" />
+                      </div>
+                    </button>
+                  ))}
               </div>
             )}
           </div>
-          
         </div>
       </div>
 
@@ -238,6 +343,10 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1 }) {
               {categoriasSeleccionadas.length === 0 ? 'Sin categorías' : 
                categoriasSeleccionadas.length === categoriasDisponibles.length ? 'Todas las categorías' : 
                `${categoriasSeleccionadas.length} categorías específicas`}
+            </div>
+            {/* Debug info */}
+            <div className="text-xs text-gray-400 mt-1">
+              Debug: {JSON.stringify(categoriasSeleccionadas.map(c => typeof c === 'string' ? c : c.nombre))}
             </div>
           </div>
         </div>

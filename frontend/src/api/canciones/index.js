@@ -3,7 +3,7 @@ import apiClient from '../client'
 // Obtener canciones con filtros
 export const getCanciones = async (params = {}) => {
   try {
-    const response = await apiClient.get('/categorias/canciones/', { params })
+    const response = await apiClient.get('/categorias/canciones', { params })
     return response.data
   } catch (error) {
     console.error('Error fetching canciones:', error)
@@ -25,7 +25,7 @@ export const getCancion = async (cancionId) => {
 // Crear nueva canción
 export const createCancion = async (cancionData) => {
   try {
-    const response = await apiClient.post('/categorias/canciones/', cancionData)
+    const response = await apiClient.post('/categorias/canciones', cancionData)
     return response.data
   } catch (error) {
     console.error('Error creating cancion:', error)
@@ -58,7 +58,7 @@ export const deleteCancion = async (cancionId) => {
 // Obtener estadísticas de canciones
 export const getCancionesStats = async () => {
   try {
-    const response = await apiClient.get('/categorias/canciones/stats/summary')
+    const response = await apiClient.get('/categorias/stats')
     return response.data
   } catch (error) {
     console.error('Error fetching canciones stats:', error)
@@ -69,8 +69,8 @@ export const getCancionesStats = async () => {
 // Obtener categorías únicas de las canciones
 export const getCategoriasCanciones = async () => {
   try {
-    const response = await apiClient.get('/categorias/canciones/categorias/unique')
-    return response.data
+    // Temporalmente devolver categorías hardcodeadas hasta que se implemente el endpoint
+    return ['Pop', 'Rock', 'Jazz', 'Balada', 'Salsa', 'Reggaeton']
   } catch (error) {
     console.error('Error fetching categorias:', error)
     throw error

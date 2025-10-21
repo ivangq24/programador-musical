@@ -16,7 +16,7 @@ import {
   RotateCcw,
   Scissors
 } from 'lucide-react'
-import { getCortes } from '../../../../api/catalogos/cortes'
+import { getCortes } from '../../../../api/catalogos/cortes/index'
 
 export default function EventosReloj({ onSave, onCancel, categoriasPolitica = [] }) {
   const [eventosReloj, setEventosReloj] = useState([])

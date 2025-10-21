@@ -321,7 +321,7 @@ export default function Difusoras({ onDifusoraSelect }) {
                 </svg>
                 <p className="text-blue-800 text-sm font-medium">
                   {error ? 
-                    `Error: ${error}` :
+                    `Error: ${error.message || error}` :
                     showOnlyActive && searchTerm ? 
                     `Mostrando difusoras activas que coinciden con "${searchTerm}" (${filteredDifusoras.length} de ${difusoras.length})` :
                     showOnlyActive ? 
@@ -482,7 +482,7 @@ export default function Difusoras({ onDifusoraSelect }) {
             </h3>
             <p className="text-gray-500 mb-6 max-w-md mx-auto">
               {error ? 
-                `Error: ${error}. Intenta recargar la página.` :
+                `Error: ${error.message || error}. Intenta recargar la página.` :
                 searchTerm ? 
                 `No se encontraron difusoras que coincidan con "${searchTerm}". Intenta con otros términos de búsqueda.` : 
                 showOnlyActive ? 

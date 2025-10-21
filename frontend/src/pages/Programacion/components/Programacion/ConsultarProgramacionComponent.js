@@ -69,6 +69,13 @@ const ConsultarProgramacionComponent = ({
       setLoading(true)
       setError(null)
       
+      console.log('🔍 ConsultarProgramacionComponent - Parámetros recibidos:', {
+        isOpen,
+        difusora,
+        politica,
+        fecha
+      })
+      
       // Convertir fecha de YYYY-MM-DD a DD/MM/YYYY
       let fechaFormateada
       if (fecha && fecha.includes('-')) {
@@ -90,14 +97,23 @@ const ConsultarProgramacionComponent = ({
         fecha: fechaFormateada
       })
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/programacion/programacion-detallada?${params}`)
+      console.log('🔍 URL completa:', `http://localhost:8000/api/v1/programacion/programacion-detallada?${params}`)
+      
+      const response = await fetch(`http://localhost:8000/api/v1/programacion/programacion-detallada?${params}`)
+      
+      console.log('🔍 Response status:', response.status)
+      console.log('🔍 Response ok:', response.ok)
       
       if (response.ok) {
         const data = await response.json()
         setProgramacion(data)
         console.log('✅ Programación detallada cargada:', data)
+        console.log('✅ Total eventos:', data.total_eventos)
+        console.log('✅ Programación array length:', data.programacion ? data.programacion.length : 'undefined')
       } else {
-        throw new Error('Error al cargar programación')
+        const errorData = await response.json()
+        console.error('❌ Error response:', errorData)
+        throw new Error(`Error al cargar programación: ${errorData.detail || response.statusText}`)
       }
       
     } catch (err) {
@@ -154,7 +170,7 @@ const ConsultarProgramacionComponent = ({
       const categoriaId = categoriaMap[categoria] || categoria
       console.log('🔍 Categoria ID:', categoriaId)
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categorias/canciones/?categoria_id=${categoriaId}&activa=true`)
+      const response = await fetch(`http://localhost:8000/api/v1/categorias/canciones/?categoria_id=${categoriaId}&activa=true`)
       console.log('🔍 Response status:', response.status)
       
       if (response.ok) {
@@ -264,7 +280,7 @@ const ConsultarProgramacionComponent = ({
           <div className="mt-4 bg-blue-500 rounded-lg p-3">
             <div className="flex items-center space-x-2">
               <div className="flex space-x-1">
-                {programacion?.eventos?.slice(0, 20).map((evento, index) => (
+                {programacion?.programacion?.slice(0, 20).map((evento, index) => (
                   <div
                     key={index}
                     className={`w-2 h-6 rounded-sm ${
@@ -277,7 +293,7 @@ const ConsultarProgramacionComponent = ({
                 ))}
               </div>
               <span className="text-blue-100 text-sm">
-                {programacion?.eventos?.length || 0} eventos
+                {programacion?.programacion?.length || 0} eventos
               </span>
             </div>
           </div>
@@ -329,7 +345,7 @@ const ConsultarProgramacionComponent = ({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {!programacion?.eventos || programacion.eventos.length === 0 ? (
+                    {!programacion?.programacion || programacion.programacion.length === 0 ? (
                       <tr>
                         <td colSpan="13" className="px-6 py-8 text-center">
                           <div className="text-gray-400">
@@ -338,7 +354,7 @@ const ConsultarProgramacionComponent = ({
                           </div>
                         </td>
                       </tr>
-                    ) : programacion?.eventos?.map((evento, index) => (
+                    ) : programacion?.programacion?.map((evento, index) => (
                       <tr 
                         key={evento.id}
                         className={`hover:bg-gray-50 ${
@@ -412,10 +428,10 @@ const ConsultarProgramacionComponent = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-6">
                     <span className="text-sm">
-                      Total Eventos ({programacion?.eventos?.length || 0})
+                      Total Eventos ({programacion?.programacion?.length || 0})
                     </span>
                     <span className="text-sm">
-                      Cortes Comerciales ({programacion?.eventos?.filter(e => e.tipo === 'corte_comercial').length || 0})
+                      Cortes Comerciales ({programacion?.programacion?.filter(e => e.tipo === 'corte_comercial').length || 0})
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">

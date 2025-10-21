@@ -22,8 +22,8 @@ import {
   AlertCircle
 } from 'lucide-react'
 import FormularioCancion from './FormularioCancion'
-import { getCanciones, createCancion, updateCancion, deleteCancion, getCancionesStats } from '../../../../api/canciones'
-import { getDifusoras } from '../../../../api/difusoras'
+import { getCanciones, createCancion, updateCancion, deleteCancion, getCancionesStats } from '../../../../api/canciones/index'
+import { getDifusoras } from '../../../../api/difusoras/index'
 
 export default function SimpleMantenimientoCanciones() {
   const [canciones, setCanciones] = useState([])
@@ -35,7 +35,7 @@ export default function SimpleMantenimientoCanciones() {
   const [selectedClasificaciones, setSelectedClasificaciones] = useState(['Balada', 'Pop'])
   const [sortBy, setSortBy] = useState('titulo')
   const [sortOrder, setSortOrder] = useState('asc')
-  const [showFilters, setShowFilters] = useState(true)
+  const [showFilters, setShowFilters] = useState(false)
   const [stats, setStats] = useState({ total_canciones: 7, canciones_activas: 7, canciones_inactivas: 0 })
   const [selectedCanciones, setSelectedCanciones] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
@@ -357,7 +357,7 @@ export default function SimpleMantenimientoCanciones() {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">Difusoras</h3>
                 </div>
-                <div className="max-h-40 overflow-y-auto space-y-2">
+                <div className="max-h-40 overflow-y-auto space-y-2 filter-panel">
                   {difusoras.map((difusora) => (
                     <label key={difusora.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/50 transition-colors cursor-pointer">
                       <input
@@ -389,7 +389,7 @@ export default function SimpleMantenimientoCanciones() {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">Categorías</h3>
                 </div>
-                <div className="max-h-40 overflow-y-auto space-y-2">
+                <div className="max-h-40 overflow-y-auto space-y-2 filter-panel">
                   {categorias.map((categoria) => (
                     <label key={categoria} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/50 transition-colors cursor-pointer">
                       <input
@@ -421,7 +421,7 @@ export default function SimpleMantenimientoCanciones() {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">Clasificaciones</h3>
                 </div>
-                <div className="max-h-40 overflow-y-auto space-y-2">
+                <div className="max-h-40 overflow-y-auto space-y-2 filter-panel">
                   {clasificaciones.map((clasificacion) => (
                     <label key={clasificacion} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/50 transition-colors cursor-pointer">
                       <input
@@ -490,10 +490,16 @@ export default function SimpleMantenimientoCanciones() {
       </div>
 
       {/* Data Table Moderna */}
-      <div className="bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl mx-6 my-6 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-white/95 backdrop-blur-sm shadow-xl rounded-2xl mx-6 my-6 overflow-hidden relative">
+        {/* Indicador de scroll */}
+        {filteredCanciones.length > 5 && (
+          <div className="absolute top-2 right-2 z-20 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+            {filteredCanciones.length} canciones
+          </div>
+        )}
+        <div className="overflow-x-auto max-h-80 overflow-y-auto allow-scroll data-table">
           <table className="min-w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-4 text-left">
                   <input

@@ -12,15 +12,25 @@ class PoliticaProgramacion(Base):
     id = Column(Integer, primary_key=True, index=True)
     clave = Column(String(50), unique=True, nullable=False, index=True)
     difusora = Column(String(10), nullable=False, index=True)
+    nombre = Column(String(200), nullable=False)
+    descripcion = Column(Text)
     habilitada = Column(Boolean, default=True)
     guid = Column(String(50), unique=True)
     categorias_seleccionadas = Column(Text, comment="IDs de categorías separados por comas")
+    # Días modelo por defecto para cada día de la semana (IDs de dias_modelo)
+    lunes = Column(Integer, ForeignKey("dias_modelo.id"), nullable=True)
+    martes = Column(Integer, ForeignKey("dias_modelo.id"), nullable=True)
+    miercoles = Column(Integer, ForeignKey("dias_modelo.id"), nullable=True)
+    jueves = Column(Integer, ForeignKey("dias_modelo.id"), nullable=True)
+    viernes = Column(Integer, ForeignKey("dias_modelo.id"), nullable=True)
+    sabado = Column(Integer, ForeignKey("dias_modelo.id"), nullable=True)
+    domingo = Column(Integer, ForeignKey("dias_modelo.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relaciones
     relojes = relationship("Reloj", back_populates="politica", cascade="all, delete-orphan")
-    dias_modelo = relationship("DiaModelo", back_populates="politica", cascade="all, delete-orphan")
+    dias_modelo = relationship("DiaModelo", back_populates="politica", cascade="all, delete-orphan", foreign_keys="DiaModelo.politica_id")
 
 class Reloj(Base):
     __tablename__ = "relojes"
@@ -97,7 +107,7 @@ class DiaModelo(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relaciones
-    politica = relationship("PoliticaProgramacion", back_populates="dias_modelo")
+    politica = relationship("PoliticaProgramacion", back_populates="dias_modelo", foreign_keys="DiaModelo.politica_id")
     relojes_dia_modelo = relationship("RelojDiaModelo", back_populates="dia_modelo", cascade="all, delete-orphan")
 
 class RelojDiaModelo(Base):
@@ -114,7 +124,7 @@ class RelojDiaModelo(Base):
     reloj = relationship("Reloj", back_populates="relojes_dia_modelo")
 
 class SetRegla(Base):
-    __tablename__ = "set_reglas"
+    __tablename__ = "sets_reglas"
     
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100), nullable=False)
@@ -130,7 +140,7 @@ class Regla(Base):
     __tablename__ = "reglas"
     
     id = Column(Integer, primary_key=True, index=True)
-    set_regla_id = Column(Integer, ForeignKey("set_reglas.id", ondelete="CASCADE"))
+    set_regla_id = Column(Integer, ForeignKey("sets_reglas.id", ondelete="CASCADE"))
     nombre = Column(String(100), nullable=False)
     descripcion = Column(Text)
     tipo = Column(String(50), nullable=False)
@@ -170,6 +180,7 @@ class Programacion(Base):
     fecha = Column(Date, nullable=False, comment="Fecha de programación")
     reloj_id = Column(Integer, ForeignKey("relojes.id", ondelete="CASCADE"))
     evento_reloj_id = Column(Integer, ForeignKey("eventos_reloj.id", ondelete="CASCADE"))
+    dia_modelo_id = Column(Integer, ForeignKey("dias_modelo.id", ondelete="CASCADE"), comment="Día modelo usado para generar la programación")
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

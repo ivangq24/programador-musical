@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { validateCSV, importCanciones, downloadCSVTemplate } from '../../../../api/import-csv'
+import { validateCSV, importCanciones, downloadCSVTemplate } from '../../../../api/import-csv/index'
 import { 
   Upload, 
   FileText, 

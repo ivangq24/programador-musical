@@ -91,7 +91,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
+    <div className="h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 overflow-hidden">
       {/* Enhanced Navigation */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="px-6">
@@ -128,8 +128,8 @@ export default function Home() {
       </nav>
 
       {/* Content Area */}
-      <main className="relative">
-        <div className="transition-opacity duration-300 ease-in-out">
+      <main className="relative h-full overflow-hidden">
+        <div className="transition-opacity duration-300 ease-in-out h-full">
           {renderTabContent()}
         </div>
       </main>

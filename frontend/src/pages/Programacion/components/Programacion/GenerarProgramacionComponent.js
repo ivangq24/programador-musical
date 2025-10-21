@@ -73,6 +73,7 @@ export default function GenerarProgramacionComponent() {
   const [loadingSetReglas, setLoadingSetReglas] = useState(false)
   const [diasModelo, setDiasModelo] = useState([])
   const [programacionData, setProgramacionData] = useState([])
+  const [dataVersion, setDataVersion] = useState(0) // Para forzar re-render cuando cambie el día modelo
   const [showConsultarModal, setShowConsultarModal] = useState(false)
   const [fechaConsultar, setFechaConsultar] = useState(null)
   const [showOverwriteModal, setShowOverwriteModal] = useState(false)
@@ -129,6 +130,17 @@ export default function GenerarProgramacionComponent() {
 
   // Check if date picker should be enabled
   const isDatePickerEnabled = difusora && politica
+
+  // Filter políticas based on selected difusora
+  const getFilteredPoliticas = () => {
+    if (!difusora) {
+      return politicas // Show all if no difusora selected
+    }
+    
+    return politicas.filter(p => 
+      p.difusora === difusora || p.difusora === 'TODAS'
+    )
+  }
 
   // Format date range for display
   const getDateRangeDisplay = () => {
@@ -339,31 +351,53 @@ export default function GenerarProgramacionComponent() {
     }
   }, [politica])
 
-  // Actualizar días modelo por defecto cuando cambien los días modelo disponibles
+  // Clear política when difusora changes and current política is not available for new difusora
   useEffect(() => {
-    if (diasModelo.length > 0 && programacionData.length > 0) {
-      const diasActualizados = programacionData.map(dia => {
-        // Solo actualizar si no tiene día modelo asignado
-        if (!dia.diaModelo) {
-          const diaModeloPorDefecto = getDiaModeloPorDefecto(dia.dia)
-          if (diaModeloPorDefecto) {
-            console.log(`🔄 Actualizando día modelo por defecto para ${dia.dia}: ${diaModeloPorDefecto}`)
-            return { ...dia, diaModelo: diaModeloPorDefecto }
-          }
-        }
-        return dia
-      })
+    if (difusora && politica) {
+      const filteredPoliticas = getFilteredPoliticas()
+      const currentPoliticaExists = filteredPoliticas.some(p => p.id === parseInt(politica))
       
-      // Solo actualizar si hay cambios
-      const hayCambios = diasActualizados.some((dia, index) => 
-        dia.diaModelo !== programacionData[index].diaModelo
-      )
-      
-      if (hayCambios) {
-        setProgramacionData(diasActualizados)
+      if (!currentPoliticaExists) {
+        console.log('🔄 Difusora cambió, limpiando política seleccionada')
+        setPolitica('')
       }
     }
-  }, [diasModelo])
+  }, [difusora])
+
+  // COMENTADO: No asignar días modelo automáticamente
+  // El usuario debe seleccionar explícitamente el día modelo para cada día
+  // useEffect(() => {
+  //   if (diasModelo.length > 0 && programacionData.length > 0) {
+  //     const diasActualizados = programacionData.map(dia => {
+  //       // Solo actualizar si no tiene día modelo asignado
+  //       if (!dia.diaModelo) {
+  //         const diaModeloPorDefecto = getDiaModeloPorDefecto(dia.dia)
+  //         if (diaModeloPorDefecto) {
+  //           console.log(`🔄 Actualizando día modelo por defecto para ${dia.dia}: ${diaModeloPorDefecto}`)
+  //           return { ...dia, diaModelo: diaModeloPorDefecto }
+  //         }
+  //       }
+  //       return dia
+  //     })
+  //     
+  //     // Solo actualizar si hay cambios
+  //     const hayCambios = diasActualizados.some((dia, index) => 
+  //       dia.diaModelo !== programacionData[index].diaModelo
+  //     )
+  //     
+  //     if (hayCambios) {
+  //       setProgramacionData(diasActualizados)
+  //     }
+  //   }
+  // }, [diasModelo])
+
+  // Debug: Log cuando cambie programacionData
+  useEffect(() => {
+    if (programacionData.length > 0) {
+      console.log('🔄 programacionData actualizado:', programacionData[0]?.diaModelo);
+      console.log('🔄 Estado completo del primer día:', programacionData[0]);
+    }
+  }, [programacionData])
 
   // Función para cargar el día de hoy automáticamente
   const cargarHoy = () => {
@@ -383,6 +417,15 @@ export default function GenerarProgramacionComponent() {
       const filasSeleccionadas = programacionData.filter(row => row.selected)
       if (filasSeleccionadas.length === 0) {
         showNotification('Debe seleccionar al menos un día para generar programación', 'warning')
+        return
+      }
+      
+      // Verificar que todos los días seleccionados tengan un día modelo asignado
+      const diasSinDiaModelo = filasSeleccionadas.filter(row => !row.diaModelo || row.diaModelo.trim() === '')
+      if (diasSinDiaModelo.length > 0) {
+        const fechasSinDiaModelo = diasSinDiaModelo.map(dia => dia.fecha).join(', ')
+        showNotification(`Los siguientes días no tienen día modelo seleccionado: ${fechasSinDiaModelo}. Debe seleccionar un día modelo para cada día antes de generar la programación.`, 'error')
+        setLoading(false)
         return
       }
       
@@ -410,11 +453,20 @@ export default function GenerarProgramacionComponent() {
         fecha_fin: convertirFecha(fechaFin)
       })
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/programacion/generar-programacion-completa?${params}`, {
+      // Preparar los días modelo seleccionados para enviar al backend
+      const diasModeloSeleccionados = filasSeleccionadas.map(dia => ({
+        fecha: dia.fecha,
+        dia_modelo: dia.diaModelo
+      }))
+      
+      const response = await fetch(`http://localhost:8000/api/v1/programacion/generar-programacion-completa?${params}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          dias_modelo: diasModeloSeleccionados
+        })
       })
       
       if (!response.ok) {
@@ -430,8 +482,8 @@ export default function GenerarProgramacionComponent() {
       await handleCargarDias(false)
       console.log('✅ Días recargados después de generación')
       
-      // Obtener estadísticas actualizadas de la programación generada
-      await cargarEstadisticasProgramacion()
+      // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
+      // await cargarEstadisticasProgramacion()
       
     } catch (err) {
       console.error('Error al generar programación:', err)
@@ -460,11 +512,50 @@ export default function GenerarProgramacionComponent() {
         fecha_fin: convertirFecha(fechaFin)
       })
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/programacion/generar-programacion-completa?${params}`, {
+      // Obtener las filas seleccionadas
+      const filasSeleccionadas = programacionData.filter(row => row.selected)
+      
+      // Preparar los días modelo seleccionados para enviar al backend
+      console.log('🔍 DEBUG: selectedDiaModelo from modal:', selectedDiaModelo)
+      console.log('🔍 DEBUG: diasModelo array:', diasModelo)
+      console.log('🔍 DEBUG: filasSeleccionadas:', filasSeleccionadas)
+      
+      const diasModeloSeleccionados = filasSeleccionadas.map(dia => {
+        // Si se seleccionó un día modelo diferente en el modal, usar ese
+        // Si no, usar el día modelo actual de la fila
+        let diaModeloNombre = dia.diaModelo
+        
+        console.log('🔍 DEBUG: Processing day:', dia.fecha, 'current diaModelo:', dia.diaModelo)
+        
+        if (selectedDiaModelo && selectedDiaModelo !== '') {
+          console.log('🔍 DEBUG: selectedDiaModelo is not empty, looking for ID:', selectedDiaModelo)
+          const diaModeloSeleccionado = diasModelo.find(dm => dm.id.toString() === selectedDiaModelo)
+          console.log('🔍 DEBUG: diaModeloSeleccionado found:', diaModeloSeleccionado)
+          if (diaModeloSeleccionado) {
+            diaModeloNombre = diaModeloSeleccionado.nombre
+            console.log('🔍 DEBUG: Using selected day model name:', diaModeloNombre)
+          }
+        } else {
+          console.log('🔍 DEBUG: No selectedDiaModelo, using current:', diaModeloNombre)
+        }
+        
+        return {
+          fecha: dia.fecha,
+          dia_modelo: diaModeloNombre
+        }
+      })
+      
+      console.log('🔍 DEBUG: Días modelo seleccionados para enviar:', diasModeloSeleccionados)
+      console.log('🔍 DEBUG: selectedDiaModelo:', selectedDiaModelo)
+      
+      const response = await fetch(`http://localhost:8000/api/v1/programacion/generar-programacion-completa?${params}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          dias_modelo: diasModeloSeleccionados
+        })
       })
       
       if (!response.ok) {
@@ -480,8 +571,8 @@ export default function GenerarProgramacionComponent() {
       await handleCargarDias(false)
       console.log('✅ Días recargados después de regeneración')
       
-      // Obtener estadísticas actualizadas de la programación generada
-      await cargarEstadisticasProgramacion()
+      // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
+      // await cargarEstadisticasProgramacion()
       
     } catch (err) {
       console.error('Error al regenerar programación:', err)
@@ -499,54 +590,8 @@ export default function GenerarProgramacionComponent() {
     setLoading(false)
   }
 
-  // Función para cargar estadísticas de programación
-  const cargarEstadisticasProgramacion = async () => {
-    try {
-      if (!difusora || !politica) return
-      
-      // Convertir fechas de YYYY-MM-DD a DD/MM/YYYY para el backend
-      const convertirFecha = (fechaYYYYMMDD) => {
-        const [year, month, day] = fechaYYYYMMDD.split('-')
-        return `${day}/${month}/${year}`
-      }
-      
-      const params = new URLSearchParams({
-        difusora: difusora,
-        politica_id: politica,
-        fecha_inicio: convertirFecha(fechaInicio),
-        fecha_fin: convertirFecha(fechaFin)
-      })
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/programacion/programacion-estadisticas?${params}`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        
-        // Actualizar los datos de la tabla con las estadísticas reales
-        const diasActualizados = programacionData.map(dia => {
-          const estadistica = data.dias_estadisticas.find(stat => stat.fecha === dia.fecha)
-          if (estadistica) {
-            return {
-              ...dia,
-              status: "Con Programación",
-              eventos: estadistica.num_eventos,
-              canciones: estadistica.num_canciones,
-              asignadas: estadistica.num_asignadas,
-              porcentaje: estadistica.porcentaje,
-              mc: estadistica.minutos_comerciales
-            }
-          }
-          return dia
-        })
-        
-        setProgramacionData(diasActualizados)
-        console.log('✅ Estadísticas de programación actualizadas:', data)
-      }
-      
-    } catch (err) {
-      console.error('Error al cargar estadísticas de programación:', err)
-    }
-  }
+  // FUNCIÓN ELIMINADA: cargarEstadisticasProgramacion
+  // Ya no es necesaria porque handleCargarDias ya actualiza las estadísticas correctamente
 
   const handleCargarDias = async (showNotification = true) => {
     try {
@@ -570,23 +615,41 @@ export default function GenerarProgramacionComponent() {
         fecha_inicio: convertirFecha(fechaInicio),
         fecha_fin: convertirFecha(fechaFin),
         difusora: difusora,
-        ...(politica && { politica_id: politica })
+        ...(politica && { politica_id: politica }),
+        _t: Date.now() // Timestamp para evitar caché
       })
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/programacion/dias-simple?${params}`)
+      const response = await fetch(`http://localhost:8000/api/v1/programacion/dias-simple?${params}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      })
       const data = await response.json()
+      
+      console.log('🔍 Respuesta completa del backend:', data)
       
       if (response.ok) {
         // Convertir datos de la API al formato esperado por el componente
         const diasConvertidos = data.dias.map((dia, index) => {
           console.log('🔍 Día modelo recibido del backend:', dia.dia_modelo);
+          console.log('🔍 Status del día:', dia.status);
           
-          // Si no hay día modelo asignado, aplicar el día modelo por defecto según el día de la semana
-          let diaModeloAsignado = dia.dia_modelo || ''
-          if (!diaModeloAsignado) {
-            diaModeloAsignado = getDiaModeloPorDefecto(dia.dia_semana)
-            console.log(`🎯 Aplicando día modelo por defecto para ${dia.dia_semana}: ${diaModeloAsignado}`)
+          // Usar el día modelo que viene del backend si ya existe programación
+          // Si no hay programación, usar el día modelo por defecto de la política
+          let diaModeloAsignado = ''
+          if (dia.status === 'Con Programación' && dia.dia_modelo) {
+            diaModeloAsignado = dia.dia_modelo
+            console.log('✅ Asignando día modelo del backend (con programación):', diaModeloAsignado);
+          } else if (dia.status !== 'Con Programación' && dia.dia_modelo) {
+            // Usar el día modelo por defecto de la política
+            diaModeloAsignado = dia.dia_modelo
+            console.log('✅ Asignando día modelo por defecto de la política:', diaModeloAsignado);
+          } else {
+            console.log('⚠️ No hay día modelo disponible - Status:', dia.status, 'Día modelo:', dia.dia_modelo);
           }
+          // Si no hay programación, NO asignar automáticamente
+          // El usuario debe seleccionar explícitamente el día modelo
           
           return {
             id: index + 1,
@@ -607,6 +670,7 @@ export default function GenerarProgramacionComponent() {
         })
         
         setProgramacionData(diasConvertidos)
+        setDataVersion(prev => prev + 1) // Incrementar versión para forzar re-render
         setTotalDays(diasConvertidos.length)
         setSelectedDays(0)
         
@@ -615,6 +679,8 @@ export default function GenerarProgramacionComponent() {
         }
         console.log('✅ Días cargados desde API:', diasConvertidos)
         console.log('📊 Días con programación:', diasConvertidos.filter(d => d.status === 'Con Programación').length)
+        console.log('🔍 Día modelo en el estado:', diasConvertidos[0]?.diaModelo);
+        console.log('🔍 Estado completo del primer día:', diasConvertidos[0]);
       } else {
         throw new Error(data.detail || 'Error al cargar días')
       }
@@ -717,7 +783,7 @@ export default function GenerarProgramacionComponent() {
         const [dia, mes, año] = fila.fecha.split('/')
         const fechaFormateada = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/programacion/eliminar-programacion`, {
+        const response = await fetch(`http://localhost:8000/api/v1/programacion/eliminar-programacion`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -738,7 +804,8 @@ export default function GenerarProgramacionComponent() {
       
       // Recargar días
       await handleCargarDias(false)
-      await cargarEstadisticasProgramacion()
+      // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
+      // await cargarEstadisticasProgramacion()
       
     } catch (err) {
       console.error('Error eliminando programación:', err)
@@ -776,7 +843,7 @@ export default function GenerarProgramacionComponent() {
     const fechaParaImpresion = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
     
     // Abrir ventana de impresión
-    const url = `${process.env.NEXT_PUBLIC_API_URL}/programacion/carta-tiempo?difusora=${difusora}&politica_id=${politica}&fecha=${fechaParaImpresion}`
+    const url = `http://localhost:8000/api/v1/programacion/carta-tiempo?difusora=${difusora}&politica_id=${politica}&fecha=${fechaParaImpresion}`
     window.open(url, '_blank')
     
     showNotification('Abriendo carta de tiempo para impresión...', 'info')
@@ -798,7 +865,7 @@ export default function GenerarProgramacionComponent() {
         const [dia, mes, año] = fila.fecha.split('/')
         const fechaFormateada = `${dia}/${mes}/${año}` // Formato DD/MM/YYYY para el endpoint
         
-        const url = `${process.env.NEXT_PUBLIC_API_URL}/programacion/generar-logfile?difusora=${difusora}&politica_id=${politica}&fecha=${fechaFormateada}`
+        const url = `http://localhost:8000/api/v1/programacion/generar-logfile?difusora=${difusora}&politica_id=${politica}&fecha=${fechaFormateada}`
         
         // Abrir el log file en una nueva ventana para descarga
         window.open(url, '_blank')
@@ -820,6 +887,7 @@ export default function GenerarProgramacionComponent() {
         row.id === id ? { ...row, selected: !row.selected } : row
       )
     )
+    setDataVersion(prev => prev + 1) // Incrementar versión para forzar re-render
   }
 
   const handleSelectAll = () => {
@@ -827,6 +895,7 @@ export default function GenerarProgramacionComponent() {
     setProgramacionData(prev => 
       prev.map(row => ({ ...row, selected: !allSelected }))
     )
+    setDataVersion(prev => prev + 1) // Incrementar versión para forzar re-render
   }
 
   // Calculate stats
@@ -839,7 +908,7 @@ export default function GenerarProgramacionComponent() {
     totalEvents: programacionData.reduce((sum, row) => sum + row.eventos, 0),
     totalSongs: programacionData.reduce((sum, row) => sum + row.canciones, 0),
     avgPercentage: programacionData.length > 0 ? 
-      (programacionData.reduce((sum, row) => sum + row.porcentaje, 0) / programacionData.length).toFixed(1) : 0
+      (programacionData.reduce((sum, row) => sum + row.porcentaje, 0) / programacionData.length).toFixed(2) : 0
   }
 
   // Update selected days count
@@ -1083,7 +1152,14 @@ export default function GenerarProgramacionComponent() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Política</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Política
+                  {difusora && (
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({getFilteredPoliticas().length} disponible{getFilteredPoliticas().length !== 1 ? 's' : ''})
+                    </span>
+                  )}
+                </label>
                 <div className="relative">
                   <select 
                     value={politica} 
@@ -1093,12 +1169,12 @@ export default function GenerarProgramacionComponent() {
                   >
                     {loadingPoliticas ? (
                       <option value="">Cargando políticas...</option>
-                    ) : politicas.length === 0 ? (
-                      <option value="">No hay políticas disponibles</option>
+                    ) : getFilteredPoliticas().length === 0 ? (
+                      <option value="">No hay políticas disponibles para esta difusora</option>
                     ) : (
                       <>
                         <option value="">Seleccionar política...</option>
-                        {politicas.map(p => (
+                        {getFilteredPoliticas().map(p => (
                           <option key={p.id} value={p.id}>
                             {p.clave} ({p.difusora})
                           </option>
@@ -1371,7 +1447,7 @@ export default function GenerarProgramacionComponent() {
             <tbody className="bg-white divide-y divide-gray-200">
               {programacionData.map((row, index) => (
                 <tr 
-                  key={row.id} 
+                  key={`${row.fecha}-${row.diaModelo}-${row.eventos}-v${dataVersion}`} 
                   className={`hover:bg-green-50 transition-all duration-200 cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${row.selected ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
                   onClick={(e) => {
                     // Prevenir la selección si se hace clic en el checkbox o en un select
@@ -1395,9 +1471,9 @@ export default function GenerarProgramacionComponent() {
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.fecha}</td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{row.dia}</td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    {row.diaModelo && row.status === 'Con Programación' ? (
+                    {row.status === 'Con Programación' ? (
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                        {row.diaModelo}
+                        {row.diaModelo || 'Sin día modelo'}
                       </span>
                     ) : (
                       <select
@@ -1410,6 +1486,7 @@ export default function GenerarProgramacionComponent() {
                               : item
                           )
                           setProgramacionData(newData)
+                          setDataVersion(prev => prev + 1) // Incrementar versión para forzar re-render
                         }}
                         onClick={(e) => e.stopPropagation()} // Prevenir propagación en el clic también
                         className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
@@ -1460,7 +1537,7 @@ export default function GenerarProgramacionComponent() {
                           style={{ width: `${Math.min(row.porcentaje, 100)}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs font-medium text-gray-600">{row.porcentaje}%</span>
+                      <span className="text-xs font-medium text-gray-600">{row.porcentaje.toFixed(2)}%</span>
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">

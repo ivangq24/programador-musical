@@ -3,7 +3,7 @@ import apiClient from '../client'
 // Validar datos del CSV antes de la importación
 export const validateCSV = async (csvData) => {
   try {
-    const response = await apiClient.post('/programacion/importcsv/validate-csv', csvData)
+    const response = await apiClient.post('/categorias/validate-csv', csvData)
     return response.data
   } catch (error) {
     console.error('Error validating CSV:', error)
@@ -14,7 +14,7 @@ export const validateCSV = async (csvData) => {
 // Importar canciones desde CSV
 export const importCanciones = async (csvData) => {
   try {
-    const response = await apiClient.post('/programacion/importcsv/import-canciones', csvData)
+    const response = await apiClient.post('/categorias/import-canciones', csvData)
     return response.data
   } catch (error) {
     console.error('Error importing canciones:', error)
@@ -25,7 +25,7 @@ export const importCanciones = async (csvData) => {
 // Obtener plantilla CSV
 export const getCSVTemplate = async () => {
   try {
-    const response = await apiClient.get('/programacion/importcsv/template')
+    const response = await apiClient.get('/categorias/template')
     return response.data
   } catch (error) {
     console.error('Error getting CSV template:', error)
@@ -36,7 +36,7 @@ export const getCSVTemplate = async () => {
 // Obtener reglas de validación
 export const getValidationRules = async () => {
   try {
-    const response = await apiClient.get('/programacion/importcsv/validation-rules')
+    const response = await apiClient.get('/categorias/validation-rules')
     return response.data
   } catch (error) {
     console.error('Error getting validation rules:', error)
@@ -47,7 +47,7 @@ export const getValidationRules = async () => {
 // Descargar plantilla CSV
 export const downloadCSVTemplate = async () => {
   try {
-    const response = await apiClient.get('/programacion/importcsv/template')
+    const response = await apiClient.get('/categorias/template')
     const { csv_content, filename } = response.data
     
     // Crear y descargar archivo

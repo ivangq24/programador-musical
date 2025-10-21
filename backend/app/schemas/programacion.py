@@ -2,12 +2,30 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime, time, date
 
+# Schema para días modelo seleccionados
+class DiaModeloSeleccionado(BaseModel):
+    fecha: str
+    dia_modelo: str
+
+class GenerarProgramacionRequest(BaseModel):
+    dias_modelo: List[DiaModeloSeleccionado]
+
 # Base schemas
 class PoliticaProgramacionBase(BaseModel):
     clave: str
     difusora: str
+    nombre: str
+    descripcion: Optional[str] = None
     habilitada: bool = True
     guid: Optional[str] = None
+    # Días modelo por defecto para cada día de la semana
+    lunes: Optional[int] = None
+    martes: Optional[int] = None
+    miercoles: Optional[int] = None
+    jueves: Optional[int] = None
+    viernes: Optional[int] = None
+    sabado: Optional[int] = None
+    domingo: Optional[int] = None
 
 class PoliticaProgramacionCreate(PoliticaProgramacionBase):
     pass
@@ -15,12 +33,23 @@ class PoliticaProgramacionCreate(PoliticaProgramacionBase):
 class PoliticaProgramacionUpdate(BaseModel):
     clave: Optional[str] = None
     difusora: Optional[str] = None
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
     habilitada: Optional[bool] = None
     guid: Optional[str] = None
+    # Días modelo por defecto para cada día de la semana
+    lunes: Optional[int] = None
+    martes: Optional[int] = None
+    miercoles: Optional[int] = None
+    jueves: Optional[int] = None
+    viernes: Optional[int] = None
+    sabado: Optional[int] = None
+    domingo: Optional[int] = None
 
 class PoliticaProgramacion(PoliticaProgramacionBase):
     id: int
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -77,20 +77,29 @@ export default function PoliticasProgramacion() {
   // Cargar categorías seleccionadas al inicializar el componente
   useEffect(() => {
     const loadCategoriasSeleccionadas = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/v1/categorias/canciones/politica/1/categorias');
-        const data = await response.json();
-        if (data.categorias && data.categorias.length > 0) {
-          setCategoriasSeleccionadas(data.categorias);
-          console.log('🔍 Categorías cargadas desde la DB:', data.categorias);
-        }
-      } catch (error) {
-        console.error('Error cargando categorías seleccionadas:', error);
-      }
+      // No cargar categorías automáticamente - se cargarán cuando se edite una política específica
+      console.log('ℹ️ Inicializando sin categorías pre-seleccionadas');
+      setCategoriasSeleccionadas([]);
     };
     
     loadCategoriasSeleccionadas();
   }, []);
+
+  // Controlar el scroll del body cuando cualquier modal esté abierto
+  useEffect(() => {
+    if (showForm || showRelojForm) {
+      // Bloquear el scroll del body
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restaurar el scroll del body
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup: restaurar el scroll cuando el componente se desmonte
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showForm, showRelojForm]);
 
   // ===== FUNCIONES AUXILIARES =====
   
@@ -135,13 +144,16 @@ export default function PoliticasProgramacion() {
       // Mapear datos de la API al formato esperado por el componente
       const politicasMapeadas = data.map(politica => ({
         id: politica.id,
-        nombre: politica.clave,
-        descripcion: `Política para ${politica.difusora}`,
+        clave: politica.clave,
+        nombre: politica.nombre,
+        descripcion: politica.descripcion || `Política para ${politica.difusora}`,
         habilitada: politica.habilitada,
         tipo: 'General',
         prioridad: 'Media',
-        fechaCreacion: politica.created_at ? new Date(politica.created_at).toLocaleDateString() : 'N/A',
-        ultimaModificacion: politica.updated_at ? new Date(politica.updated_at).toLocaleDateString() : 'N/A',
+        fechaCreacion: politica.created_at ? new Date(politica.created_at).toLocaleDateString('es-ES') : 'N/A',
+        ultimaModificacion: politica.updated_at ? new Date(politica.updated_at).toLocaleDateString('es-ES') : 'N/A',
+        alta: politica.created_at ? new Date(politica.created_at).toLocaleDateString('es-ES') : 'N/A',
+        modificacion: politica.updated_at ? new Date(politica.updated_at).toLocaleDateString('es-ES') : 'N/A',
         difusora: politica.difusora,
         guid: politica.guid
       }));
@@ -164,6 +176,8 @@ export default function PoliticasProgramacion() {
       console.log('🔄 Cargando días modelo para política ID:', politicaId);
       const diasModeloData = await diasModeloApi.getByPolitica(politicaId);
       console.log('✅ Días modelo cargados desde API:', diasModeloData);
+      console.log('🔍 IDs de días modelo disponibles:', diasModeloData.map(d => ({ id: d.id, nombre: d.nombre })));
+      console.log('🔍 Días modelo completos:', diasModeloData);
       setDiasModelo(diasModeloData);
     } catch (err) {
       console.error('❌ Error loading días modelo:', err);
@@ -438,7 +452,20 @@ export default function PoliticasProgramacion() {
   };
 
   const handleEdit = async (politica) => {
-    setSelectedPolitica(politica);
+    console.log('🔍 handleEdit - Política seleccionada:', politica);
+    console.log('🔍 handleEdit - Clave de la política:', politica.clave);
+    console.log('🔍 handleEdit - Nombre de la política:', politica.nombre);
+    
+    try {
+      // Obtener los datos completos de la política
+      const politicaCompleta = await politicasApi.getById(politica.id);
+      console.log('🔍 handleEdit - Política completa obtenida:', politicaCompleta);
+      setSelectedPolitica(politicaCompleta);
+    } catch (error) {
+      console.error('❌ Error al obtener política completa:', error);
+      setSelectedPolitica(politica);
+    }
+    
     setFormMode('edit');
     setShowForm(true);
     // Cargar relojes de la política
@@ -458,7 +485,7 @@ export default function PoliticasProgramacion() {
     if (window.confirm(`¿Está seguro de eliminar la política "${politica?.nombre}"?`)) {
       try {
         setLoading(true);
-        await deletePolitica(id);
+        await politicasApi.delete(id);
         showNotification('Política eliminada correctamente', 'success');
         await loadPoliticas();
       } catch (err) {
@@ -477,11 +504,17 @@ export default function PoliticasProgramacion() {
   const handleSave = async (politicaData) => {
     try {
       setLoading(true);
+      console.log('🔍 handleSave - Datos a enviar:', politicaData);
+      console.log('🔍 handleSave - Modo:', formMode);
+      console.log('🔍 handleSave - ID de política:', selectedPolitica?.id);
+      
       if (formMode === 'edit') {
-        await updatePolitica(selectedPolitica.id, politicaData);
+        console.log('🔍 handleSave - Actualizando política ID:', selectedPolitica.id);
+        await politicasApi.update(selectedPolitica.id, politicaData);
         showNotification('Política actualizada correctamente', 'success');
       } else {
-        await createPolitica(politicaData);
+        console.log('🔍 handleSave - Creando nueva política');
+        await politicasApi.create(politicaData);
         showNotification('Política creada correctamente', 'success');
       }
       
@@ -636,18 +669,29 @@ export default function PoliticasProgramacion() {
   };
 
   const handleSaveReloj = async (relojData) => {
+    console.log('🔍 handleSaveReloj - INICIO');
+    console.log('🔍 handleSaveReloj - relojData recibido:', relojData);
+    console.log('🔍 handleSaveReloj - relojFormMode:', relojFormMode);
+    console.log('🔍 handleSaveReloj - selectedPolitica:', selectedPolitica);
+    
     try {
       setLoading(true);
       
       let relojId;
       
       if (relojFormMode === 'new') {
+        console.log('🔍 handleSaveReloj - Modo: CREAR NUEVO RELOJ');
         // Crear nuevo reloj
         if (!selectedPolitica || !selectedPolitica.id) {
           throw new Error('No se ha seleccionado una política válida');
         }
         
+        console.log('🔍 handleSaveReloj - Llamando a relojesApi.create...');
+        console.log('🔍 handleSaveReloj - politicaId:', selectedPolitica.id);
+        console.log('🔍 handleSaveReloj - relojData:', relojData);
+        
         const newReloj = await relojesApi.create(selectedPolitica.id, relojData);
+        console.log('✅ handleSaveReloj - Reloj creado exitosamente:', newReloj);
         relojId = newReloj.id;
         setNotification({ type: 'success', message: 'Reloj creado exitosamente' });
       } else {
@@ -1326,7 +1370,7 @@ export default function PoliticasProgramacion() {
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 min-h-screen overflow-y-auto allow-scroll">
       {/* Notification Component */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md transition-all duration-300 ${
@@ -1359,13 +1403,26 @@ export default function PoliticasProgramacion() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-indigo-50">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Políticas de Programación</h1>
-              <p className="text-sm text-gray-600 mt-1">Administra las políticas de programación musical</p>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 sticky top-0 z-10">
+        {/* Header Moderno */}
+        <div className="px-8 py-8 border-b border-gray-200/50 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 relative overflow-hidden">
+          {/* Elementos decorativos de fondo */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-200/30 to-indigo-200/30 rounded-full -translate-y-16 translate-x-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-blue-200/30 to-purple-200/30 rounded-full translate-y-12 -translate-x-12"></div>
+          
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 relative z-10">
+            <div className="flex items-center space-x-6">
+              <div className="p-4 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-purple-800 to-indigo-800 bg-clip-text text-transparent">
+                  Políticas de Programación
+                </h1>
+                <p className="text-gray-600 mt-2 text-lg">Administra las políticas de programación musical</p>
+              </div>
             </div>
             
             {/* Action Buttons */}
@@ -1462,92 +1519,115 @@ export default function PoliticasProgramacion() {
 
         {/* Content */}
         {viewMode === 'tarjetas' ? (
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 max-h-[calc(100vh-300px)] overflow-y-auto allow-scroll">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filteredPoliticas.map((politica) => (
-                <div key={politica.id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200">
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${politica.habilitada ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                        <h3 className="text-lg font-semibold text-gray-900">{politica.nombre}</h3>
+                <div key={politica.id} className="group bg-white border border-gray-200/50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105">
+                  <div className="p-8">
+                    {/* Header con gradiente */}
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-4 h-4 rounded-full shadow-lg ${politica.habilitada ? 'bg-gradient-to-r from-green-400 to-green-600' : 'bg-gradient-to-r from-red-400 to-red-600'}`}></div>
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900 group-hover:text-purple-700 transition-colors">{politica.nombre}</h3>
+                          <p className="text-sm text-gray-500 mt-1">Política de Programación</p>
+                        </div>
                       </div>
-                      <div className="flex space-x-1">
+                      <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <button
                           onClick={() => handleView(politica)}
-                          className="p-2 text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200"
+                          className="p-3 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-500 hover:to-blue-600 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-110"
                           title="Ver detalles"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
                         <button
                           onClick={() => handleEdit(politica)}
-                          className="p-2 text-yellow-600 hover:text-yellow-900 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-all duration-200"
+                          className="p-3 text-green-600 hover:text-white bg-green-50 hover:bg-gradient-to-r hover:from-green-500 hover:to-green-600 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-110"
                           title="Editar"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
                         <button
                           onClick={() => handleDelete(politica.id)}
-                          className="p-2 text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200"
+                          className="p-3 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 rounded-xl transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-110"
                           title="Eliminar"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
                       </div>
                     </div>
                     
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="font-medium text-gray-600">Clave:</span>
-                          <p className="text-gray-900">{politica.clave}</p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-600">Difusora:</span>
-                          <p className="text-gray-900">{politica.difusora}</p>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <span className="font-medium text-gray-600">Habilitada:</span>
-                        <div className="flex items-center mt-1">
-                          <input
-                            type="checkbox"
-                            checked={politica.habilitada}
-                            readOnly
-                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                          />
-                          <span className="ml-2 text-sm text-gray-900">
-                            {politica.habilitada ? 'Sí' : 'No'}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <span className="font-medium text-gray-600">GUID:</span>
-                        <p className="text-gray-900 text-xs font-mono">{politica.guid}</p>
-                      </div>
-                      
-                      <div>
-                        <span className="font-medium text-gray-600">Descripción:</span>
-                        <p className="text-gray-900">{politica.descripcion || 'Sin descripción'}</p>
-                      </div>
-                      
-                      <div className="pt-3 border-t border-gray-200">
-                        <div className="grid grid-cols-1 gap-2 text-xs text-gray-500">
-                          <div>
-                            <span className="font-medium">Alta:</span> {politica.alta}
+                    {/* Contenido principal con diseño moderno */}
+                    <div className="space-y-6">
+                      {/* Información principal */}
+                      <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-4 border border-gray-100">
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <span className="text-sm font-medium text-gray-600">Clave</span>
+                            </div>
+                            <span className="font-bold text-gray-900 bg-white px-3 py-1 rounded-lg shadow-sm">{politica.clave}</span>
                           </div>
-                          <div>
-                            <span className="font-medium">Modificación:</span> {politica.modificacion}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                              <span className="text-sm font-medium text-gray-600">Difusora</span>
+                            </div>
+                            <span className="font-semibold text-purple-700 bg-purple-50 px-3 py-1 rounded-lg">{politica.difusora}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-2 h-2 rounded-full ${politica.habilitada ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              <span className="text-sm font-medium text-gray-600">Estado</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-3 h-3 rounded-full ${politica.habilitada ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              <span className={`font-semibold ${politica.habilitada ? 'text-green-700' : 'text-red-700'}`}>
+                                {politica.habilitada ? 'Activa' : 'Inactiva'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Descripción */}
+                      {politica.descripcion && (
+                        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-100">
+                          <div className="flex items-start space-x-3">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+                            <div>
+                              <span className="text-sm font-medium text-gray-600 block">Descripción</span>
+                              <p className="mt-1 text-sm text-gray-700 leading-relaxed">{politica.descripcion}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Fechas */}
+                      <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-4 border border-gray-100">
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                            <span className="text-gray-500">Alta:</span>
+                            <span className="font-medium text-gray-700">
+                              {politica.alta || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                            <span className="text-gray-500">Modificación:</span>
+                            <span className="font-medium text-gray-700">
+                              {politica.modificacion || 'N/A'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1663,7 +1743,7 @@ export default function PoliticasProgramacion() {
             </h3>
             <p className="text-gray-500 mb-6 max-w-md mx-auto">
               {error ? 
-                `Error: ${error}. Intenta recargar la página.` :
+                `Error: ${error.message || error}. Intenta recargar la página.` :
                 searchTerm ? 
                 `No se encontraron políticas que coincidan con "${searchTerm}". Intenta con otros términos de búsqueda.` : 
                 showOnlyActive ? 
@@ -1696,8 +1776,9 @@ export default function PoliticasProgramacion() {
                   setFormMode('new');
                 }}
                 relojes={relojes}
-                onCategoriasSaved={handleCategoriasSaved}
                 categoriasSeleccionadas={categoriasSeleccionadas}
+                setCategoriasSeleccionadas={setCategoriasSeleccionadas}
+                onCategoriasSaved={handleCategoriasSaved}
                 activeTab={politicaFormActiveTab}
                 setActiveTab={setPoliticaFormActiveTab}
                 diasModelo={diasModelo}
@@ -1719,6 +1800,7 @@ export default function PoliticasProgramacion() {
                 calculateTotalDuration={calculateTotalDuration}
                 getSelectedRelojEvents={getSelectedRelojEvents}
                 getSelectedRelojDuration={getSelectedRelojDuration}
+                politicas={politicas}
               />
             )}
 
@@ -1860,7 +1942,7 @@ export default function PoliticasProgramacion() {
           const loadCortes = async () => {
             setLoadingCortes(true);
             try {
-              const response = await fetch('http://localhost:8000/api/v1/catalogos/cortes/?activo=true');
+              const response = await fetch('http://localhost:8000/api/v1/catalogos/general/cortes/?activo=true');
               const data = await response.json();
               setCortes(data.cortes || []);
               console.log('🔍 RelojForm - Cortes cargados:', data.cortes);
@@ -1963,7 +2045,14 @@ export default function PoliticasProgramacion() {
         };
 
         const handleSubmit = async () => {
-          if (!validateForm()) return;
+          console.log('🔍 RelojForm - handleSubmit INICIO');
+          console.log('🔍 RelojForm - formData actual:', formData);
+          console.log('🔍 RelojForm - relojEvents:', relojEvents);
+          
+          if (!validateForm()) {
+            console.log('❌ RelojForm - Validación falló');
+            return;
+          }
           
           setIsLoading(true);
           try {
@@ -1977,9 +2066,11 @@ export default function PoliticasProgramacion() {
             };
             
             console.log('📦 DATOS A ENVIAR AL BACKEND:', JSON.stringify(relojDataForBackend, null, 2));
+            console.log('🔍 RelojForm - Llamando a onSave...');
             
             // Llamar a la función onSave del componente padre
             await onSave(relojDataForBackend);
+            console.log('✅ RelojForm - onSave completado exitosamente');
           } catch (error) {
             console.error('Error en RelojForm handleSubmit:', error);
           } finally {
@@ -2017,7 +2108,7 @@ export default function PoliticasProgramacion() {
           switch (activeTab) {
             case 0: // Datos generales
               return (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <input 
                       type="checkbox" 
@@ -2030,7 +2121,7 @@ export default function PoliticasProgramacion() {
                     <label className="text-sm font-medium text-gray-700">Reloj habilitado</label>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Clave *</label>
                       <input 
@@ -2290,16 +2381,16 @@ export default function PoliticasProgramacion() {
                             <span className="text-sm font-medium text-gray-700">Canciones</span>
                           </div>
                           <div className="space-y-1 ml-6">
-                            {categoriasSeleccionadas.map((cancion, index) => (
+                            {categoriasSeleccionadas.map((categoria, index) => (
                               <div 
                                 key={index} 
-                                onClick={() => onPredefinedEventClick('canciones', cancion)}
+                                onClick={() => onPredefinedEventClick('canciones', typeof categoria === 'string' ? categoria : categoria.nombre)}
                                 className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
                               >
                                 <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                                 </svg>
-                                <span>{cancion}</span>
+                                <span>{typeof categoria === 'string' ? categoria : categoria.nombre}</span>
                               </div>
                             ))}
                           </div>
@@ -2972,39 +3063,39 @@ export default function PoliticasProgramacion() {
         };
 
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-            <div className="bg-white border border-gray-300 shadow-lg w-[95vw] max-w-[1400px] h-[95vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+            <div className="bg-white border border-gray-300 shadow-lg w-[90vw] max-w-[1000px] h-[85vh] overflow-hidden flex flex-col rounded-lg" onClick={(e) => e.stopPropagation()}>
               {/* Window Header */}
-              <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center">
+              <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                  <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                  <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-red-400 rounded-full"></div>
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                  <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                 </div>
-                <div className="flex items-center space-x-4">
-                  <h1 className="text-lg font-semibold text-gray-800">{title}</h1>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-lg font-semibold text-white">{title}</h1>
+                  <div className="flex items-center space-x-1 text-sm text-purple-100">
                     <span>Políticas</span>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                     <span>Relojes</span>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                    <span className="text-purple-600 font-medium">{title}</span>
+                    <span className="text-purple-200 font-medium">{title}</span>
                   </div>
                   {!isReadOnly && (
                     <div className="flex items-center space-x-2 text-xs">
                       <div className={`px-2 py-1 rounded-full ${
-                        mode === 'new' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                        mode === 'new' ? 'bg-blue-200 text-blue-900' : 'bg-green-200 text-green-900'
                       }`}>
                         {mode === 'new' ? 'Nuevo' : 'Edición'}
                       </div>
                     </div>
                   )}
                 </div>
-                <button onClick={onCancel} className="text-gray-600 hover:text-gray-800 transition-colors">
+                <button onClick={onCancel} className="text-white hover:text-purple-200 transition-colors p-1 rounded hover:bg-purple-600">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -3013,19 +3104,19 @@ export default function PoliticasProgramacion() {
               
               {/* Tabs Navigation */}
               <div className="bg-white border-b border-gray-200">
-                <div className="flex space-x-1 overflow-x-auto">
+                <div className="flex space-x-0 overflow-x-auto">
                   {tabs.map((tab) => (
                     <button 
                       key={tab.id} 
                       onClick={() => setActiveTab(tab.id)} 
-                      className={`group flex items-center space-x-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
+                      className={`group flex items-center space-x-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
                         activeTab === tab.id 
                           ? "text-purple-700 bg-purple-50 border-b-2 border-purple-600" 
                           : "text-gray-600 hover:text-purple-600 hover:bg-purple-50/50"
                       }`}
                     >
                       {tab.icon}
-                      <span className="font-semibold">{tab.name}</span>
+                      <span className="font-medium">{tab.name}</span>
                     </button>
                   ))}
                 </div>
@@ -3037,7 +3128,7 @@ export default function PoliticasProgramacion() {
               </div>
               
               {/* Footer with Action Buttons */}
-              <div className="bg-gray-50 border-t border-gray-300 px-6 py-4 flex justify-between items-center">
+              <div className="bg-gray-50 border-t border-gray-300 px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center space-x-2">
                   {!isReadOnly && hasUnsavedChanges && (
                     <div className="flex items-center space-x-2 text-orange-600 text-sm">
@@ -3048,12 +3139,12 @@ export default function PoliticasProgramacion() {
                     </div>
                   )}
                 </div>
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
                   <button 
                     type="button" 
                     onClick={onCancel} 
                     disabled={isLoading} 
-                    className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -3065,7 +3156,7 @@ export default function PoliticasProgramacion() {
                       type="button" 
                       onClick={handleSubmit} 
                       disabled={isLoading} 
-                      className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
                     >
                       {isLoading ? (
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -3823,8 +3914,9 @@ export default function PoliticasProgramacion() {
   onSave, 
   onCancel, 
   onNewReloj,
-  onCategoriasSaved,
   categoriasSeleccionadas,
+  setCategoriasSeleccionadas,
+  onCategoriasSaved,
   activeTab: propActiveTab,
   setActiveTab: propSetActiveTab,
   relojes,
@@ -3846,7 +3938,8 @@ export default function PoliticasProgramacion() {
   relojEvents,
   calculateTotalDuration,
   getSelectedRelojEvents,
-  getSelectedRelojDuration
+  getSelectedRelojDuration,
+  politicas
 }) {
   
   const [isLoading, setIsLoading] = useState(false);
@@ -3896,21 +3989,133 @@ export default function PoliticasProgramacion() {
     reglas: politica?.reglas || [],
     ordenAsignacion: politica?.ordenAsignacion || [],
     relojes: politica?.relojes || [],
-    diasModelo: politica?.diasModelo || []
+    diasModelo: politica?.diasModelo || [],
+    // Días modelo por defecto para cada día de la semana
+    lunes: politica?.lunes ? String(politica.lunes) : '',
+    martes: politica?.martes ? String(politica.martes) : '',
+    miercoles: politica?.miercoles ? String(politica.miercoles) : '',
+    jueves: politica?.jueves ? String(politica.jueves) : '',
+    viernes: politica?.viernes ? String(politica.viernes) : '',
+    sabado: politica?.sabado ? String(politica.sabado) : '',
+    domingo: politica?.domingo ? String(politica.domingo) : ''
   });
+
+  // Estado para difusoras
+  const [difusoras, setDifusoras] = useState([]);
+
+  // Cargar difusoras al inicializar el componente
+  useEffect(() => {
+    loadDifusoras();
+  }, []);
+
+  // Actualizar formData cuando cambie la política
+  useEffect(() => {
+    if (politica) {
+      console.log('🔍 Política recibida en PoliticaForm:', politica);
+      console.log('🔍 Clave de la política:', politica.clave);
+      console.log('🔍 Nombre de la política:', politica.nombre);
+      console.log('🔍 Descripción de la política:', politica.descripcion);
+      
+      setFormData({
+        clave: politica.clave || '',
+        difusora: politica.difusora || '',
+        nombre: politica.nombre || '',
+        descripcion: politica.descripcion || '',
+        habilitada: politica.habilitada ?? true,
+        setsReglas: politica.setsReglas || [],
+        reglas: politica.reglas || [],
+        ordenAsignacion: politica.ordenAsignacion || [],
+        relojes: politica.relojes || [],
+        diasModelo: politica.diasModelo || [],
+        // Días modelo por defecto para cada día de la semana
+        lunes: politica.lunes ? String(politica.lunes) : '',
+        martes: politica.martes ? String(politica.martes) : '',
+        miercoles: politica.miercoles ? String(politica.miercoles) : '',
+        jueves: politica.jueves ? String(politica.jueves) : '',
+        viernes: politica.viernes ? String(politica.viernes) : '',
+        sabado: politica.sabado ? String(politica.sabado) : '',
+        domingo: politica.domingo ? String(politica.domingo) : ''
+      });
+      
+      console.log('🔍 FormData días modelo asignados:', {
+        lunes: politica.lunes ? String(politica.lunes) : '',
+        martes: politica.martes ? String(politica.martes) : '',
+        miercoles: politica.miercoles ? String(politica.miercoles) : '',
+        jueves: politica.jueves ? String(politica.jueves) : '',
+        viernes: politica.viernes ? String(politica.viernes) : '',
+        sabado: politica.sabado ? String(politica.sabado) : '',
+        domingo: politica.domingo ? String(politica.domingo) : ''
+      });
+      console.log('🔍 Valores específicos para formData:', {
+        lunes: politica.lunes ? String(politica.lunes) : '',
+        miercoles: politica.miercoles ? String(politica.miercoles) : ''
+      });
+      
+      console.log('🔍 FormData actualizado:', {
+        clave: politica.clave || '',
+        difusora: politica.difusora || '',
+        nombre: politica.nombre || '',
+        descripcion: politica.descripcion || ''
+      });
+      console.log('🔍 Días modelo por defecto desde DB:', {
+        lunes: politica.lunes,
+        martes: politica.martes,
+        miercoles: politica.miercoles,
+        jueves: politica.jueves,
+        viernes: politica.viernes,
+        sabado: politica.sabado,
+        domingo: politica.domingo
+      });
+      console.log('🔍 Valores específicos:', {
+        lunes: politica.lunes,
+        miercoles: politica.miercoles
+      });
+      console.log('🔍 Tipos de datos:', {
+        lunes: typeof politica.lunes,
+        martes: typeof politica.martes,
+        miercoles: typeof politica.miercoles,
+        jueves: typeof politica.jueves,
+        viernes: typeof politica.viernes,
+        sabado: typeof politica.sabado,
+        domingo: typeof politica.domingo
+      });
+      console.log('🔍 Difusoras disponibles:', difusoras);
+      console.log('🔍 Valor de difusora de la política:', politica.difusora);
+      console.log('🔍 ¿Existe la difusora en las opciones?', difusoras.some(d => d.value === politica.difusora));
+    }
+  }, [politica, difusoras]);
 
   const isReadOnly = mode === 'view';
   const title = mode === 'new' ? 'Nueva Política' : 
                mode === 'edit' ? 'Editar Política' : 
                'Consultar Política';
 
-  // Mock data para difusoras
-  const difusoras = [
-    { value: 'XRAD', label: 'XRAD' },
-    { value: 'XHPER', label: 'XHPER' },
-    { value: 'XHGR', label: 'XHGR' },
-    { value: 'XHOZ', label: 'XHOZ' }
-  ];
+  // Cargar difusoras desde la API
+  const loadDifusoras = async () => {
+    try {
+      console.log('🔍 Cargando difusoras desde API...');
+      const response = await fetch('http://localhost:8000/api/v1/catalogos/general/difusoras/');
+      const data = await response.json();
+      console.log('✅ Difusoras cargadas desde API:', data);
+      
+      // Mapear datos de la API al formato esperado por el select
+      const difusorasMapeadas = data.map(difusora => ({
+        value: difusora.siglas,
+        label: `${difusora.siglas} - ${difusora.nombre}`
+      }));
+      
+      // Agregar opción especial para "Todas las difusoras"
+      const difusorasConTodas = [
+        { value: 'TODAS', label: 'Todas las difusoras' },
+        ...difusorasMapeadas
+      ];
+      
+      setDifusoras(difusorasConTodas);
+    } catch (err) {
+      console.error('❌ Error cargando difusoras:', err);
+      setDifusoras([]);
+    }
+  };
 
   const tabs = [
     { 
@@ -3975,6 +4180,15 @@ export default function PoliticasProgramacion() {
     
     if (!formData.clave || formData.clave.trim() === '') {
       newErrors.clave = 'La clave es obligatoria';
+    } else {
+      // Verificar si la clave ya existe en otra política
+      const claveExistente = politicas.find(p => 
+        p.clave === formData.clave.trim() && 
+        p.id !== politica?.id
+      );
+      if (claveExistente) {
+        newErrors.clave = `La clave "${formData.clave.trim()}" ya existe en la política "${claveExistente.nombre || claveExistente.difusora}"`;
+      }
     }
     
     if (!formData.difusora || formData.difusora.trim() === '') {
@@ -3998,7 +4212,32 @@ export default function PoliticasProgramacion() {
     setIsLoading(true);
     
     try {
-      await onSave(formData);
+      console.log('🔍 FormData antes de enviar:', formData);
+      
+      // Convertir cadenas vacías a null para los días modelo
+      const formDataToSend = {
+        ...formData,
+        lunes: formData.lunes === '' ? null : formData.lunes,
+        martes: formData.martes === '' ? null : formData.martes,
+        miercoles: formData.miercoles === '' ? null : formData.miercoles,
+        jueves: formData.jueves === '' ? null : formData.jueves,
+        viernes: formData.viernes === '' ? null : formData.viernes,
+        sabado: formData.sabado === '' ? null : formData.sabado,
+        domingo: formData.domingo === '' ? null : formData.domingo
+      };
+      
+      console.log('🔍 FormData después de limpiar:', formDataToSend);
+      console.log('🔍 Días modelo en formDataToSend:', {
+        lunes: formDataToSend.lunes,
+        martes: formDataToSend.martes,
+        miercoles: formDataToSend.miercoles,
+        jueves: formDataToSend.jueves,
+        viernes: formDataToSend.viernes,
+        sabado: formDataToSend.sabado,
+        domingo: formDataToSend.domingo
+      });
+      
+      await onSave(formDataToSend);
     } catch (err) {
       console.error('Error in form submission:', err);
     } finally {
@@ -4075,16 +4314,21 @@ export default function PoliticasProgramacion() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Difusora *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="difusora"
                     value={formData.difusora || ''}
                     onChange={handleChange}
-                    readOnly={isReadOnly}
-                    className={inputClass}
+                    disabled={isReadOnly}
+                    className={selectClass}
                     required={!isReadOnly}
-                    placeholder="Ej: RADIO_1"
-                  />
+                  >
+                    <option value="">Seleccionar difusora</option>
+                    {difusoras.map((difusora) => (
+                      <option key={difusora.value} value={difusora.value}>
+                        {difusora.label}
+                      </option>
+                    ))}
+                  </select>
                   {errors.difusora && (
                     <p className="mt-1 text-sm text-red-600">{errors.difusora}</p>
                   )}
@@ -4164,7 +4408,9 @@ export default function PoliticasProgramacion() {
       case 3: // Orden de asignación
         return (
           <OrdenAsignacion 
-            politicaId={1} // ID fijo por ahora, en una implementación real vendría del estado
+            politicaId={politica?.id || 1} // Usar el ID de la política actual
+            categoriasSeleccionadas={categoriasSeleccionadas}
+            setCategoriasSeleccionadas={setCategoriasSeleccionadas}
             onSave={onCategoriasSaved}
             onCancel={() => {
               // Cerrar el modal o volver a la vista anterior
