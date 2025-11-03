@@ -263,55 +263,6 @@ class RelojDiaModelo(RelojDiaModeloBase):
     class Config:
         from_attributes = True
 
-# Set Regla schemas
-class SetReglaBase(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-    habilitado: bool = True
-
-class SetReglaCreate(SetReglaBase):
-    pass
-
-class SetReglaUpdate(BaseModel):
-    nombre: Optional[str] = None
-    descripcion: Optional[str] = None
-    habilitado: Optional[bool] = None
-
-class SetRegla(SetReglaBase):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-# Regla schemas
-class ReglaBase(BaseModel):
-    set_regla_id: int
-    nombre: str
-    descripcion: Optional[str] = None
-    tipo: str
-    parametros: Optional[Dict[str, Any]] = None
-    habilitada: bool = True
-    orden: int = 0
-
-class ReglaCreate(ReglaBase):
-    pass
-
-class ReglaUpdate(BaseModel):
-    set_regla_id: Optional[int] = None
-    nombre: Optional[str] = None
-    descripcion: Optional[str] = None
-    tipo: Optional[str] = None
-    parametros: Optional[Dict[str, Any]] = None
-    habilitada: Optional[bool] = None
-    orden: Optional[int] = None
-
-class Regla(ReglaBase):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 # Orden Asignación schemas
 class OrdenAsignacionBase(BaseModel):
@@ -349,14 +300,11 @@ class RelojConEventos(Reloj):
 class PoliticaCompleta(PoliticaProgramacion):
     relojes: List[RelojConEventos] = []
     dias_modelo: List[DiaModelo] = []
-    sets_reglas: List[SetRegla] = []
     orden_asignacion: List[OrdenAsignacion] = []
 
 class DiaModeloConRelojes(DiaModelo):
     relojes_relacion: List[RelojDiaModelo] = []
 
-class SetReglaConReglas(SetRegla):
-    reglas: List[Regla] = []
 
 # Schemas para estadísticas
 class PoliticasStats(BaseModel):
@@ -441,4 +389,63 @@ class ProgramacionStats(BaseModel):
     por_categoria: Dict[str, int]
     mc_completados: int
     mc_pendientes: int
+
+
+# Reglas schemas
+class SeparacionReglaBase(BaseModel):
+    valor: str
+    separacion: int
+
+class SeparacionReglaCreate(SeparacionReglaBase):
+    pass
+
+class SeparacionReglaUpdate(BaseModel):
+    valor: Optional[str] = None
+    separacion: Optional[int] = None
+
+class SeparacionRegla(SeparacionReglaBase):
+    id: int
+    regla_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ReglaBase(BaseModel):
+    politica_id: int
+    tipo_regla: str
+    caracteristica: str
+    tipo_separacion: str
+    descripcion: Optional[str] = None
+    horario: bool = False
+    solo_verificar_dia: bool = False
+    habilitada: bool = True
+
+class ReglaCreate(ReglaBase):
+    separaciones: List[SeparacionReglaCreate] = []
+
+class ReglaUpdate(BaseModel):
+    tipo_regla: Optional[str] = None
+    caracteristica: Optional[str] = None
+    tipo_separacion: Optional[str] = None
+    descripcion: Optional[str] = None
+    horario: Optional[bool] = None
+    solo_verificar_dia: Optional[bool] = None
+    habilitada: Optional[bool] = None
+    separaciones: Optional[List[SeparacionReglaCreate]] = None
+
+class Regla(ReglaBase):
+    id: int
+    separaciones: List[SeparacionRegla] = []
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ReglaConSeparaciones(Regla):
+    separaciones: List[SeparacionRegla] = []
+
+    class Config:
+        from_attributes = True
 

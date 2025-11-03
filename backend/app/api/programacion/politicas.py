@@ -7,9 +7,7 @@ from app.models.programacion import (
     Reloj as RelojModel, 
     EventoReloj as EventoRelojModel, 
     DiaModelo as DiaModeloModel, 
-    RelojDiaModelo as RelojDiaModeloModel, 
-    SetRegla as SetReglaModel, 
-    Regla as ReglaModel
+    RelojDiaModelo as RelojDiaModeloModel
 )
 from app.schemas.programacion import (
     PoliticaProgramacionCreate, PoliticaProgramacionUpdate, PoliticaProgramacion,
@@ -17,8 +15,6 @@ from app.schemas.programacion import (
     EventoRelojCreate, EventoRelojUpdate, EventoReloj,
     DiaModeloCreate, DiaModeloUpdate, DiaModelo,
     RelojDiaModeloCreate, RelojDiaModeloUpdate, RelojDiaModelo,
-    SetReglaCreate, SetReglaUpdate, SetRegla,
-    ReglaCreate, ReglaUpdate, Regla,
     OrdenAsignacionCreate, OrdenAsignacionUpdate, OrdenAsignacion,
     PoliticaCompleta, PoliticasStats, RelojesStats
 )

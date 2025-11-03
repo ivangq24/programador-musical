@@ -1,5 +1,5 @@
 # Dockerfile optimizado para DESARROLLO
-FROM postgres:17
+FROM postgres:15-alpine
 
 # Establecer variables de entorno para desarrollo
 ENV POSTGRES_DB=programador-musical
@@ -8,8 +8,8 @@ ENV POSTGRES_PASSWORD=postgres
 ENV POSTGRES_INITDB_ARGS="--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
 
 # Instalar herramientas adicionales para desarrollo
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+RUN apk update \
+    && apk add --no-cache \
         postgresql-contrib \
         postgresql-client \
         vim \
@@ -18,9 +18,7 @@ RUN apt-get update \
         procps \
         less \
         nano \
-        git \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+        git
 
 # Crear directorio para logs de desarrollo
 RUN mkdir -p /var/log/postgresql

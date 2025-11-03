@@ -69,33 +69,4 @@ async def get_difusoras_stats(db: Session = Depends(get_db)):
         logger.error(f"Error al obtener estadísticas de difusoras: {str(e)}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-@router.get("/general/tipos-clasificacion")
-async def get_tipos_clasificacion(db: Session = Depends(get_db)):
-    """Obtener tipos de clasificación"""
-    return {"message": "Hello World - Tipos de Clasificación", "data": []}
-
-@router.get("/general/clasificaciones")
-async def get_clasificaciones(db: Session = Depends(get_db)):
-    """Obtener clasificaciones"""
-    return {"message": "Hello World - Clasificaciones", "data": []}
-
-@router.get("/general/interpretes")
-async def get_interpretes(db: Session = Depends(get_db)):
-    """Obtener intérpretes"""
-    return {"message": "Hello World - Intérpretes", "data": []}
-
-@router.get("/general/personas")
-async def get_personas(db: Session = Depends(get_db)):
-    """Obtener personas"""
-    return {"message": "Hello World - Personas", "data": []}
-
-@router.get("/general/sellos-discograficos")
-async def get_sellos_discograficos(db: Session = Depends(get_db)):
-    """Obtener sellos discográficos"""
-    return {"message": "Hello World - Sellos Discográficos", "data": []}
-
-@router.get("/general/dayparts")
-async def get_dayparts(db: Session = Depends(get_db)):
-    """Obtener dayparts"""
-    return {"message": "Hello World - Dayparts", "data": []}
 

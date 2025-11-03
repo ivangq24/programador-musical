@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { PoliticasSection, ProgramacionSection, LogfilesSection } from './components/ProgramacionSections'
-import { PoliticasProgramacion, ReporteReglasComponent } from './components/Politicas'
+import { PoliticasProgramacion } from './components/Politicas'
 import { GenerarProgramacionComponent } from './components/Programacion'
 import { GenerarLogfilesComponent } from './components/Logfiles'
 import SimplePage from './components/SimplePage'
@@ -50,12 +50,6 @@ export default function ProgramacionPage() {
         return <PoliticasProgramacion />
       case 'generar-programacion':
         return <GenerarProgramacionComponent />
-      case 'reporte-reglas':
-        return <SimplePage title="REPORTE DE REGLAS" color="purple" />
-      case 'grupos-reglas':
-        return <SimplePage title="GRUPOS DE REGLAS" color="yellow" />
-      case 'grupos-relojes':
-        return <SimplePage title="GRUPOS DE RELOJES" color="orange" />
       case 'generar-logfiles':
         return <GenerarLogfilesComponent />
       default:
@@ -77,8 +71,8 @@ export default function ProgramacionPage() {
       </div>
       
       {/* Contenido principal */}
-      <div className="relative z-10 h-full flex items-center justify-center p-6">
-        <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="relative z-10 h-full flex items-center justify-center p-5">
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-5 h-full max-h-[calc(100vh-120px)]">
           <PoliticasSection onItemClick={handleItemClick} />
           <ProgramacionSection onItemClick={handleItemClick} />
           <LogfilesSection onItemClick={handleItemClick} />

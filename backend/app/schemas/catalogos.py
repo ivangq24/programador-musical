@@ -31,46 +31,4 @@ class Difusora(DifusoraBase):
     class Config:
         from_attributes = True
 
-# Tipo Clasificación schemas
-class TipoClasificacionBase(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-    activo: bool = True
-
-class TipoClasificacionCreate(TipoClasificacionBase):
-    pass
-
-class TipoClasificacionUpdate(TipoClasificacionBase):
-    nombre: Optional[str] = None
-    activo: Optional[bool] = None
-
-class TipoClasificacion(TipoClasificacionBase):
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
-# Clasificación schemas
-class ClasificacionBase(BaseModel):
-    nombre: str
-    tipo_id: Optional[int] = None
-    descripcion: Optional[str] = None
-    activa: bool = True
-
-class ClasificacionCreate(ClasificacionBase):
-    pass
-
-class ClasificacionUpdate(ClasificacionBase):
-    nombre: Optional[str] = None
-    activa: Optional[bool] = None
-
-class Clasificacion(ClasificacionBase):
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 

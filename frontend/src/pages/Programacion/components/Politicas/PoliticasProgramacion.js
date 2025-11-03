@@ -1,18 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   politicasApi, 
   diasModeloApi, 
   relojesApi, 
   eventosRelojApi 
 } from '../../../../api/programacion/politicasApi';
+import {
+  getReglasByPolitica,
+  createRegla,
+  updateRegla,
+  deleteRegla
+} from '../../../../api/reglas';
+import { guardarCategoriasPolitica } from '../../../../api/canciones';
 import OrdenAsignacion from './OrdenAsignacion'
 import EventosReloj from './EventosReloj';
 
 export default function PoliticasProgramacion() {
-  // Estado para políticas de programación
+  // Estado para políticas de programación - cargar todas una vez, filtrar del lado del cliente
   const [politicas, setPoliticas] = useState([]);
-  
-  const [filteredPoliticas, setFilteredPoliticas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -46,19 +51,6 @@ export default function PoliticasProgramacion() {
     idMedia: '',
     categoria: '',
     tipoETM: '',
-    comandoDAS: '',
-    caracteristica: '',
-    twoferValor: '',
-    todasCategorias: true,
-    categoriasUsar: '',
-    gruposReglasIgnorar: '',
-    clasificacionesEvento: '',
-    caracteristicaEspecifica: '',
-    valorDeseado: '',
-    usarTodasCategorias: true,
-    categoriasUsarEspecifica: '',
-    gruposReglasIgnorarEspecifica: '',
-    clasificacionesEventoEspecifica: ''
   });
   
   // Estado para manejar los eventos del reloj actualmente en edición
@@ -69,25 +61,60 @@ export default function PoliticasProgramacion() {
   const [notification, setNotification] = useState(null);
   const [viewMode, setViewMode] = useState('tarjetas'); // 'tarjetas' or 'grid'
   const [expandedCategories, setExpandedCategories] = useState(new Set());
+  // Nota: la acción ETM se maneja localmente dentro de RelojForm
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [selectedRelojInTable, setSelectedRelojInTable] = useState(null);
   const [categoriasSeleccionadas, setCategoriasSeleccionadas] = useState([]);
   const [politicaFormActiveTab, setPoliticaFormActiveTab] = useState(0); // Mostrar primera pestaña por defecto
+  
+  // Estados para el modal de reglas
+  const [showReglaForm, setShowReglaForm] = useState(false);
+  const [reglaFormData, setReglaFormData] = useState({
+    posicion: 0,
+    tipoRegla: 'Separación Mínima',
+    caracteristica: 'Inquebrantable',
+    caracteristica2: '',
+    setReglas: false,
+    reglaHabilitada: true,
+    caracteristicaDetalle: '',
+    horario: false,
+    horaInicial: '',
+    horaFinal: '',
+    tipoSeparacion: 'Tiempo - Segundos',
+    soloVerificarDia: false,
+    descripcion: '',
+    separaciones: []
+  });
+  
+  // Estado para las reglas de la política actual
+  const [reglasPolitica, setReglasPolitica] = useState([]);
+  const [loadingReglas, setLoadingReglas] = useState(false);
 
-  // Cargar categorías seleccionadas al inicializar el componente
+  // Cargar reglas por política - Memoizada (debe definirse antes de handleReglaSave)
+  const loadReglasPolitica = useCallback(async (politicaId) => {
+    try {
+      setLoadingReglas(true);
+      console.log('🔄 Cargando reglas para política ID:', politicaId);
+      const reglasData = await getReglasByPolitica(politicaId);
+      console.log('✅ Reglas cargadas desde API:', reglasData);
+      setReglasPolitica(reglasData);
+    } catch (error) {
+      console.error('❌ Error al cargar reglas:', error);
+    } finally {
+      setLoadingReglas(false);
+    }
+  }, []);
+
+  // Cargar categorías seleccionadas al inicializar el componente - Optimizado
   useEffect(() => {
-    const loadCategoriasSeleccionadas = async () => {
-      // No cargar categorías automáticamente - se cargarán cuando se edite una política específica
-      console.log('ℹ️ Inicializando sin categorías pre-seleccionadas');
-      setCategoriasSeleccionadas([]);
-    };
-    
-    loadCategoriasSeleccionadas();
+    // No cargar categorías automáticamente - se cargarán cuando se edite una política específica
+    console.log('ℹ️ Inicializando sin categorías pre-seleccionadas');
+    setCategoriasSeleccionadas([]);
   }, []);
 
   // Controlar el scroll del body cuando cualquier modal esté abierto
   useEffect(() => {
-    if (showForm || showRelojForm) {
+    if (showForm || showRelojForm || showReglaForm) {
       // Bloquear el scroll del body
       document.body.style.overflow = 'hidden';
     } else {
@@ -99,12 +126,17 @@ export default function PoliticasProgramacion() {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showForm, showRelojForm]);
+  }, [showForm, showRelojForm, showReglaForm]);
+
+  // Debug: monitorear cambios en showReglaForm
+  useEffect(() => {
+    console.log('🔍 showReglaForm cambió a:', showReglaForm);
+  }, [showReglaForm]);
 
   // ===== FUNCIONES AUXILIARES =====
   
-  // Función para manejar el guardado de categorías desde OrdenAsignacion
-  const handleCategoriasSaved = (configuracion) => {
+  // Función para manejar el guardado de categorías desde OrdenAsignacion - Memoizada
+  const handleCategoriasSaved = useCallback((configuracion) => {
     console.log('Configuración de orden de asignación:', configuracion);
     // Actualizar las categorías seleccionadas
     if (configuracion.categorias) {
@@ -113,10 +145,10 @@ export default function PoliticasProgramacion() {
       // Actualizar el estado de categorías seleccionadas
       setCategoriasSeleccionadas(nuevasCategorias);
     }
-  };
+  }, []);
   
-  // Función para convertir errores de API a cadenas legibles
-  const formatErrorMessage = (error, defaultMessage = 'Error desconocido') => {
+  // Función para convertir errores de API a cadenas legibles - Memoizada
+  const formatErrorMessage = useCallback((error, defaultMessage = 'Error desconocido') => {
     if (error.response?.data?.detail) {
       if (typeof error.response.data.detail === 'string') {
         return error.response.data.detail;
@@ -129,10 +161,10 @@ export default function PoliticasProgramacion() {
       return error.message;
     }
     return defaultMessage;
-  };
+  }, []);
 
-  // Load políticas
-  const loadPoliticas = async () => {
+  // Load políticas - Memoizada
+  const loadPoliticas = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -159,19 +191,17 @@ export default function PoliticasProgramacion() {
       }));
       
       setPoliticas(politicasMapeadas);
-      setFilteredPoliticas(politicasMapeadas);
     } catch (err) {
       console.error('❌ Error loading políticas:', err);
       setError(err.message || 'Error al cargar las políticas');
       setPoliticas([]);
-      setFilteredPoliticas([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Cargar días modelo por política
-  const loadDiasModelo = async (politicaId) => {
+  // Cargar días modelo por política - Memoizada
+  const loadDiasModelo = useCallback(async (politicaId) => {
     try {
       console.log('🔄 Cargando días modelo para política ID:', politicaId);
       const diasModeloData = await diasModeloApi.getByPolitica(politicaId);
@@ -183,10 +213,10 @@ export default function PoliticasProgramacion() {
       console.error('❌ Error loading días modelo:', err);
       setDiasModelo([]);
     }
-  };
+  }, []);
 
-  // Cargar relojes por política
-  const loadRelojes = async (politicaId) => {
+  // Cargar relojes por política - Memoizada
+  const loadRelojes = useCallback(async (politicaId) => {
     try {
       console.log('🔄 Cargando relojes para política ID:', politicaId);
       const relojesData = await relojesApi.getByPolitica(politicaId);
@@ -196,44 +226,146 @@ export default function PoliticasProgramacion() {
       console.error('❌ Error loading relojes:', err);
       setRelojes([]);
     }
-  };
+  }, []);
 
-  // Manejar nuevo día modelo
-  const handleNewDiaModelo = () => {
+  // Manejar nuevo día modelo - Memoizada
+  const handleNewDiaModelo = useCallback(() => {
     setShowDiaModeloForm(true);
-  };
+  }, []);
 
-  // Manejar editar día modelo
-  const handleEditDiaModelo = (diaModelo) => {
-    setShowDiaModeloForm(true);
-  };
+  // Funciones para el formulario de reglas - Memoizadas
+  const handleNewRegla = useCallback(() => {
+    console.log('🔍 handleNewRegla ejecutándose...');
+    console.log('🔍 showReglaForm antes:', showReglaForm);
+    setReglaFormData({
+      tipoRegla: '',
+      reglaHabilitada: true,
+      caracteristicaDetalle: 'ID de Canción',
+      horario: false,
+      horaInicial: '',
+      horaFinal: '',
+      tipoSeparacion: '',
+      soloVerificarDia: false,
+      separaciones: []
+    });
+    console.log('🔍 setShowReglaForm(true) ejecutándose...');
+    setShowReglaForm(true);
+    console.log('🔍 showReglaForm después:', showReglaForm);
+  }, []);
 
-  // Manejar ver día modelo
-  const handleViewDiaModelo = (diaModelo) => {
+  const handleReglaFormChange = useCallback((field, value) => {
+    setReglaFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  }, []);
+
+  const handleSeparacionChange = useCallback((index, field, value) => {
+    setReglaFormData(prev => ({
+      ...prev,
+      separaciones: prev.separaciones.map((sep, i) => 
+        i === index ? { ...sep, [field]: value } : sep
+      )
+    }));
+  }, []);
+
+  const addSeparacion = useCallback(() => {
+    setReglaFormData(prev => ({
+      ...prev,
+      separaciones: [...prev.separaciones, { valor: '', separacion: 0 }]
+    }));
+  }, []);
+
+  const removeSeparacion = useCallback((index) => {
+    setReglaFormData(prev => ({
+      ...prev,
+      separaciones: prev.separaciones.filter((_, i) => i !== index)
+    }));
+  }, []);
+
+  const handleReglaSave = useCallback(async () => {
+    try {
+      console.log('💾 Guardando regla:', reglaFormData);
+      
+      // Preparar datos para enviar a la API
+      const reglaData = {
+        politica_id: politica?.id || 1, // Usar la política actual o un ID por defecto
+        tipo_regla: reglaFormData.tipoRegla,
+        caracteristica: reglaFormData.caracteristicaDetalle,
+        tipo_separacion: reglaFormData.tipoSeparacion,
+        descripcion: reglaFormData.descripcion,
+        horario: reglaFormData.horario,
+        solo_verificar_dia: reglaFormData.soloVerificarDia,
+        habilitada: reglaFormData.reglaHabilitada,
+        separaciones: reglaFormData.separaciones.map(sep => ({
+          valor: sep.valor,
+          separacion: parseInt(sep.separacion) || 0
+        }))
+      };
+      
+      // Crear la regla
+      const nuevaRegla = await createRegla(reglaData);
+      console.log('✅ Regla creada:', nuevaRegla);
+      
+      // Cerrar el modal y limpiar el formulario
+      setShowReglaForm(false);
+      setReglaFormData({
+        tipoRegla: 'Separación Mínima',
+        caracteristica: '',
+        tipoSeparacion: 'Tiempo - Segundos',
+        horario: false,
+        soloVerificarDia: false,
+        habilitada: true,
+        separaciones: []
+      });
+      
+      // Mostrar notificación de éxito
+      console.log('✅ Regla guardada exitosamente');
+      
+      // Recargar las reglas de la política
+      await loadReglasPolitica(selectedPolitica?.id || 1);
+      
+    } catch (error) {
+      console.error('❌ Error al guardar regla:', error);
+      console.error('❌ Error al guardar la regla. Por favor, inténtalo de nuevo.');
+    }
+  }, [reglaFormData, selectedPolitica, loadReglasPolitica]);
+
+  const handleReglaCancel = useCallback(() => {
+    setShowReglaForm(false);
+  }, []);
+
+  // Manejar editar día modelo - Memoizada
+  const handleEditDiaModelo = useCallback((diaModelo) => {
     setShowDiaModeloForm(true);
-  };
+  }, []);
+
+  // Manejar ver día modelo - Memoizada
+  const handleViewDiaModelo = useCallback((diaModelo) => {
+    setShowDiaModeloForm(true);
+  }, []);
 
   useEffect(() => {
     loadPoliticas();
-  }, []);
+  }, [loadPoliticas]);
 
-  // Cargar días modelo cuando se selecciona una política
+  // Cargar días modelo cuando se selecciona una política - Optimizado
   useEffect(() => {
-    if (selectedPolitica && selectedPolitica.id) {
+    if (selectedPolitica?.id) {
       loadDiasModelo(selectedPolitica.id);
     } else {
       setDiasModelo([]);
     }
-  }, [selectedPolitica]);
+  }, [selectedPolitica, loadDiasModelo]);
 
-  // Cargar relojes cuando se selecciona una política
+  // Cargar relojes cuando se selecciona una política - Optimizado
   useEffect(() => {
-    if (selectedPolitica && selectedPolitica.id) {
+    if (selectedPolitica?.id) {
       loadRelojes(selectedPolitica.id);
     } else {
       setRelojes([]);
     }
-  }, [selectedPolitica]);
+  }, [selectedPolitica, loadRelojes]);
 
   // Seleccionar el primer reloj por defecto - DESHABILITADO para evitar reaperturas automáticas
   // useEffect(() => {
@@ -243,47 +375,38 @@ export default function PoliticasProgramacion() {
   //   }
   // }, [relojes, selectedRelojInTable, showRelojForm]);
 
-  // Función para obtener el color de cada categoría de evento
-  const getEventColor = (categoria) => {
+  // Función para obtener el color de cada categoría de evento - Memoizada
+  const getEventColor = useCallback((categoria) => {
     const colorMap = {
       'Canciones': '#3b82f6', // blue-500
       'Nota Operador': '#eab308', // yellow-500
       'Cartucho Fijo': '#8b5cf6', // purple-500
-      'Canción Manual': '#f97316', // orange-500
-      'Twofer': '#ec4899', // pink-500
       'Corte Comercial': '#ef4444', // red-500
       'ETM': '#22c55e', // green-500
-      'Exact Time Marker': '#06b6d4', // cyan-500
-      'Comando': '#6366f1', // indigo-500
-      'Característica Específica': '#84cc16' // lime-500
     };
     
     return colorMap[categoria] || '#6b7280'; // gray-500 como fallback
-  };
+  }, []);
 
-  // Función para obtener los eventos del reloj seleccionado en la tabla
-  const getSelectedRelojEvents = () => {
+  // Función para obtener los eventos del reloj seleccionado en la tabla - Memoizada
+  const getSelectedRelojEvents = useCallback(() => {
     // Si estamos en el formulario de reloj (creando o editando), usar relojEvents
     if (showRelojForm && relojEvents.length > 0) {
-      console.log('🔄 getSelectedRelojEvents - Usando relojEvents del formulario:', relojEvents);
       return relojEvents;
     }
 
     // Si hay un reloj seleccionado en la tabla, buscar sus eventos
     if (selectedRelojInTable) {
       const relojSeleccionado = relojes.find(reloj => reloj.id === selectedRelojInTable.id);
-      const eventos = relojSeleccionado ? relojSeleccionado.eventos || [] : [];
-      console.log('🔄 getSelectedRelojEvents - Usando eventos del reloj seleccionado:', eventos);
-      return eventos;
+      return relojSeleccionado ? relojSeleccionado.eventos || [] : [];
     }
 
     // Si no hay nada seleccionado, devolver array vacío
-    console.log('🔄 getSelectedRelojEvents - No hay eventos disponibles');
     return [];
-  };
+  }, [showRelojForm, relojEvents, selectedRelojInTable, relojes]);
 
-  // Función para calcular la duración total del reloj seleccionado
-  const getSelectedRelojDuration = () => {
+  // Función para calcular la duración total del reloj seleccionado - Memoizada
+  const getSelectedRelojDuration = useCallback(() => {
     const events = getSelectedRelojEvents();
     if (events.length === 0) return "0' 00\" 00\"";
     
@@ -306,39 +429,36 @@ export default function PoliticasProgramacion() {
     const secs = totalSeconds % 60;
     
     return `${hours}' ${minutes.toString().padStart(2, '0')}\" ${secs.toString().padStart(2, '0')}\"`;
-  };
+  }, [getSelectedRelojEvents]);
 
-
-
-
-
-  // Filter políticas
-  useEffect(() => {
+  // Filter políticas - Optimizado con useMemo
+  const filteredPoliticas = useMemo(() => {
     let filtered = politicas;
     
     if (showOnlyActive) {
       filtered = filtered.filter(p => p.habilitada === true);
     }
     
-    if (searchTerm) {
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(p => 
-        p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.clave?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.difusora?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
+        p.nombre?.toLowerCase().includes(searchLower) ||
+        p.clave?.toLowerCase().includes(searchLower) ||
+        p.difusora?.toLowerCase().includes(searchLower) ||
+        p.descripcion?.toLowerCase().includes(searchLower)
       );
     }
     
-    setFilteredPoliticas(filtered);
+    return filtered;
   }, [politicas, showOnlyActive, searchTerm]);
 
-  // Show notification
-  const showNotification = (message, type = 'error') => {
+  // Show notification - Memoizada
+  const showNotification = useCallback((message, type = 'error') => {
     setNotification({ message, type });
-  };
+  }, []);
 
-  // Función para obtener estadísticas por categoría
-  const getCategoryStats = () => {
+  // Función para obtener estadísticas por categoría - Memoizada
+  const getCategoryStats = useCallback(() => {
     const stats = {};
     
     relojEvents.forEach(event => {
@@ -371,37 +491,41 @@ export default function PoliticasProgramacion() {
     });
     
     return stats;
-  };
+  }, [relojEvents]);
 
-  // Función para formatear duración
-  const formatDuration = (minutes) => {
+  // Función para formatear duración - Memoizada
+  const formatDuration = useCallback((minutes) => {
     const mins = Math.floor(minutes);
     const secs = Math.round((minutes - mins) * 60);
     return `${mins}' ${secs.toString().padStart(2, '0')}"`;
-  };
+  }, []);
 
-  // Función para manejar expansión de categorías
-  const toggleCategoryExpansion = (category) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category);
-    } else {
-      newExpanded.add(category);
-    }
-    setExpandedCategories(newExpanded);
-  };
+  // Función para manejar expansión de categorías - Memoizada
+  const toggleCategoryExpansion = useCallback((category) => {
+    setExpandedCategories(prev => {
+      const newExpanded = new Set(prev);
+      if (newExpanded.has(category)) {
+        newExpanded.delete(category);
+      } else {
+        newExpanded.add(category);
+      }
+      return newExpanded;
+    });
+  }, []);
 
-  // Función para ordenar estadísticas
-  const sortStats = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
+  // Función para ordenar estadísticas - Memoizada
+  const sortStats = useCallback((key) => {
+    setSortConfig(prev => {
+      let direction = 'asc';
+      if (prev.key === key && prev.direction === 'asc') {
+        direction = 'desc';
+      }
+      return { key, direction };
+    });
+  }, []);
 
-  // Función para obtener estadísticas ordenadas
-  const getSortedCategoryStats = () => {
+  // Función para obtener estadísticas ordenadas - Memoizada
+  const getSortedCategoryStats = useMemo(() => {
     const stats = getCategoryStats();
     const entries = Object.entries(stats);
     
@@ -422,7 +546,7 @@ export default function PoliticasProgramacion() {
       
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  };
+  }, [getCategoryStats, sortConfig]);
 
   useEffect(() => {
     if (notification) {
@@ -433,13 +557,13 @@ export default function PoliticasProgramacion() {
     }
   }, [notification]);
 
-  const handleNew = () => {
+  const handleNew = useCallback(() => {
     setSelectedPolitica(null);
     setFormMode('new');
     setShowForm(true);
-  };
+  }, []);
 
-  const loadRelojesForPolitica = async (politicaId) => {
+  const loadRelojesForPolitica = useCallback(async (politicaId) => {
     try {
       console.log('🔄 Cargando relojes para política ID:', politicaId);
       const relojesData = await relojesApi.getByPolitica(politicaId);
@@ -449,12 +573,106 @@ export default function PoliticasProgramacion() {
       console.error('❌ Error loading relojes:', err);
       setRelojes([]);
     }
-  };
+  }, []);
 
-  const handleEdit = async (politica) => {
+
+  // Actualizar estado habilitado de un reloj - Memoizada
+  const handleToggleRelojHabilitado = useCallback(async (relojId, nuevoEstado) => {
+    // Guardar el estado anterior para poder revertir en caso de error
+    const relojAnterior = relojes.find(r => r.id === relojId);
+    const estadoAnterior = relojAnterior?.habilitado || false;
+    
+    try {
+      // Actualizar estado local primero para feedback inmediato
+      setRelojes(prev => prev.map(r => 
+        r.id === relojId ? { ...r, habilitado: nuevoEstado } : r
+      ));
+
+      // Actualizar en la base de datos
+      await relojesApi.update(relojId, { habilitado: nuevoEstado });
+      console.log(`✅ Reloj ${relojId} actualizado: habilitado = ${nuevoEstado}`);
+    } catch (error) {
+      console.error('❌ Error al actualizar estado del reloj:', error);
+      
+      // Revertir cambio local en caso de error
+      setRelojes(prev => prev.map(r => 
+        r.id === relojId ? { ...r, habilitado: estadoAnterior } : r
+      ));
+      
+      setNotification({ 
+        type: 'error', 
+        message: 'Error al actualizar el estado del reloj. Por favor, intenta de nuevo.' 
+      });
+    }
+  }, [relojes, showNotification]);
+
+  // Actualizar estado habilitada de una regla - Memoizada
+  const handleToggleReglaHabilitada = useCallback(async (reglaId, nuevoEstado) => {
+    // Guardar el estado anterior para poder revertir en caso de error
+    const reglaAnterior = reglasPolitica.find(r => r.id === reglaId);
+    const estadoAnterior = reglaAnterior?.habilitada ?? true;
+    
+    try {
+      // Actualizar estado local primero para feedback inmediato
+      setReglasPolitica(prev => prev.map(r => 
+        r.id === reglaId ? { ...r, habilitada: nuevoEstado } : r
+      ));
+
+      // Actualizar en la base de datos
+      await updateRegla(reglaId, { habilitada: nuevoEstado });
+      console.log(`✅ Regla ${reglaId} actualizada: habilitada = ${nuevoEstado}`);
+    } catch (error) {
+      console.error('❌ Error al actualizar estado de la regla:', error);
+      
+      // Revertir cambio local en caso de error
+      setReglasPolitica(prev => prev.map(r => 
+        r.id === reglaId ? { ...r, habilitada: estadoAnterior } : r
+      ));
+      
+      setNotification({ 
+        type: 'error', 
+        message: 'Error al actualizar el estado de la regla. Por favor, intenta de nuevo.' 
+      });
+    }
+  }, [reglasPolitica, showNotification]);
+
+  // Actualizar estado habilitado de un día modelo - Memoizada
+  const handleToggleDiaModeloHabilitado = useCallback(async (diaModeloId, nuevoEstado) => {
+    // Guardar el estado anterior para poder revertir en caso de error
+    const diaModeloAnterior = diasModelo.find(dm => dm.id === diaModeloId);
+    const estadoAnterior = diaModeloAnterior?.habilitado ?? true;
+    
+    try {
+      // Actualizar estado local primero para feedback inmediato
+      setDiasModelo(prev => prev.map(dm => 
+        dm.id === diaModeloId ? { ...dm, habilitado: nuevoEstado } : dm
+      ));
+
+      // Actualizar en la base de datos
+      await diasModeloApi.update(diaModeloId, { habilitado: nuevoEstado });
+      console.log(`✅ Día modelo ${diaModeloId} actualizado: habilitado = ${nuevoEstado}`);
+    } catch (error) {
+      console.error('❌ Error al actualizar estado del día modelo:', error);
+      
+      // Revertir cambio local en caso de error
+      setDiasModelo(prev => prev.map(dm => 
+        dm.id === diaModeloId ? { ...dm, habilitado: estadoAnterior } : dm
+      ));
+      
+      setNotification({ 
+        type: 'error', 
+        message: 'Error al actualizar el estado del día modelo. Por favor, intenta de nuevo.' 
+      });
+    }
+  }, [diasModelo, showNotification]);
+
+  const handleEdit = useCallback(async (politica) => {
     console.log('🔍 handleEdit - Política seleccionada:', politica);
     console.log('🔍 handleEdit - Clave de la política:', politica.clave);
     console.log('🔍 handleEdit - Nombre de la política:', politica.nombre);
+    
+    // Resetear categorías seleccionadas para no arrastrar selección entre políticas
+    setCategoriasSeleccionadas([]);
     
     try {
       // Obtener los datos completos de la política
@@ -470,24 +688,27 @@ export default function PoliticasProgramacion() {
     setShowForm(true);
     // Cargar relojes de la política
     await loadRelojesForPolitica(politica.id);
-  };
+    // Cargar reglas de la política
+    await loadReglasPolitica(politica.id);
+  }, [loadRelojesForPolitica, loadReglasPolitica]);
 
-  const handleView = async (politica) => {
+  const handleView = useCallback(async (politica) => {
     setSelectedPolitica(politica);
     setFormMode('view');
     setShowForm(true);
     // Cargar relojes de la política
     await loadRelojesForPolitica(politica.id);
-  };
+  }, [loadRelojesForPolitica]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     const politica = politicas.find(p => p.id === id);
     if (window.confirm(`¿Está seguro de eliminar la política "${politica?.nombre}"?`)) {
       try {
         setLoading(true);
         await politicasApi.delete(id);
         showNotification('Política eliminada correctamente', 'success');
-        await loadPoliticas();
+        // Actualizar estado local en lugar de recargar todo
+        setPoliticas(prev => prev.filter(p => p.id !== id));
       } catch (err) {
         console.error('Error deleting política:', err);
         showNotification(`Error al eliminar la política: ${err.message}`, 'error');
@@ -495,13 +716,13 @@ export default function PoliticasProgramacion() {
         setLoading(false);
       }
     }
-  };
+  }, [politicas, showNotification]);
 
-  const handleToggleActive = () => {
-    setShowOnlyActive(!showOnlyActive);
-  };
+  const handleToggleActive = useCallback(() => {
+    setShowOnlyActive(prev => !prev);
+  }, []);
 
-  const handleSave = async (politicaData) => {
+  const handleSave = useCallback(async (politicaData) => {
     try {
       setLoading(true);
       console.log('🔍 handleSave - Datos a enviar:', politicaData);
@@ -518,7 +739,15 @@ export default function PoliticasProgramacion() {
         showNotification('Política creada correctamente', 'success');
       }
       
-      await loadPoliticas();
+      // Actualizar estado local en lugar de recargar todo
+      if (formMode === 'edit' && selectedPolitica) {
+        setPoliticas(prev => prev.map(p => 
+          p.id === selectedPolitica.id ? { ...p, ...politicaData } : p
+        ))
+      } else {
+        // Para nuevas políticas, recargar ya que necesitamos el ID
+        await loadPoliticas();
+      }
       setShowForm(false);
       setSelectedPolitica(null);
       setFormMode('new');
@@ -528,16 +757,23 @@ export default function PoliticasProgramacion() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [formMode, selectedPolitica, showNotification, loadPoliticas]);
 
   // ===== FUNCIONES DE GESTIÓN DE RELOJES =====
   
-  const handleNewReloj = async () => {
+  const handleNewReloj = useCallback(async () => {
     console.log('🔵 handleNewReloj - INICIO');
-    if (!selectedPolitica) {
+    console.log('🔵 selectedPolitica:', selectedPolitica);
+    console.log('🔵 showForm:', showForm);
+    console.log('🔵 formMode:', formMode);
+    
+    // Permitir crear reloj si:
+    // 1. Hay una política seleccionada, O
+    // 2. El formulario de política está abierto (modo new o edit)
+    if (!selectedPolitica && !showForm) {
       setNotification({
         type: 'error',
-        message: 'Debe seleccionar una política primero para crear un reloj'
+        message: 'Debe seleccionar una política primero o abrir el formulario de política para crear un reloj'
       });
       return;
     }
@@ -551,9 +787,9 @@ export default function PoliticasProgramacion() {
     
     setShowRelojForm(true); // Mostrar el RelojForm modal
     console.log('🔵 handleNewReloj - FIN - Modal abierto');
-  };
+  }, [selectedPolitica, showForm, formMode]);
 
-  const handleEditReloj = (reloj) => {
+  const handleEditReloj = useCallback((reloj) => {
     console.log('🟡 handleEditReloj - INICIO - Reloj recibido:', reloj);
     console.log('🟡 handleEditReloj - Eventos del reloj:', reloj.eventos);
     setSelectedReloj(reloj);
@@ -576,19 +812,7 @@ export default function PoliticasProgramacion() {
       idMedia: evento.id_media,
       categoriaMedia: evento.categoria_media,
       tipoETM: evento.tipo_etm,
-      comandoDAS: evento.comando_das,
-      caracteristica: evento.caracteristica,
-      twoferValor: evento.twofer_valor,
-      todasCategorias: evento.todas_categorias,
-      categoriasUsar: evento.categorias_usar,
-      gruposReglasIgnorar: evento.grupos_reglas_ignorar,
-      clasificacionesEvento: evento.clasificaciones_evento,
-      caracteristicaEspecifica: evento.caracteristica_especifica,
-      valorDeseado: evento.valor_deseado,
-      usarTodasCategorias: evento.usar_todas_categorias,
-      categoriasUsarEspecifica: evento.categorias_usar_especifica,
-      gruposReglasIgnorarEspecifica: evento.grupos_reglas_ignorar_especifica,
-      clasificacionesEventoEspecifica: evento.clasificaciones_evento_especifica,
+      accionETM: evento.tipo_etm,  // La acción ETM se guarda en tipo_etm
       orden: evento.orden
     })) : [];
     
@@ -596,9 +820,9 @@ export default function PoliticasProgramacion() {
     console.log('🟡 handleEditReloj - Eventos mapeados al estado:', eventosMapeados);
     setShowRelojForm(true);
     console.log('🟡 handleEditReloj - FIN - Modal abierto para edición');
-  };
+  }, []);
 
-  const handleViewReloj = (reloj) => {
+  const handleViewReloj = useCallback((reloj) => {
     console.log('🔄 handleViewReloj - Reloj recibido:', reloj);
     console.log('🔄 handleViewReloj - Eventos del reloj:', reloj.eventos);
     setSelectedReloj(reloj);
@@ -621,28 +845,16 @@ export default function PoliticasProgramacion() {
       idMedia: evento.id_media,
       categoriaMedia: evento.categoria_media,
       tipoETM: evento.tipo_etm,
-      comandoDAS: evento.comando_das,
-      caracteristica: evento.caracteristica,
-      twoferValor: evento.twofer_valor,
-      todasCategorias: evento.todas_categorias,
-      categoriasUsar: evento.categorias_usar,
-      gruposReglasIgnorar: evento.grupos_reglas_ignorar,
-      clasificacionesEvento: evento.clasificaciones_evento,
-      caracteristicaEspecifica: evento.caracteristica_especifica,
-      valorDeseado: evento.valor_deseado,
-      usarTodasCategorias: evento.usar_todas_categorias,
-      categoriasUsarEspecifica: evento.categorias_usar_especifica,
-      gruposReglasIgnorarEspecifica: evento.grupos_reglas_ignorar_especifica,
-      clasificacionesEventoEspecifica: evento.clasificaciones_evento_especifica,
+      accionETM: evento.tipo_etm,  // La acción ETM se guarda en tipo_etm
       orden: evento.orden
     })) : [];
     
     setRelojEvents(eventosMapeados);
     console.log('🔄 handleViewReloj - Eventos mapeados al estado:', eventosMapeados);
     setShowRelojForm(true);
-  };
+  }, []);
 
-  const handleDeleteReloj = async (id) => {
+  const handleDeleteReloj = useCallback(async (id) => {
     const reloj = relojes.find(r => r.id === id);
     if (window.confirm(`¿Está seguro de eliminar el reloj "${reloj?.nombre}"?`)) {
       try {
@@ -653,11 +865,12 @@ export default function PoliticasProgramacion() {
           setSelectedRelojInTable(null);
         }
         setNotification({ type: 'success', message: 'Reloj eliminado exitosamente' });
-        // Recargar relojes de la política actual
+        // Actualizar estado local en lugar de recargar todo
         if (selectedPolitica) {
-          const relojesData = await relojesApi.getByPolitica(selectedPolitica.id);
-          console.log('🔄 Relojes recargados después de eliminar:', relojesData);
-          setRelojes(relojesData);
+          setRelojes(prev => prev.filter(r => r.id !== id));
+          if (selectedRelojInTable?.id === id) {
+            setSelectedRelojInTable(null);
+          }
         }
       } catch (err) {
         console.error('Error deleting reloj:', err);
@@ -666,31 +879,39 @@ export default function PoliticasProgramacion() {
         setLoading(false);
       }
     }
-  };
+  }, [relojes, selectedPolitica, selectedRelojInTable, showNotification]);
 
-  const handleSaveReloj = async (relojData) => {
+  const handleSaveReloj = useCallback(async (relojData, politicaFromForm = null) => {
     console.log('🔍 handleSaveReloj - INICIO');
     console.log('🔍 handleSaveReloj - relojData recibido:', relojData);
     console.log('🔍 handleSaveReloj - relojFormMode:', relojFormMode);
     console.log('🔍 handleSaveReloj - selectedPolitica:', selectedPolitica);
+    console.log('🔍 handleSaveReloj - politicaFromForm:', politicaFromForm);
     
     try {
       setLoading(true);
+      
+      // Usar la política del formulario si está disponible, sino usar selectedPolitica
+      const politicaToUse = politicaFromForm || selectedPolitica;
+      console.log('🔍 handleSaveReloj - politicaToUse:', politicaToUse);
       
       let relojId;
       
       if (relojFormMode === 'new') {
         console.log('🔍 handleSaveReloj - Modo: CREAR NUEVO RELOJ');
         // Crear nuevo reloj
-        if (!selectedPolitica || !selectedPolitica.id) {
-          throw new Error('No se ha seleccionado una política válida');
+        if (!politicaToUse || !politicaToUse.id) {
+          const errorMsg = 'No se ha seleccionado una política válida. Por favor, guarde la política primero antes de crear el reloj.';
+          console.error('❌', errorMsg);
+          setNotification({ type: 'error', message: errorMsg });
+          return;
         }
         
         console.log('🔍 handleSaveReloj - Llamando a relojesApi.create...');
-        console.log('🔍 handleSaveReloj - politicaId:', selectedPolitica.id);
+        console.log('🔍 handleSaveReloj - politicaId:', politicaToUse.id);
         console.log('🔍 handleSaveReloj - relojData:', relojData);
         
-        const newReloj = await relojesApi.create(selectedPolitica.id, relojData);
+        const newReloj = await relojesApi.create(politicaToUse.id, relojData);
         console.log('✅ handleSaveReloj - Reloj creado exitosamente:', newReloj);
         relojId = newReloj.id;
         setNotification({ type: 'success', message: 'Reloj creado exitosamente' });
@@ -731,20 +952,7 @@ export default function PoliticasProgramacion() {
               sin_categorias: evento.sinCategorias || evento.sin_categorias || '-',
               id_media: evento.idMedia || evento.id_media,
               categoria_media: evento.categoriaMedia || evento.categoria_media,
-              tipo_etm: evento.tipoETM || evento.tipo_etm,
-              comando_das: evento.comandoDAS || evento.comando_das,
-              caracteristica: evento.caracteristica,
-              twofer_valor: evento.twoferValor || evento.twofer_valor,
-              todas_categorias: evento.todasCategorias !== undefined ? evento.todasCategorias : true,
-              categorias_usar: evento.categoriasUsar || evento.categorias_usar,
-              grupos_reglas_ignorar: evento.gruposReglasIgnorar || evento.grupos_reglas_ignorar,
-              clasificaciones_evento: evento.clasificacionesEvento || evento.clasificaciones_evento,
-              caracteristica_especifica: evento.caracteristicaEspecifica || evento.caracteristica_especifica,
-              valor_deseado: evento.valorDeseado || evento.valor_deseado,
-              usar_todas_categorias: evento.usarTodasCategorias !== undefined ? evento.usarTodasCategorias : true,
-              categorias_usar_especifica: evento.categoriasUsarEspecifica || evento.categorias_usar_especifica,
-              grupos_reglas_ignorar_especifica: evento.gruposReglasIgnorarEspecifica || evento.grupos_reglas_ignorar_especifica,
-              clasificaciones_evento_especifica: evento.clasificacionesEventoEspecifica || evento.clasificaciones_evento_especifica,
+              tipo_etm: evento.accionETM || evento.tipoETM || evento.tipo_etm,  // Guardar accionETM en tipo_etm
               orden: evento.orden || 0
             };
             
@@ -785,10 +993,9 @@ export default function PoliticasProgramacion() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [relojFormMode, selectedPolitica, selectedReloj, relojEvents, formatErrorMessage, showNotification]);
 
-
-  const handleDeleteDiaModelo = async (diaModelo) => {
+  const handleDeleteDiaModelo = useCallback(async (diaModelo) => {
     if (window.confirm('¿Está seguro de eliminar este día modelo?')) {
       try {
         setLoading(true);
@@ -812,9 +1019,9 @@ export default function PoliticasProgramacion() {
         setLoading(false);
       }
     }
-  };
+  }, [showNotification]);
 
-  const handleSaveDiaModelo = async (diaModeloData, diaModeloId = null) => {
+  const handleSaveDiaModelo = useCallback(async (diaModeloData, diaModeloId = null) => {
     try {
       setLoading(true);
       
@@ -852,9 +1059,176 @@ export default function PoliticasProgramacion() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedPolitica, formatErrorMessage, showNotification]);
 
-  const handleEventClick = (eventType, eventName) => {
+  // Funciones helper deben definirse antes de los handlers que las usan
+  // parseTimeSafely debe definirse primero porque otras funciones lo usan
+  const parseTimeSafely = useCallback((timeString) => {
+    if (!timeString || typeof timeString !== 'string') {
+      return [0, 0, 0];
+    }
+    
+    // Verificar que tenga el formato correcto (HH:MM:SS)
+    if (!/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(timeString)) {
+      return [0, 0, 0];
+    }
+    
+    try {
+      const parts = timeString.split(':');
+      const hours = parseInt(parts[0], 10) || 0;
+      const minutes = parseInt(parts[1], 10) || 0;
+      const seconds = parseInt(parts[2], 10) || 0;
+      
+      return [hours, minutes, seconds];
+    } catch (error) {
+      console.error('Error parsing time:', error);
+      return [0, 0, 0];
+    }
+  }, []);
+
+  const getDefaultDuration = useCallback((eventType) => {
+    const defaultDurations = {
+      'corte-comercial': '00:03:00', // 3 minutos por defecto
+      'canciones': '00:04:00',       // 4 minutos por defecto
+      'nota-operador': '00:00:30',   // 30 segundos por defecto
+      'vacío': '00:00:00',           // 0 segundos
+      'cartucho-fijo': '00:01:00',   // 1 minuto por defecto
+      'exact-time-marker': '00:00:00', // 0 segundos
+      'comando-automatizacion': '00:00:10', // 10 segundos por defecto
+      'twofer': '00:00:20',          // 20 segundos por defecto
+      'caracteristica-especifica': '00:02:00' // 2 minutos por defecto
+    };
+    return defaultDurations[eventType] || '00:01:00';
+  }, []);
+
+  const generateConsecutivo = useCallback(() => {
+    // Generar el siguiente número consecutivo basado en los eventos actuales
+    const lastEventNumber = relojEvents.length;
+    return (lastEventNumber + 1).toString().padStart(3, '0');
+  }, [relojEvents]);
+
+  const calculateLastEventOffset = useCallback(() => {
+    // Calcular el offset del último evento basado en los eventos actuales
+    if (relojEvents.length === 0) {
+      return '00:00:00';
+    }
+    
+    const lastEvent = relojEvents[relojEvents.length - 1];
+    const lastOffset = lastEvent.offsetFinal || lastEvent.offset || '00:00:00';
+    
+    // Verificar que lastOffset sea una cadena válida
+    if (!lastOffset || typeof lastOffset !== 'string') {
+      return '00:00:00';
+    }
+    
+    // Verificar que tenga el formato correcto (HH:MM:SS)
+    if (!/^\d{2}:\d{2}:\d{2}$/.test(lastOffset)) {
+      return '00:00:00';
+    }
+    
+    try {
+      // Convertir el offset a segundos, sumar 1 segundo y volver a formato
+      const [hours, minutes, seconds] = parseTimeSafely(lastOffset);
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds + 1;
+      
+      const newHours = Math.floor(totalSeconds / 3600);
+      const newMinutes = Math.floor((totalSeconds % 3600) / 60);
+      const newSeconds = totalSeconds % 60;
+      
+      return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}:${newSeconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error('Error al calcular offset:', error);
+      return '00:00:00';
+    }
+  }, [relojEvents, parseTimeSafely]);
+
+  // Funciones helper adicionales deben definirse antes de los handlers que las usan
+  const getEventTypeNumber = useCallback((eventType) => {
+    const typeNumbers = {
+      'corte-comercial': '2',
+      'canciones': '1',
+      'nota-operador': '3',
+      'vacío': '4',
+      'cartucho-fijo': '5',
+      'exact-time-marker': '6',
+      'comando-automatizacion': '8',
+      'twofer': '9',
+      'caracteristica-especifica': '10'
+    };
+    return typeNumbers[eventType] || '1';
+  }, []);
+
+  const getEventCategory = useCallback((eventType) => {
+    const categories = {
+      'corte-comercial': 'Corte Comercial',
+      'canciones': 'Canciones',
+      'nota-operador': 'Nota Operador',
+      'vacío': 'Vacío',
+      'cartucho-fijo': 'Cartucho Fijo',
+      'exact-time-marker': 'ETM',
+    };
+    return categories[eventType] || 'Otros';
+  }, []);
+
+  const getNumeroCancion = useCallback((eventType) => {
+    if (eventType === 'canciones') {
+      return (relojEvents.filter(e => e.categoria === 'Canciones').length + 1).toString().padStart(3, '0');
+    }
+    return '-';
+  }, [relojEvents]);
+
+  // addEventToReloj debe definirse antes de handlePredefinedEventClick porque lo usa
+  const addEventToReloj = useCallback((newEvent) => {
+    console.log('🔄 addEventToReloj - Evento recibido:', newEvent);
+    console.log('🔄 addEventToReloj - Estado actual de relojEvents:', relojEvents);
+    
+    setRelojEvents(prev => {
+      // Calcular el offset correcto para el nuevo evento
+      let offsetInicial = '00:00:00';
+      if (prev.length > 0) {
+        const lastEvent = prev[prev.length - 1];
+        offsetInicial = lastEvent.offsetFinal || lastEvent.offset || '00:00:00';
+      }
+      
+      // Calcular la duración en segundos
+      let durationSeconds = 0;
+      if (typeof newEvent.duracion === 'number') {
+        durationSeconds = newEvent.duracion;
+      } else if (typeof newEvent.duracion === 'string' && newEvent.duracion.includes(':')) {
+        const [hours, minutes, seconds] = newEvent.duracion.split(':').map(Number);
+        durationSeconds = hours * 3600 + minutes * 60 + seconds;
+      } else {
+        durationSeconds = parseInt(newEvent.duracion) || 0;
+      }
+      
+      // Calcular el offset final
+      const [offsetHours, offsetMinutes, offsetSeconds] = offsetInicial.split(':').map(Number);
+      const offsetTotalSeconds = offsetHours * 3600 + offsetMinutes * 60 + offsetSeconds;
+      const finalTotalSeconds = offsetTotalSeconds + durationSeconds;
+      
+      const finalHours = Math.floor(finalTotalSeconds / 3600);
+      const finalMinutes = Math.floor((finalTotalSeconds % 3600) / 60);
+      const finalSeconds = finalTotalSeconds % 60;
+      
+      const offsetFinal = `${finalHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}:${finalSeconds.toString().padStart(2, '0')}`;
+      
+      // Crear el evento con los offsets correctos
+      const eventWithCorrectOffsets = {
+        ...newEvent,
+        offset: offsetInicial,
+        desdeETM: offsetInicial,
+        desdeCorte: offsetInicial,
+        offsetFinal: offsetFinal
+      };
+      
+      const newState = [...prev, eventWithCorrectOffsets];
+      console.log('🔄 addEventToReloj - Nuevo estado de relojEvents:', newState);
+      return newState;
+    });
+    console.log('✅ Evento añadido al reloj:', newEvent);
+  }, [relojEvents]);
+
+  const handleEventClick = useCallback((eventType, eventName) => {
     setSelectedEventType({ type: eventType, name: eventName });
     
     // Calcular el offset basado en el último evento
@@ -868,9 +1242,9 @@ export default function PoliticasProgramacion() {
     });
     
     setShowEventForm(true);
-  };
+  }, [calculateLastEventOffset, generateConsecutivo, getDefaultDuration]);
 
-  const handleCategoryClick = (eventType, categoryName) => {
+  const handleCategoryClick = useCallback((eventType, categoryName) => {
     setSelectedEventType({ type: eventType, name: categoryName });
     
     // Calcular el offset basado en el último evento
@@ -884,13 +1258,30 @@ export default function PoliticasProgramacion() {
     });
     
     setShowEventForm(true);
-  };
+  }, [calculateLastEventOffset, generateConsecutivo, getDefaultDuration]);
 
-  const handlePredefinedEventClick = (eventType, eventName) => {
+  const handlePredefinedEventClick = useCallback((eventType, eventName, param3 = []) => {
     // Configuración específica para eventos de cartucho fijo
     let categoria = getEventCategory(eventType);
     let idMedia = '';
     let categoriaEspecifica = '';
+    let duracion = getDefaultDuration(eventType);
+    // Si es ETM, param3 puede ser la acción; si es corte/vacío, param3 es la lista de cortes
+    const etmActionParam = eventType === 'exact-time-marker' ? (param3 || 'espera') : undefined;
+    const cortes = eventType === 'corte-comercial' || eventType === 'vacío' ? (param3 || []) : [];
+    
+    // Configuración específica para cortes comerciales y vacíos
+    if (eventType === 'corte-comercial' || eventType === 'vacío') {
+      // Buscar el corte en la lista de cortes cargados
+      const corteEncontrado = cortes.find(corte => corte.nombre === eventName);
+      if (corteEncontrado) {
+        duracion = corteEncontrado.duracion; // Usar la duración real del corte
+        console.log('🔍 Corte encontrado:', corteEncontrado);
+        console.log('🔍 Duración del corte:', duracion);
+      } else {
+        console.warn('⚠️ Corte no encontrado:', eventName);
+      }
+    }
     
     if (eventType === 'cartucho-fijo') {
       // Mapear nombres de eventos a categorías específicas
@@ -925,144 +1316,18 @@ export default function PoliticasProgramacion() {
       tipoETM = etmMapping[eventName] || eventName;
     }
     
-    // Configuración específica para eventos de Comando Automatización
-    let comandoDAS = '';
-    if (eventType === 'comando-automatizacion') {
-      // Mapear nombres de eventos a comandos DAS específicos
-      const comandoMapping = {
-        'AUTO_CMD_1': 'DAS_CMD_1',
-        'AUTO_CMD_2': 'DAS_CMD_2',
-        'AUTO_CMD_3': 'DAS_CMD_3',
-        'AUTO_CMD_4': 'DAS_CMD_4'
-      };
-      
-      comandoDAS = comandoMapping[eventName] || eventName;
-    }
     
-    // Configuración específica para eventos de Twofer
-    let caracteristica = '';
-    let twoferValor = '';
-    let todasCategorias = true;
-    let categoriasUsar = '';
-    let gruposReglasIgnorar = '';
-    let clasificacionesEvento = '';
     
-    if (eventType === 'twofer') {
-      // Mapear nombres de eventos a configuraciones específicas
-      const twoferMapping = {
-        'TWOFER_1': { 
-          caracteristica: 'CARACT_1', 
-          twoferValor: 'TWOFER_1',
-          todasCategorias: true,
-          categoriasUsar: '',
-          gruposReglasIgnorar: 'GRUPO_1',
-          clasificacionesEvento: 'CLASIF_1'
-        },
-        'TWOFER_2': { 
-          caracteristica: 'CARACT_2', 
-          twoferValor: 'TWOFER_2',
-          todasCategorias: false,
-          categoriasUsar: 'CAT_1',
-          gruposReglasIgnorar: 'GRUPO_2',
-          clasificacionesEvento: 'CLASIF_2'
-        },
-        'TWOFER_3': { 
-          caracteristica: 'CARACT_3', 
-          twoferValor: 'TWOFER_3',
-          todasCategorias: true,
-          categoriasUsar: '',
-          gruposReglasIgnorar: 'GRUPO_3',
-          clasificacionesEvento: 'CLASIF_3'
-        },
-        'TWOFER_4': { 
-          caracteristica: 'CARACT_4', 
-          twoferValor: 'TWOFER_4',
-          todasCategorias: false,
-          categoriasUsar: 'CAT_2',
-          gruposReglasIgnorar: 'GRUPO_4',
-          clasificacionesEvento: 'CLASIF_4'
-        }
-      };
-      
-      const mapping = twoferMapping[eventName];
-      if (mapping) {
-        caracteristica = mapping.caracteristica;
-        twoferValor = mapping.twoferValor;
-        todasCategorias = mapping.todasCategorias;
-        categoriasUsar = mapping.categoriasUsar;
-        gruposReglasIgnorar = mapping.gruposReglasIgnorar;
-        clasificacionesEvento = mapping.clasificacionesEvento;
-      }
-    }
     
-    // Configuración específica para eventos de Característica Específica
-    let caracteristicaEspecifica = '';
-    let valorDeseado = '';
-    let usarTodasCategorias = true;
-    let categoriasUsarEspecifica = '';
-    let gruposReglasIgnorarEspecifica = '';
-    let clasificacionesEventoEspecifica = '';
-    
-    if (eventType === 'caracteristica-especifica') {
-      // Mapear nombres de eventos a configuraciones específicas
-      const caracteristicaMapping = {
-        'CARACT_ESP_1': { 
-          caracteristicaEspecifica: 'CARACT_ESP_1', 
-          valorDeseado: 'Valor 1',
-          usarTodasCategorias: true,
-          categoriasUsarEspecifica: '',
-          gruposReglasIgnorarEspecifica: 'GRUPO_ESP_1',
-          clasificacionesEventoEspecifica: 'CLASIF_ESP_1'
-        },
-        'CARACT_ESP_2': { 
-          caracteristicaEspecifica: 'CARACT_ESP_2', 
-          valorDeseado: 'Valor 2',
-          usarTodasCategorias: false,
-          categoriasUsarEspecifica: 'CAT_ESP_1',
-          gruposReglasIgnorarEspecifica: 'GRUPO_ESP_2',
-          clasificacionesEventoEspecifica: 'CLASIF_ESP_2'
-        },
-        'CARACT_ESP_3': { 
-          caracteristicaEspecifica: 'CARACT_ESP_3', 
-          valorDeseado: 'Valor 3',
-          usarTodasCategorias: true,
-          categoriasUsarEspecifica: '',
-          gruposReglasIgnorarEspecifica: 'GRUPO_ESP_3',
-          clasificacionesEventoEspecifica: 'CLASIF_ESP_3'
-        },
-        'CARACT_ESP_4': { 
-          caracteristicaEspecifica: 'CARACT_ESP_4', 
-          valorDeseado: 'Valor 4',
-          usarTodasCategorias: false,
-          categoriasUsarEspecifica: 'CAT_ESP_2',
-          gruposReglasIgnorarEspecifica: 'GRUPO_ESP_4',
-          clasificacionesEventoEspecifica: 'CLASIF_ESP_4'
-        }
-      };
-      
-      const mapping = caracteristicaMapping[eventName];
-      if (mapping) {
-        caracteristicaEspecifica = mapping.caracteristicaEspecifica;
-        valorDeseado = mapping.valorDeseado;
-        usarTodasCategorias = mapping.usarTodasCategorias;
-        categoriasUsarEspecifica = mapping.categoriasUsarEspecifica;
-        gruposReglasIgnorarEspecifica = mapping.gruposReglasIgnorarEspecifica;
-        clasificacionesEventoEspecifica = mapping.clasificacionesEventoEspecifica;
-      }
-    }
     
     // Añadir directamente al reloj
     const newEvent = {
       id: relojEvents.length + 1,
       numero: generateConsecutivo(),
-      offset: calculateLastEventOffset(),
-      desdeETM: calculateLastEventOffset(),
-      desdeCorte: calculateLastEventOffset(),
-      offsetFinal: calculateLastEventOffset(), // Se calculará después
       tipo: getEventTypeNumber(eventType),
       categoria: categoria,
       descripcion: eventName,
-      duracion: getDefaultDuration(eventType),
+      duracion: duracion, // Usar la duración calculada
       numeroCancion: getNumeroCancion(eventType),
       sinCategorias: '-',
       // Campos adicionales para Cartucho Fijo
@@ -1072,54 +1337,13 @@ export default function PoliticasProgramacion() {
       }),
       // Campo adicional para Exact Time Marker
       ...(eventType === 'exact-time-marker' && {
-        tipoETM: tipoETM
+        tipoETM: tipoETM,
+        accionETM: etmActionParam || 'espera'
       }),
-      // Campo adicional para Comando Automatización
-      ...(eventType === 'comando-automatizacion' && {
-        comandoDAS: comandoDAS
-      }),
-      // Campos adicionales para Twofer
-      ...(eventType === 'twofer' && {
-        caracteristica: caracteristica,
-        twoferValor: twoferValor,
-        todasCategorias: todasCategorias,
-        categoriasUsar: categoriasUsar,
-        gruposReglasIgnorar: gruposReglasIgnorar,
-        clasificacionesEvento: clasificacionesEvento
-      }),
-      // Campos adicionales para Característica Específica
-      ...(eventType === 'caracteristica-especifica' && {
-        caracteristicaEspecifica: caracteristicaEspecifica,
-        valorDeseado: valorDeseado,
-        usarTodasCategorias: usarTodasCategorias,
-        categoriasUsarEspecifica: categoriasUsarEspecifica,
-        gruposReglasIgnorarEspecifica: gruposReglasIgnorarEspecifica,
-        clasificacionesEventoEspecifica: clasificacionesEventoEspecifica
-      })
     };
     
-    // Calcular el offset final basado en la duración
-    let durationSeconds = 0;
-    if (typeof newEvent.duracion === 'number') {
-      durationSeconds = newEvent.duracion;
-    } else if (typeof newEvent.duracion === 'string' && newEvent.duracion.includes(':')) {
-      const [hours, minutes, seconds] = newEvent.duracion.split(':').map(Number);
-      durationSeconds = hours * 3600 + minutes * 60 + seconds;
-    } else {
-      durationSeconds = parseInt(newEvent.duracion) || 0;
-    }
-    const [offsetHours, offsetMinutes, offsetSeconds] = newEvent.offset.split(':').map(Number);
-    const offsetTotalSeconds = offsetHours * 3600 + offsetMinutes * 60 + offsetSeconds;
-    const finalTotalSeconds = offsetTotalSeconds + durationSeconds;
-    
-    const finalHours = Math.floor(finalTotalSeconds / 3600);
-    const finalMinutes = Math.floor((finalTotalSeconds % 3600) / 60);
-    const finalSeconds = finalTotalSeconds % 60;
-    
-    newEvent.offsetFinal = `${finalHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}:${finalSeconds.toString().padStart(2, '0')}`;
-    
-    // Añadir el evento a la tabla
-    setRelojEvents(prev => [...prev, newEvent]);
+    // Añadir el evento a la tabla (addEventToReloj calculará los offsets automáticamente)
+    addEventToReloj(newEvent);
     
     console.log('Evento añadido al reloj:', newEvent);
     
@@ -1128,41 +1352,11 @@ export default function PoliticasProgramacion() {
       type: 'success',
       message: `Evento "${eventName}" añadido al reloj`
     });
-  };
+  }, [relojEvents, getEventCategory, getDefaultDuration, getEventTypeNumber, getNumeroCancion, addEventToReloj, generateConsecutivo]);
 
   // ===== FUNCIONES DE GESTIÓN DE EVENTOS =====
-  
-  // Función helper para parsear tiempo de forma segura
-  const parseTimeSafely = (timeString) => {
-    if (!timeString || typeof timeString !== 'string') {
-      return [0, 0, 0];
-    }
-    
-    // Verificar que tenga el formato correcto (HH:MM:SS)
-    if (!/^\d{1,2}:\d{1,2}:\d{1,2}$/.test(timeString)) {
-      return [0, 0, 0];
-    }
-    
-    try {
-      return timeString.split(':').map(Number);
-    } catch (error) {
-      console.error('Error al parsear tiempo:', error);
-      return [0, 0, 0];
-    }
-  };
-  
-  const addEventToReloj = (newEvent) => {
-    console.log('🔄 addEventToReloj - Evento recibido:', newEvent);
-    console.log('🔄 addEventToReloj - Estado actual de relojEvents:', relojEvents);
-    setRelojEvents(prev => {
-      const newState = [...prev, newEvent];
-      console.log('🔄 addEventToReloj - Nuevo estado de relojEvents:', newState);
-      return newState;
-    });
-    console.log('✅ Evento añadido al reloj:', newEvent);
-  };
 
-  const deleteEventFromReloj = async (eventId) => {
+  const deleteEventFromReloj = useCallback(async (eventId) => {
     if (window.confirm('¿Está seguro de eliminar este evento?')) {
       try {
         // Si el evento tiene un ID válido (no es temporal), eliminarlo de la BD
@@ -1194,10 +1388,10 @@ export default function PoliticasProgramacion() {
         });
       }
     }
-  };
+  }, [selectedPolitica, showNotification]);
 
-  // Función para verificar si hay cambios sin guardar en el reloj en edición
-  const hasUnsavedChanges = () => {
+  // Función para verificar si hay cambios sin guardar en el reloj en edición - Memoizada
+  const hasUnsavedChanges = useCallback(() => {
     if (!selectedReloj) return false;
     
     // Si es un reloj nuevo, cualquier evento es un cambio
@@ -1214,107 +1408,9 @@ export default function PoliticasProgramacion() {
       const currentEvent = relojEvents[index];
       return !currentEvent || JSON.stringify(event) !== JSON.stringify(currentEvent);
     });
-  };
+  }, [selectedReloj, relojFormMode, relojEvents]);
 
-
-
-  const calculateLastEventOffset = () => {
-    // Calcular el offset del último evento basado en los eventos actuales
-    if (relojEvents.length === 0) {
-      return '00:00:00';
-    }
-    
-    const lastEvent = relojEvents[relojEvents.length - 1];
-    const lastOffset = lastEvent.offsetFinal || lastEvent.offset || '00:00:00';
-    
-    // Verificar que lastOffset sea una cadena válida
-    if (!lastOffset || typeof lastOffset !== 'string') {
-      return '00:00:00';
-    }
-    
-    // Verificar que tenga el formato correcto (HH:MM:SS)
-    if (!/^\d{2}:\d{2}:\d{2}$/.test(lastOffset)) {
-      return '00:00:00';
-    }
-    
-    try {
-      // Convertir el offset a segundos, sumar 1 segundo y volver a formato
-            const [hours, minutes, seconds] = parseTimeSafely(lastOffset);
-      const totalSeconds = hours * 3600 + minutes * 60 + seconds + 1;
-      
-      const newHours = Math.floor(totalSeconds / 3600);
-      const newMinutes = Math.floor((totalSeconds % 3600) / 60);
-      const newSeconds = totalSeconds % 60;
-      
-      return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}:${newSeconds.toString().padStart(2, '0')}`;
-    } catch (error) {
-      console.error('Error al calcular offset:', error);
-      return '00:00:00';
-    }
-  };
-
-  const generateConsecutivo = () => {
-    // Generar el siguiente número consecutivo basado en los eventos actuales
-    const lastEventNumber = relojEvents.length;
-    return (lastEventNumber + 1).toString().padStart(3, '0');
-  };
-
-  const getDefaultDuration = (eventType) => {
-    const defaultDurations = {
-      'corte-comercial': '00:03:00', // 3 minutos por defecto
-      'canciones': '00:04:00',       // 4 minutos por defecto
-      'nota-operador': '00:00:30',   // 30 segundos por defecto
-      'vacío': '00:00:00',           // 0 segundos
-      'cartucho-fijo': '00:01:00',   // 1 minuto por defecto
-      'exact-time-marker': '00:00:00', // 0 segundos
-      'cancion-manual': '00:04:00',  // 4 minutos por defecto
-      'comando-automatizacion': '00:00:10', // 10 segundos por defecto
-      'twofer': '00:00:20',          // 20 segundos por defecto
-      'caracteristica-especifica': '00:02:00' // 2 minutos por defecto
-    };
-    return defaultDurations[eventType] || '00:01:00';
-  };
-
-  const getEventTypeNumber = (eventType) => {
-    const typeNumbers = {
-      'corte-comercial': '2',
-      'canciones': '1',
-      'nota-operador': '3',
-      'vacío': '4',
-      'cartucho-fijo': '5',
-      'exact-time-marker': '6',
-      'cancion-manual': '7',
-      'comando-automatizacion': '8',
-      'twofer': '9',
-      'caracteristica-especifica': '10'
-    };
-    return typeNumbers[eventType] || '1';
-  };
-
-  const getEventCategory = (eventType) => {
-    const categories = {
-      'corte-comercial': 'Corte Comercial',
-      'canciones': 'Canciones',
-      'nota-operador': 'Nota Operador',
-      'vacío': 'Vacío',
-      'cartucho-fijo': 'Cartucho Fijo',
-      'exact-time-marker': 'ETM',
-      'cancion-manual': 'Canción Manual',
-      'comando-automatizacion': 'Comando',
-      'twofer': 'Twofer',
-      'caracteristica-especifica': 'Característica'
-    };
-    return categories[eventType] || 'Otros';
-  };
-
-  const getNumeroCancion = (eventType) => {
-    if (eventType === 'canciones') {
-      return (relojEvents.filter(e => e.categoria === 'Canciones').length + 1).toString().padStart(3, '0');
-    }
-    return '-';
-  };
-
-  const calculateTotalDuration = () => {
+  const calculateTotalDuration = useCallback(() => {
     let totalSeconds = 0;
     
     relojEvents.forEach(event => {
@@ -1327,9 +1423,9 @@ export default function PoliticasProgramacion() {
     const seconds = totalSeconds % 60;
     
     return `${hours}' ${minutes.toString().padStart(2, '0')}" ${seconds.toString().padStart(2, '0')}"`;
-  };
+  }, [relojEvents, parseTimeSafely]);
 
-  const calculateCategoryDuration = (category) => {
+  const calculateCategoryDuration = useCallback((category) => {
     let totalSeconds = 0;
     
     relojEvents.filter(event => event.categoria === category).forEach(event => {
@@ -1341,9 +1437,9 @@ export default function PoliticasProgramacion() {
     const seconds = totalSeconds % 60;
     
     return `${minutes}' ${seconds.toString().padStart(2, '0')}"`;
-  };
+  }, [relojEvents, parseTimeSafely]);
 
-  const calculateOtherDuration = () => {
+  const calculateOtherDuration = useCallback(() => {
     let totalSeconds = 0;
     
     relojEvents.filter(event => !['Corte Comercial', 'Canciones', 'Nota Operador'].includes(event.categoria)).forEach(event => {
@@ -1355,7 +1451,7 @@ export default function PoliticasProgramacion() {
     const seconds = totalSeconds % 60;
     
     return `${minutes}' ${seconds.toString().padStart(2, '0')}"`;
-  };
+  }, [relojEvents, parseTimeSafely]);
 
   if (loading) {
     return (
@@ -1370,30 +1466,34 @@ export default function PoliticasProgramacion() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen overflow-y-auto allow-scroll">
+    <>
       {/* Notification Component */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md transition-all duration-300 ${
+        <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 border-2 ${
           notification.type === 'success'
-            ? 'bg-green-100 border border-green-400 text-green-800'
-            : 'bg-red-100 border border-red-400 text-red-800'
+            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 text-green-800'
+            : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-300 text-red-800'
         }`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center space-x-3">
               {notification.type === 'success' ? (
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <div className="p-2 bg-gradient-to-br from-green-100 to-green-200 rounded-lg shadow-md">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
               ) : (
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <div className="p-2 bg-gradient-to-br from-red-100 to-red-200 rounded-lg shadow-md">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
               )}
-              <span className="font-medium">{notification.message}</span>
+              <span className="font-bold">{notification.message}</span>
             </div>
             <button
               onClick={() => setNotification(null)}
-              className="ml-4 text-gray-500 hover:text-gray-700"
+              className="ml-4 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg p-1 transition-all duration-200"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1403,25 +1503,30 @@ export default function PoliticasProgramacion() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 sticky top-0 z-10">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/50 overflow-hidden relative">
+        {/* Fondo decorativo */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-200/10 rounded-full blur-2xl"></div>
+        </div>
+
+        <div className="relative z-10 p-6">
+
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 mb-6 sticky top-0 z-10 overflow-hidden">
         {/* Header Moderno */}
-        <div className="px-8 py-8 border-b border-gray-200/50 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 relative overflow-hidden">
-          {/* Elementos decorativos de fondo */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-200/30 to-indigo-200/30 rounded-full -translate-y-16 translate-x-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-blue-200/30 to-purple-200/30 rounded-full translate-y-12 -translate-x-12"></div>
-          
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 relative z-10">
-            <div className="flex items-center space-x-6">
-              <div className="p-4 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/90 to-indigo-600/90"></div>
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm shadow-lg">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-purple-800 to-indigo-800 bg-clip-text text-transparent">
-                  Políticas de Programación
-                </h1>
-                <p className="text-gray-600 mt-2 text-lg">Administra las políticas de programación musical</p>
+                <h1 className="text-3xl font-bold text-white mb-1">Políticas de Programación</h1>
+                <p className="text-blue-100 text-sm">Administra las políticas de programación musical</p>
               </div>
             </div>
             
@@ -1429,7 +1534,7 @@ export default function PoliticasProgramacion() {
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleNew}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-sm font-medium hover:shadow-md transform hover:-translate-y-0.5"
+                className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white px-6 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-semibold hover:shadow-xl transform hover:scale-[1.02] hover:-translate-y-0.5 border border-white/30"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -1441,18 +1546,18 @@ export default function PoliticasProgramacion() {
               
               <button
                 onClick={handleToggleActive}
-                className={`px-4 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 shadow-sm font-medium hover:shadow-md transform hover:-translate-y-0.5 ${
+                className={`px-5 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-semibold hover:shadow-xl transform hover:scale-[1.02] hover:-translate-y-0.5 ${
                   showOnlyActive 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700 border border-gray-300'
+                    ? 'bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white border border-white/30' 
+                    : 'bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white border border-white/20'
                 }`}
               >
                 {showOnlyActive ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
@@ -1461,61 +1566,64 @@ export default function PoliticasProgramacion() {
               </button>
             </div>
           </div>
+          {/* Efecto de partículas decorativas */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-20 translate-x-20"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-16 -translate-x-16"></div>
         </div>
 
-        {/* Search and View Toggle */}
-        <div className="px-6 py-5 bg-gray-50 border-b border-gray-200">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="relative max-w-md flex-1">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+            {/* Search and View Toggle */}
+            <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50/30 border-b border-gray-200">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="relative max-w-md flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Buscar políticas..."
+                    value={searchTerm || ''}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="block w-full pl-12 pr-12 py-3.5 border-2 border-gray-300 rounded-xl leading-5 bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-md hover:border-gray-400 transition-all duration-200"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center hover:bg-gray-100 rounded-r-xl transition-colors"
+                    >
+                      <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                
+                {/* View Mode Toggle */}
+                <div className="flex items-center space-x-2 bg-white border-2 border-gray-300 rounded-xl p-1 shadow-md">
+                  <button
+                    onClick={() => setViewMode('tarjetas')}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      viewMode === 'tarjetas'
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    Tarjetas
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      viewMode === 'grid'
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    Grid
+                  </button>
+                </div>
               </div>
-              <input
-                type="text"
-                placeholder="Buscar políticas..."
-                value={searchTerm || ''}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg leading-5 bg-white text-black placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 shadow-sm transition-all duration-200"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center hover:bg-gray-100 rounded-r-lg transition-colors"
-                >
-                  <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
             </div>
-            
-            {/* View Mode Toggle */}
-            <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('tarjetas')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                  viewMode === 'tarjetas'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                Tarjetas
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                  viewMode === 'grid'
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                Grid
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* Content */}
         {viewMode === 'tarjetas' ? (
@@ -1638,61 +1746,61 @@ export default function PoliticasProgramacion() {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto bg-white rounded-xl shadow-lg border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gradient-to-r from-gray-100 to-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Estado
                   </th>
-                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Clave
                   </th>
-                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Difusora
                   </th>
-                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Nombre
                   </th>
-                  <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Descripción
                   </th>
-                  <th className="px-3 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-40">
+                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider w-40 border-l-2 border-gray-300 shadow-lg sticky right-0 bg-gradient-to-r from-gray-100 to-gray-50">
                     Acciones
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredPoliticas.map((politica, index) => (
-                  <tr key={politica.id} className={`hover:bg-purple-50 transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${
+                  <tr key={politica.id} className={`hover:bg-blue-50/50 transition-all duration-200 group ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-3 py-1.5 text-xs font-bold rounded-full border-2 shadow-sm ${
                         politica.habilitada 
-                          ? 'bg-green-100 text-green-800 border-green-200' 
-                          : 'bg-red-100 text-red-800 border-red-200'
+                          ? 'bg-gradient-to-r from-green-100 to-green-50 text-green-800 border-green-300' 
+                          : 'bg-gradient-to-r from-red-100 to-red-50 text-red-800 border-red-300'
                       }`}>
                         {politica.habilitada ? 'Habilitada' : 'Deshabilitada'}
                       </span>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                       {politica.clave}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {politica.difusora}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                       {politica.nombre}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       <div className="max-w-48 truncate" title={politica.descripcion}>
                         {politica.descripcion || 'Sin descripción'}
                       </div>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex justify-center space-x-1">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium border-l-2 border-gray-300 shadow-lg sticky right-0 bg-white group-hover:bg-blue-50/50">
+                      <div className="flex justify-center space-x-2">
                         <button
                           onClick={() => handleView(politica)}
-                          className="p-2 text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all duration-200"
+                          className="p-2.5 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-500 hover:to-blue-600 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-110 border border-blue-200"
                           title="Ver detalles"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1702,7 +1810,7 @@ export default function PoliticasProgramacion() {
                         </button>
                         <button
                           onClick={() => handleEdit(politica)}
-                          className="p-2 text-yellow-600 hover:text-yellow-900 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-all duration-200"
+                          className="p-2.5 text-yellow-600 hover:text-white bg-yellow-50 hover:bg-gradient-to-r hover:from-yellow-500 hover:to-yellow-600 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-110 border border-yellow-200"
                           title="Editar"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1711,7 +1819,7 @@ export default function PoliticasProgramacion() {
                         </button>
                         <button
                           onClick={() => handleDelete(politica.id)}
-                          className="p-2 text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 rounded-lg transition-all duration-200"
+                          className="p-2.5 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-110 border border-red-200"
                           title="Eliminar"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1727,44 +1835,46 @@ export default function PoliticasProgramacion() {
           </div>
         )}
         
-        {/* Empty State */}
-        {filteredPoliticas.length === 0 && !loading && (
-          <div className="text-center py-16 px-6">
-            <div className="mx-auto h-20 w-20 text-gray-400 mb-6">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {error ? 'Error al cargar políticas' :
-               searchTerm ? 'No se encontraron políticas' : 
-               showOnlyActive ? 'No hay políticas habilitadas' : 
-               'No hay políticas registradas'}
-            </h3>
-            <p className="text-gray-500 mb-6 max-w-md mx-auto">
-              {error ? 
-                `Error: ${error.message || error}. Intenta recargar la página.` :
-                searchTerm ? 
-                `No se encontraron políticas que coincidan con "${searchTerm}". Intenta con otros términos de búsqueda.` : 
-                showOnlyActive ? 
-                'No hay políticas habilitadas en el sistema. Puedes ver todas las políticas o crear una nueva.' : 
-                'Comienza agregando tu primera política de programación al sistema.'
-              }
-            </p>
-            {!searchTerm && !showOnlyActive && !error && (
-              <button
-                onClick={handleNew}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg transition-all duration-200 font-medium hover:shadow-md transform hover:-translate-y-0.5"
-              >
-                Crear primera política
-              </button>
+            {/* Empty State */}
+            {filteredPoliticas.length === 0 && !loading && (
+              <div className="text-center py-20 px-6 bg-white rounded-xl shadow-lg border border-gray-200">
+                <div className="mx-auto w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6 shadow-lg">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-12 h-12 text-gray-400">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  {error ? 'Error al cargar políticas' :
+                   searchTerm ? 'No se encontraron políticas' : 
+                   showOnlyActive ? 'No hay políticas habilitadas' : 
+                   'No hay políticas registradas'}
+                </h3>
+                <p className="text-gray-600 mb-8 max-w-md mx-auto text-base">
+                  {error ? 
+                    `Error: ${error.message || error}. Intenta recargar la página.` :
+                    searchTerm ? 
+                    `No se encontraron políticas que coincidan con "${searchTerm}". Intenta con otros términos de búsqueda.` : 
+                    showOnlyActive ? 
+                    'No hay políticas habilitadas en el sistema. Puedes ver todas las políticas o crear una nueva.' : 
+                    'Comienza agregando tu primera política de programación al sistema.'
+                  }
+                </p>
+                {!searchTerm && !showOnlyActive && !error && (
+                  <button
+                    onClick={handleNew}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    Crear primera política
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
 
-                  {/* Form Modal */}
-            {showForm && (
+      {/* Form Modal */}
+      {showForm && (
               <PoliticaForm
                 politica={selectedPolitica}
                 mode={formMode}
@@ -1793,23 +1903,31 @@ export default function PoliticasProgramacion() {
                 handleViewDiaModelo={handleViewDiaModelo}
                 handleDeleteDiaModelo={handleDeleteDiaModelo}
                 handleSaveDiaModelo={handleSaveDiaModelo}
+                handleToggleDiaModeloHabilitado={handleToggleDiaModeloHabilitado}
                 handleViewReloj={handleViewReloj}
                 handleDeleteReloj={handleDeleteReloj}
+                handleToggleRelojHabilitado={handleToggleRelojHabilitado}
                 getEventColor={getEventColor}
                 relojEvents={relojEvents}
                 calculateTotalDuration={calculateTotalDuration}
                 getSelectedRelojEvents={getSelectedRelojEvents}
                 getSelectedRelojDuration={getSelectedRelojDuration}
                 politicas={politicas}
+                handleNewRegla={handleNewRegla}
+                reglasPolitica={reglasPolitica}
+                loadingReglas={loadingReglas}
+                loadReglasPolitica={loadReglasPolitica}
+                handleToggleReglaHabilitada={handleToggleReglaHabilitada}
               />
-            )}
+      )}
 
-                        {/* Reloj Form Modal */}
-            {showRelojForm && (
+      {/* Reloj Form Modal */}
+      {showRelojForm && (
               <RelojForm
                 reloj={selectedReloj}
                 mode={relojFormMode}
                 relojEvents={relojEvents}
+                politica={selectedPolitica}
                 categoriasSeleccionadas={categoriasSeleccionadas}
                 parseTimeSafely={parseTimeSafely}
                 getEventTypeNumber={getEventTypeNumber}
@@ -1841,10 +1959,10 @@ export default function PoliticasProgramacion() {
                   setRelojEvents([]); // Limpiar eventos al cancelar
                 }}
               />
-            )}
+      )}
 
-            {/* Event Form Modal */}
-            {showEventForm && (
+      {/* Event Form Modal */}
+      {showEventForm && (
               <EventForm
                 eventType={selectedEventType}
                 formData={eventFormData}
@@ -1862,23 +1980,9 @@ export default function PoliticasProgramacion() {
                     consecutivo: '',
                     offset: '',
                     duracion: '',
-                    descripcion: '',
                     idMedia: '',
                     categoria: '',
                     tipoETM: '',
-                    comandoDAS: '',
-                    caracteristica: '',
-                    twoferValor: '',
-                    todasCategorias: true,
-                    categoriasUsar: '',
-                    gruposReglasIgnorar: '',
-                    clasificacionesEvento: '',
-                    caracteristicaEspecifica: '',
-                    valorDeseado: '',
-                    usarTodasCategorias: true,
-                    categoriasUsarEspecifica: '',
-                    gruposReglasIgnorarEspecifica: '',
-                    clasificacionesEventoEspecifica: ''
                   });
                 }}
                 onCancel={() => {
@@ -1888,30 +1992,16 @@ export default function PoliticasProgramacion() {
                     consecutivo: '',
                     offset: '',
                     duracion: '',
-                    descripcion: '',
                     idMedia: '',
                     categoria: '',
                     tipoETM: '',
-                    comandoDAS: '',
-                    caracteristica: '',
-                    twoferValor: '',
-                    todasCategorias: true,
-                    categoriasUsar: '',
-                    gruposReglasIgnorar: '',
-                    clasificacionesEvento: '',
-                    caracteristicaEspecifica: '',
-                    valorDeseado: '',
-                    usarTodasCategorias: true,
-                    categoriasUsarEspecifica: '',
-                    gruposReglasIgnorarEspecifica: '',
-                    clasificacionesEventoEspecifica: ''
                   });
                 }}
               />
-            )}
+      )}
 
-            {/* DiaModelo Form Modal */}
-            {showDiaModeloForm && (
+      {/* DiaModelo Form Modal */}
+      {showDiaModeloForm && (
               <DiaModeloForm
                 diaModelo={selectedDiaModelo}
                 mode={diaModeloFormMode}
@@ -1924,18 +2014,31 @@ export default function PoliticasProgramacion() {
                   setDiaModeloFormMode('new');
                 }}
               />
-            )}
-          </div>
-        );
-      }
+      )}
+    </>
+  );
+}
 
       // Reloj Form Component
-      function RelojForm({ reloj, mode, relojEvents, categoriasSeleccionadas = [], parseTimeSafely, getEventTypeNumber, getEventCategory, getNumeroCancion, calculateTotalDuration, calculateCategoryDuration, calculateOtherDuration, addEventToReloj, deleteEventFromReloj, hasUnsavedChanges, getSelectedRelojEvents, getSelectedRelojDuration, getCategoryStats, formatDuration, expandedCategories, toggleCategoryExpansion, sortConfig, sortStats, getSortedCategoryStats, onSave, onCancel, onEventClick, onCategoryClick, onPredefinedEventClick }) {
+      function RelojForm({ reloj, mode, relojEvents, politica, categoriasSeleccionadas = [], parseTimeSafely, getEventTypeNumber, getEventCategory, getNumeroCancion, calculateTotalDuration, calculateCategoryDuration, calculateOtherDuration, addEventToReloj, deleteEventFromReloj, hasUnsavedChanges, getSelectedRelojEvents, getSelectedRelojDuration, getCategoryStats, formatDuration, expandedCategories, toggleCategoryExpansion, sortConfig, sortStats, getSortedCategoryStats, onSave, onCancel, onEventClick, onCategoryClick, onPredefinedEventClick }) {
         const [isLoading, setIsLoading] = useState(false);
         const [errors, setErrors] = useState({});
         const [activeTab, setActiveTab] = useState(0);
         const [cortes, setCortes] = useState([]);
         const [loadingCortes, setLoadingCortes] = useState(false);
+        // Acción local para ETM
+        const [etmAction, setEtmAction] = useState('espera');
+        // Color helper local para filas
+        const colorForCategory = (categoria) => {
+          const map = {
+            'Canciones': '#3b82f6',
+            'Corte Comercial': '#ef4444',
+            'Nota Operador': '#f59e0b',
+            'ETM': '#10b981',
+            'Cartucho Fijo': '#8b5cf6',
+          };
+          return map[categoria] || '#6b7280';
+        };
 
         // Cargar cortes desde la base de datos
         useEffect(() => {
@@ -1944,8 +2047,8 @@ export default function PoliticasProgramacion() {
             try {
               const response = await fetch('http://localhost:8000/api/v1/catalogos/general/cortes/?activo=true');
               const data = await response.json();
-              setCortes(data.cortes || []);
-              console.log('🔍 RelojForm - Cortes cargados:', data.cortes);
+              setCortes(data || []);
+              console.log('🔍 RelojForm - Cortes cargados:', data);
             } catch (error) {
               console.error('Error al cargar cortes en RelojForm:', error);
               setCortes([]);
@@ -1982,7 +2085,6 @@ export default function PoliticasProgramacion() {
           grupo: reloj?.grupo || '',
           clave: reloj?.clave || '',
           numeroRegla: reloj?.numero_regla || '',
-          duracionReferencia: reloj?.duracion || '00:00:00',
           nombre: reloj?.nombre || '',
           descripcion: reloj?.descripcion || ''
         });
@@ -2013,16 +2115,6 @@ export default function PoliticasProgramacion() {
           },
           { 
             id: 1, 
-            name: 'Reglas', 
-            icon: (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            )
-          },
-          { 
-            id: 2, 
             name: 'Eventos del reloj', 
             icon: (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2032,8 +2124,12 @@ export default function PoliticasProgramacion() {
           }
         ];
 
-        const inputClass = `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`;
-        const selectClass = `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`;
+        const inputClass = `w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+          isReadOnly ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : 'bg-white text-gray-900 hover:border-gray-400'
+        }`;
+        const selectClass = `w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+          isReadOnly ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : 'bg-white text-gray-900 hover:border-gray-400'
+        }`;
 
         const validateForm = () => {
           const newErrors = {};
@@ -2062,14 +2158,15 @@ export default function PoliticasProgramacion() {
               clave: formData.clave || '',
               nombre: formData.nombre || '',
               numero_eventos: relojEvents.length || 0,
-              duracion: formData.duracionReferencia || '00:00:00'
+              duracion: '00:00:00'
             };
             
             console.log('📦 DATOS A ENVIAR AL BACKEND:', JSON.stringify(relojDataForBackend, null, 2));
+            console.log('🔍 RelojForm - politica disponible:', politica);
             console.log('🔍 RelojForm - Llamando a onSave...');
             
-            // Llamar a la función onSave del componente padre
-            await onSave(relojDataForBackend);
+            // Llamar a la función onSave del componente padre, pasando también la política
+            await onSave(relojDataForBackend, politica);
             console.log('✅ RelojForm - onSave completado exitosamente');
           } catch (error) {
             console.error('Error en RelojForm handleSubmit:', error);
@@ -2109,21 +2206,23 @@ export default function PoliticasProgramacion() {
             case 0: // Datos generales
               return (
                 <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
                     <input 
                       type="checkbox" 
                       name="habilitado" 
                       checked={formData.habilitado} 
                       onChange={handleChange} 
                       disabled={isReadOnly} 
-                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" 
+                      className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded transition-all cursor-pointer disabled:cursor-not-allowed" 
                     />
-                    <label className="text-sm font-medium text-gray-700">Reloj habilitado</label>
+                    <label className="text-base font-semibold text-gray-700 cursor-pointer">Reloj habilitado</label>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Clave *</label>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Clave <span className="text-red-500">*</span>
+                      </label>
                       <input 
                         type="text" 
                         name="clave" 
@@ -2134,26 +2233,18 @@ export default function PoliticasProgramacion() {
                         placeholder="Clave del reloj"
                         required={!isReadOnly}
                       />
-                      {errors.clave && <p className="mt-1 text-sm text-red-600">{errors.clave}</p>}
+                      {errors.clave && (
+                        <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>{errors.clave}</span>
+                        </p>
+                      )}
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                      <input 
-                        type="text" 
-                        name="nombre" 
-                        value={formData.nombre || ''} 
-                        onChange={handleChange} 
-                        disabled={isReadOnly} 
-                        className={inputClass} 
-                        placeholder="Nombre del reloj"
-                        required={!isReadOnly}
-                      />
-                      {errors.nombre && <p className="mt-1 text-sm text-red-600">{errors.nombre}</p>}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Número de Regla</label>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Número de Regla</label>
                       <input 
                         type="text" 
                         name="numeroRegla" 
@@ -2165,35 +2256,22 @@ export default function PoliticasProgramacion() {
                       />
                     </div>
                     
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Duración de Referencia</label>
-                      <input 
-                        type="text" 
-                        name="duracionReferencia" 
-                        value={formData.duracionReferencia || ''} 
-                        onChange={handleChange} 
-                        disabled={isReadOnly} 
-                        className={inputClass} 
-                        placeholder="00:00:00"
-                      />
-                    </div>
-                    
                     <div className="md:col-span-2">
-                      <div className="flex items-center space-x-3 mb-2">
+                      <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm mb-4">
                         <input 
                           type="checkbox" 
                           name="perteneceGrupo" 
                           checked={formData.perteneceGrupo} 
                           onChange={handleChange} 
                           disabled={isReadOnly} 
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" 
+                          className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded transition-all cursor-pointer disabled:cursor-not-allowed" 
                         />
-                        <label className="text-sm font-medium text-gray-700">Pertenece al grupo de relojes</label>
+                        <label className="text-base font-semibold text-gray-700 cursor-pointer">Pertenece al grupo de relojes</label>
                       </div>
                       
                       {formData.perteneceGrupo && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Grupo</label>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Grupo</label>
                           <select 
                             name="grupo" 
                             value={formData.grupo || ''} 
@@ -2208,123 +2286,26 @@ export default function PoliticasProgramacion() {
                               </option>
                             ))}
                           </select>
-                          {errors.grupo && <p className="mt-1 text-sm text-red-600">{errors.grupo}</p>}
+                          {errors.grupo && (
+                            <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>{errors.grupo}</span>
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
                     
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Duración de referencia</label>
-                      <div className="flex flex-col space-y-2">
-                        <div className="flex space-x-2 items-center">
-                          <div className="flex flex-col items-center">
-                            <input 
-                              type="number" 
-                              name="duracionReferenciaHoras" 
-                              value={formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[0]) || 0 : 0} 
-                              onChange={(e) => {
-                                const horas = e.target.value;
-                                const minutos = formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[1]) || 0 : 0;
-                                const segundos = formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[2]) || 0 : 0;
-                                const newValue = `${horas.padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
-                                handleChange({ target: { name: 'duracionReferencia', value: newValue } });
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.target.value.length === 2) {
-                                  e.target.nextElementSibling?.nextElementSibling?.focus();
-                                }
-                              }}
-                              readOnly={isReadOnly} 
-                              className="w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 text-center" 
-                              min="0"
-                              max="23"
-                              placeholder="00"
-                              title="Horas (0-23)"
-                            />
-                            <span className="text-xs text-gray-500 mt-1">H</span>
-                          </div>
-                          <span className="flex items-center text-gray-500 text-lg font-bold">:</span>
-                          <div className="flex flex-col items-center">
-                            <input 
-                              type="number" 
-                              name="duracionReferenciaMinutos" 
-                              value={formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[1]) || 0 : 0} 
-                              onChange={(e) => {
-                                const horas = formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[0]) || 0 : 0;
-                                const minutos = e.target.value;
-                                const segundos = formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[2]) || 0 : 0;
-                                const newValue = `${horas.toString().padStart(2, '0')}:${minutos.padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
-                                handleChange({ target: { name: 'duracionReferencia', value: newValue } });
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.target.value.length === 2) {
-                                  e.target.nextElementSibling?.nextElementSibling?.focus();
-                                }
-                              }}
-                              readOnly={isReadOnly} 
-                              className="w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 text-center" 
-                              min="0"
-                              max="59"
-                              placeholder="00"
-                              title="Minutos (0-59)"
-                            />
-                            <span className="text-xs text-gray-500 mt-1">M</span>
-                          </div>
-                          <span className="flex items-center text-gray-500 text-lg font-bold">:</span>
-                          <div className="flex flex-col items-center">
-                            <input 
-                              type="number" 
-                              name="duracionReferenciaSegundos" 
-                              value={formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[2]) || 0 : 0} 
-                              onChange={(e) => {
-                                const horas = formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[0]) || 0 : 0;
-                                const minutos = formData.duracionReferencia ? parseInt(formData.duracionReferencia.split(':')[1]) || 0 : 0;
-                                const segundos = e.target.value;
-                                const newValue = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.padStart(2, '0')}`;
-                                handleChange({ target: { name: 'duracionReferencia', value: newValue } });
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.target.closest('form')?.querySelector('button[type="submit"]')?.focus();
-                                }
-                              }}
-                              readOnly={isReadOnly} 
-                              className="w-20 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 text-center" 
-                              min="0"
-                              max="59"
-                              placeholder="00"
-                              title="Segundos (0-59)"
-                            />
-                            <span className="text-xs text-gray-500 mt-1">S</span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">Formato: HH:MM:SS</p>
-                    </div>
-                    
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                      <input 
-                        type="text" 
-                        name="nombre" 
-                        value={formData.nombre || ''} 
-                        onChange={handleChange} 
-                        readOnly={isReadOnly} 
-                        className={inputClass} 
-                        required={!isReadOnly} 
-                        placeholder="Ej: Reloj Matutino" 
-                      />
-                      {errors.nombre && <p className="mt-1 text-sm text-red-600">{errors.nombre}</p>}
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Descripción</label>
                       <textarea 
                         name="descripcion" 
                         value={formData.descripcion || ''} 
                         onChange={handleChange} 
                         readOnly={isReadOnly} 
-                        rows="3" 
+                        rows="4" 
                         className={inputClass} 
                         placeholder="Descripción del reloj..." 
                       />
@@ -2333,24 +2314,7 @@ export default function PoliticasProgramacion() {
                 </div>
               );
               
-            case 1: // Reglas
-              return (
-                <div className="space-y-4">
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Reglas del Reloj</h3>
-                    <p className="text-gray-600">Configuración de reglas específicas para este reloj</p>
-                    <p className="text-sm text-gray-500 mt-2">Funcionalidad en desarrollo</p>
-                  </div>
-                </div>
-              );
-              
-            case 2: // Eventos del reloj
+            case 1: // Eventos del reloj
               return (
                 <div className="flex flex-col h-full space-y-4">
                   {/* Header */}
@@ -2419,7 +2383,7 @@ export default function PoliticasProgramacion() {
                               cortes.filter(corte => corte.tipo === 'comercial').map((corte, index) => (
                                 <div 
                                   key={corte.id} 
-                                  onClick={() => onPredefinedEventClick('corte-comercial', corte.nombre)}
+                                  onClick={() => onPredefinedEventClick('corte-comercial', corte.nombre, cortes)}
                                   className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
                                 >
                                   <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2436,26 +2400,12 @@ export default function PoliticasProgramacion() {
                         <div>
                           <div 
                             className="flex items-center space-x-2 mb-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => onCategoryClick('nota-operador', 'Nota para el Operador')}
+                            onClick={() => onPredefinedEventClick('nota-operador', 'Nota para el Operador')}
                           >
                             <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                             <span className="text-sm font-medium text-gray-700">Nota para el Operador</span>
-                          </div>
-                          <div className="space-y-1 ml-6">
-                            {['NOTA_OP_1', 'NOTA_OP_2', 'NOTA_OP_3', 'NOTA_OP_4'].map((nota, index) => (
-                              <div 
-                                key={index} 
-                                onClick={() => onPredefinedEventClick('nota-operador', nota)}
-                                className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
-                              >
-                                <svg className="w-3 h-3 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span>{nota}</span>
-                              </div>
-                            ))}
                           </div>
                         </div>
 
@@ -2482,7 +2432,7 @@ export default function PoliticasProgramacion() {
                               cortes.filter(corte => corte.tipo === 'vacio').map((corte, index) => (
                                 <div 
                                   key={corte.id} 
-                                  onClick={() => onPredefinedEventClick('vacío', corte.nombre)}
+                                  onClick={() => onPredefinedEventClick('vacío', corte.nombre, cortes)}
                                   className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
                                 >
                                   <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2534,141 +2484,30 @@ export default function PoliticasProgramacion() {
                             <span className="text-sm font-medium text-gray-700">Exact Time Marker</span>
                           </div>
                           <div className="space-y-1 ml-6">
-                            {['ETM_00', 'ETM_15', 'ETM_30', 'ETM_45'].map((etm, index) => (
-                              <div 
-                                key={index} 
-                                onClick={() => onPredefinedEventClick('exact-time-marker', etm)}
+                            {[
+                              { label: 'Cortar canción', value: 'cortar' },
+                              { label: 'Fade out', value: 'fadeout' },
+                              { label: 'Esperar a terminar', value: 'espera' }
+                            ].map(({label, value}) => (
+                              <div
+                                key={value}
+                                onClick={() => onPredefinedEventClick('exact-time-marker', label, value)}
                                 className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
                               >
                                 <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <span>{etm}</span>
+                                <span>{label}</span>
                               </div>
                             ))}
                           </div>
                         </div>
 
-                        {/* Canción Manual */}
-                        <div>
-                          <div 
-                            className="flex items-center space-x-2 mb-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => onCategoryClick('cancion-manual', 'Canción Manual')}
-                          >
-                            <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                            </svg>
-                            <span className="text-sm font-medium text-gray-700">Canción Manual</span>
-                          </div>
-                          <div className="space-y-1 ml-6">
-                            {['MANUAL_1', 'MANUAL_2', 'MANUAL_3', 'MANUAL_4'].map((manual, index) => (
-                              <div 
-                                key={index} 
-                                onClick={() => onPredefinedEventClick('cancion-manual', manual)}
-                                className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
-                              >
-                                <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                </svg>
-                                <span>{manual}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
 
-                        {/* Comando Automatización */}
-                        <div>
-                          <div 
-                            className="flex items-center space-x-2 mb-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => onCategoryClick('comando-automatizacion', 'Comando Automatización')}
-                          >
-                            <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span className="text-sm font-medium text-gray-700">Comando Automatización</span>
-                          </div>
-                          <div className="space-y-1 ml-6">
-                            {['AUTO_CMD_1', 'AUTO_CMD_2', 'AUTO_CMD_3', 'AUTO_CMD_4'].map((cmd, index) => (
-                              <div 
-                                key={index} 
-                                onClick={() => onPredefinedEventClick('comando-automatizacion', cmd)}
-                                className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
-                              >
-                                <svg className="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                <span>{cmd}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
 
-                        {/* Twofer */}
-                        <div>
-                          <div 
-                            className="flex items-center space-x-2 mb-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => onCategoryClick('twofer', 'Twofer')}
-                          >
-                            <svg className="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            <span className="text-sm font-medium text-gray-700">Twofer</span>
-                          </div>
-                          <div className="space-y-1 ml-6">
-                            {['TWOFER_1', 'TWOFER_2', 'TWOFER_3', 'TWOFER_4'].map((twofer, index) => (
-                              <div 
-                                key={index} 
-                                onClick={() => onPredefinedEventClick('twofer', twofer)}
-                                className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
-                              >
-                                <svg className="w-3 h-3 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                <span>{twofer}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
 
-                        {/* Característica Específica */}
-                        <div>
-                          <div 
-                            className="flex items-center space-x-2 mb-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => onCategoryClick('caracteristica-especifica', 'Característica Específica')}
-                          >
-                            <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                            <span className="text-sm font-medium text-gray-700">Característica Específica</span>
-                          </div>
-                          <div className="space-y-1 ml-6">
-                            {['CARAC_ESP_1', 'CARAC_ESP_2', 'CARAC_ESP_3', 'CARAC_ESP_4'].map((carac, index) => (
-                              <div 
-                                key={index} 
-                                onClick={() => onPredefinedEventClick('caracteristica-especifica', carac)}
-                                className="flex items-center space-x-2 text-sm text-gray-600 hover:bg-gray-50 p-1 rounded cursor-pointer"
-                              >
-                                <svg className="w-3 h-3 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                </svg>
-                                <span>{carac}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
 
-                        {/* Eventos Modelo */}
-                        <div className="pt-3 border-t border-gray-200">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Eventos Modelo</label>
-                          <select className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
-                            <option value="">Seleccionar evento modelo</option>
-                            <option value="modelo1">Modelo 1 - Hora Completa</option>
-                            <option value="modelo2">Modelo 2 - Media Hora</option>
-                            <option value="modelo3">Modelo 3 - Personalizado</option>
-                          </select>
-                        </div>
+
                       </div>
                     </div>
 
@@ -2683,10 +2522,8 @@ export default function PoliticasProgramacion() {
                             <tr>
                               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
                               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offset</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Desde ETM</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Desde corte</th>
+                              
                               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offset final</th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
                               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
                               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripcion</th>
                               <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duracion</th>
@@ -2698,16 +2535,22 @@ export default function PoliticasProgramacion() {
                           <tbody className="bg-white divide-y divide-gray-200">
                             {(() => {
                               const events = getSelectedRelojEvents();
-                              console.log('🔄 Eventos en tabla:', events);
                               return events.map((event, index) => (
-                              <tr key={event.id} className={`hover:bg-gray-50 ${index === getSelectedRelojEvents().length - 1 ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}>
+                              <tr
+                                key={event.id}
+                                className={`hover:bg-gray-50`}
+                                style={{ borderLeft: `4px solid ${colorForCategory(event.categoria)}` }}
+                              >
                                 <td className="px-3 py-2 text-sm font-medium text-gray-900">{event.numero}</td>
                                 <td className="px-3 py-2 text-sm text-gray-600">{event.offset}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.desdeETM}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.desdeCorte}</td>
+                                
                                 <td className="px-3 py-2 text-sm text-gray-600">{event.offsetFinal}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.tipo}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.categoria}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorForCategory(event.categoria) }}></span>
+                                    {event.categoria}
+                                  </span>
+                                </td>
                                 <td className="px-3 py-2 text-sm text-gray-600">{event.descripcion}</td>
                                 <td className="px-3 py-2 text-sm text-gray-600">{event.duracion}</td>
                                 <td className="px-3 py-2 text-sm text-gray-600">{event.numeroCancion}</td>
@@ -2790,11 +2633,6 @@ export default function PoliticasProgramacion() {
                                     'Nota Operador': '#f59e0b', // Amarillo
                                     'ETM': '#10b981', // Verde
                                     'Cartucho Fijo': '#8b5cf6', // Púrpura
-                                    'Exact Time Marker': '#06b6d4', // Cyan
-                                    'Canción Manual': '#f97316', // Naranja
-                                    'Comando': '#6366f1', // Índigo
-                                    'Twofer': '#ec4899', // Rosa
-                                    'Característica Específica': '#84cc16' // Verde lima
                                   };
                                   return colors[categoria] || '#6b7280'; // Gris por defecto
                                 };
@@ -2893,48 +2731,42 @@ export default function PoliticasProgramacion() {
                         {/* Leyenda de colores */}
                         <div className="mt-4">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">Leyenda de colores:</h4>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                              <span className="text-gray-600">Canciones</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                              <span className="text-gray-600">Corte Comercial</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                              <span className="text-gray-600">Nota Operador</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                              <span className="text-gray-600">ETM</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                              <span className="text-gray-600">Cartucho Fijo</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
-                              <span className="text-gray-600">Exact Time Marker</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                              <span className="text-gray-600">Canción Manual</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
-                              <span className="text-gray-600">Comando</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-pink-500"></div>
-                              <span className="text-gray-600">Twofer</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                              <span className="text-gray-600">Característica Específica</span>
-                            </div>
-                          </div>
+                          {(() => {
+                            // Obtener categorías únicas presentes en los eventos del reloj
+                            const categoriasPresentes = [...new Set(relojEvents.map(e => e.categoria))];
+                            
+                            // Mapa de colores para cada categoría
+                            const colorMap = {
+                              'Canciones': { color: 'bg-blue-500', nombre: 'Canciones' },
+                              'Corte Comercial': { color: 'bg-red-500', nombre: 'Corte Comercial' },
+                              'Nota Operador': { color: 'bg-yellow-500', nombre: 'Nota Operador' },
+                              'ETM': { color: 'bg-green-500', nombre: 'ETM' },
+                              'Cartucho Fijo': { color: 'bg-purple-500', nombre: 'Cartucho Fijo' },
+                              'Comando': { color: 'bg-indigo-500', nombre: 'Comando' },
+                              'Twofer': { color: 'bg-pink-500', nombre: 'Twofer' },
+                              'Característica Específica': { color: 'bg-lime-500', nombre: 'Característica Específica' }
+                            };
+                            
+                            // Filtrar solo las categorías presentes
+                            const categoriasDisponibles = categoriasPresentes
+                              .filter(cat => colorMap[cat])
+                              .map(cat => colorMap[cat]);
+                            
+                            if (categoriasDisponibles.length === 0) {
+                              return <p className="text-xs text-gray-500">No hay eventos para mostrar</p>;
+                            }
+                            
+                            return (
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                {categoriasDisponibles.map((item, index) => (
+                                  <div key={index} className="flex items-center space-x-2">
+                                    <div className={`w-3 h-3 rounded-full ${item.color}`}></div>
+                                    <span className="text-gray-600">{item.nombre}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                         
                         <div className="mt-4 space-y-2">
@@ -3063,41 +2895,37 @@ export default function PoliticasProgramacion() {
         };
 
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-            <div className="bg-white border border-gray-300 shadow-lg w-[90vw] max-w-[1000px] h-[85vh] overflow-hidden flex flex-col rounded-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 w-[95vw] max-w-[1400px] h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100" onClick={(e) => e.stopPropagation()}>
               {/* Window Header */}
-              <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                  <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <h1 className="text-lg font-semibold text-white">{title}</h1>
-                  <div className="flex items-center space-x-1 text-sm text-purple-100">
-                    <span>Políticas</span>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-6 py-4 flex justify-between items-center relative overflow-hidden border-b border-blue-800/20">
+                {/* Elementos decorativos */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
+                
+                <div className="flex items-center space-x-4 relative z-10">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Relojes</span>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                    <span className="text-purple-200 font-medium">{title}</span>
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">{title}</h1>
+                    <p className="text-blue-100 text-xs">Configuración del reloj</p>
                   </div>
                   {!isReadOnly && (
-                    <div className="flex items-center space-x-2 text-xs">
-                      <div className={`px-2 py-1 rounded-full ${
-                        mode === 'new' ? 'bg-blue-200 text-blue-900' : 'bg-green-200 text-green-900'
+                    <div className="flex items-center space-x-2 ml-4">
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        mode === 'new' ? 'bg-blue-400/30 text-white border border-white/30' : 'bg-green-400/30 text-white border border-white/30'
                       }`}>
                         {mode === 'new' ? 'Nuevo' : 'Edición'}
                       </div>
                     </div>
                   )}
                 </div>
-                <button onClick={onCancel} className="text-white hover:text-purple-200 transition-colors p-1 rounded hover:bg-purple-600">
+                <button onClick={onCancel} className="text-white/90 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-all duration-200 hover:scale-110 relative z-10">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
@@ -3109,26 +2937,26 @@ export default function PoliticasProgramacion() {
                     <button 
                       key={tab.id} 
                       onClick={() => setActiveTab(tab.id)} 
-                      className={`group flex items-center space-x-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
+                      className={`group flex items-center space-x-2 px-4 py-3 text-sm font-semibold whitespace-nowrap transition-all duration-200 relative ${
                         activeTab === tab.id 
-                          ? "text-purple-700 bg-purple-50 border-b-2 border-purple-600" 
-                          : "text-gray-600 hover:text-purple-600 hover:bg-purple-50/50"
+                          ? "text-blue-700 bg-blue-50 border-b-2 border-blue-600" 
+                          : "text-gray-600 hover:text-blue-600 hover:bg-blue-50/50"
                       }`}
                     >
                       {tab.icon}
-                      <span className="font-medium">{tab.name}</span>
+                      <span>{tab.name}</span>
                     </button>
                   ))}
                 </div>
               </div>
               
               {/* Form Content */}
-              <div className="flex-1 overflow-y-auto p-4 bg-white">
+              <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-gray-50 via-white to-blue-50/20">
                 {renderTabContent()}
               </div>
               
               {/* Footer with Action Buttons */}
-              <div className="bg-gray-50 border-t border-gray-300 px-4 py-3 flex justify-between items-center">
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t-2 border-gray-300 px-8 py-5 flex justify-between items-center shadow-inner">
                 <div className="flex items-center space-x-2">
                   {!isReadOnly && hasUnsavedChanges && (
                     <div className="flex items-center space-x-2 text-orange-600 text-sm">
@@ -3139,15 +2967,16 @@ export default function PoliticasProgramacion() {
                     </div>
                   )}
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex gap-4">
                   <button 
                     type="button" 
                     onClick={onCancel} 
                     disabled={isLoading} 
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
+                    className="min-w-[140px] px-8 py-4 bg-red-600 text-white rounded-xl hover:bg-red-700 active:bg-red-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-red-300"
+                    aria-label="Cerrar formulario"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                     <span>Cerrar</span>
                   </button>
@@ -3156,13 +2985,14 @@ export default function PoliticasProgramacion() {
                       type="button" 
                       onClick={handleSubmit} 
                       disabled={isLoading} 
-                      className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
+                      className="min-w-[140px] px-8 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-green-300"
+                      aria-label={isLoading ? 'Guardando cambios' : mode === 'new' ? 'Crear nuevo reloj' : 'Guardar cambios del reloj'}
                     >
                       {isLoading ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-5 h-5 border-[3px] border-white border-t-transparent rounded-full animate-spin"></div>
                       ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
                       <span>{isLoading ? 'Guardando...' : mode === 'new' ? 'Crear' : 'Guardar'}</span>
@@ -3202,7 +3032,7 @@ export default function PoliticasProgramacion() {
 
         const title = `Agregar ${eventType?.name || 'Evento'}`;
 
-        const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500";
+        const inputClass = "w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 hover:border-gray-400";
 
         const validateForm = () => {
           const newErrors = {};
@@ -3217,33 +3047,7 @@ export default function PoliticasProgramacion() {
             if (!localFormData.categoria) newErrors.categoria = 'La categoría es requerida';
           }
           
-          // Validación adicional para Exact Time Marker
-          if (eventType?.type === 'exact-time-marker') {
-            if (!localFormData.tipoETM) newErrors.tipoETM = 'El Tipo ETM es requerido';
-          }
           
-          // Validación adicional para Comando Automatización
-          if (eventType?.type === 'comando-automatizacion') {
-            if (!localFormData.comandoDAS) newErrors.comandoDAS = 'El Comando DAS es requerido';
-          }
-          
-          // Validación adicional para Twofer
-          if (eventType?.type === 'twofer') {
-            if (!localFormData.caracteristica) newErrors.caracteristica = 'La Característica es requerida';
-            if (!localFormData.twoferValor) newErrors.twoferValor = 'El Twofer el valor es requerido';
-            if (!localFormData.todasCategorias && !localFormData.categoriasUsar) {
-              newErrors.categoriasUsar = 'Debe seleccionar categorías a usar si no usa todas las categorías';
-            }
-          }
-          
-          // Validación adicional para Característica Específica
-          if (eventType?.type === 'caracteristica-especifica') {
-            if (!localFormData.caracteristicaEspecifica) newErrors.caracteristicaEspecifica = 'La Característica es requerida';
-            if (!localFormData.valorDeseado) newErrors.valorDeseado = 'El Valor deseado es requerido';
-            if (!localFormData.usarTodasCategorias && !localFormData.categoriasUsarEspecifica) {
-              newErrors.categoriasUsarEspecifica = 'Debe seleccionar categorías a usar si no usa todas las categorías';
-            }
-          }
           
           setErrors(newErrors);
           return Object.keys(newErrors).length === 0;
@@ -3273,32 +3077,6 @@ export default function PoliticasProgramacion() {
                 idMedia: localFormData.idMedia,
                 categoriaEspecifica: localFormData.categoria
               }),
-              // Campo adicional para Exact Time Marker
-              ...(eventType?.type === 'exact-time-marker' && {
-                tipoETM: localFormData.tipoETM
-              }),
-              // Campo adicional para Comando Automatización
-              ...(eventType?.type === 'comando-automatizacion' && {
-                comandoDAS: localFormData.comandoDAS
-              }),
-              // Campos adicionales para Twofer
-              ...(eventType?.type === 'twofer' && {
-                caracteristica: localFormData.caracteristica,
-                twoferValor: localFormData.twoferValor,
-                todasCategorias: localFormData.todasCategorias,
-                categoriasUsar: localFormData.categoriasUsar,
-                gruposReglasIgnorar: localFormData.gruposReglasIgnorar,
-                clasificacionesEvento: localFormData.clasificacionesEvento
-              }),
-              // Campos adicionales para Característica Específica
-              ...(eventType?.type === 'caracteristica-especifica' && {
-                caracteristicaEspecifica: localFormData.caracteristicaEspecifica,
-                valorDeseado: localFormData.valorDeseado,
-                usarTodasCategorias: localFormData.usarTodasCategorias,
-                categoriasUsarEspecifica: localFormData.categoriasUsarEspecifica,
-                gruposReglasIgnorarEspecifica: localFormData.gruposReglasIgnorarEspecifica,
-                clasificacionesEventoEspecifica: localFormData.clasificacionesEventoEspecifica
-              })
             };
             
             // Calcular el offset final basado en la duración
@@ -3335,29 +3113,43 @@ export default function PoliticasProgramacion() {
         };
 
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-            <div className="bg-white border border-gray-300 shadow-lg w-[500px] max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-              {/* Window Header */}
-              <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                  <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                  <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100" onClick={(e) => e.stopPropagation()}>
+              {/* Enhanced Window Header */}
+              <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-6 py-4 relative overflow-hidden border-b border-blue-800/20">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/90 to-indigo-600/90"></div>
+                <div className="relative z-10 flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm shadow-lg">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </div>
+                    <h1 className="text-2xl font-bold text-white">{title}</h1>
+                  </div>
+                  <button
+                    onClick={onCancel}
+                    className="text-white/90 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-all duration-200 hover:scale-110"
+                    title="Cerrar"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <h1 className="text-lg font-semibold text-gray-800">{title}</h1>
-                <button onClick={onCancel} className="text-gray-600 hover:text-gray-800 transition-colors">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                {/* Efecto de partículas decorativas */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
               </div>
               
-              {/* Form Content */}
-              <div className="flex-1 overflow-y-auto p-6 bg-white">
-                <div className="space-y-4">
+              {/* Enhanced Form Content */}
+              <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-gray-50 via-white to-blue-50/20">
+                <div className="space-y-6">
                   {/* Consecutivo */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Consecutivo *</label>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Consecutivo <span className="text-red-500">*</span>
+                    </label>
                     <input 
                       type="text" 
                       name="consecutivo" 
@@ -3372,7 +3164,9 @@ export default function PoliticasProgramacion() {
                   
                   {/* Offset */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Offset *</label>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Offset <span className="text-red-500">*</span>
+                    </label>
                     <div className="flex flex-col space-y-2">
                       <div className="flex space-x-2 items-center">
                         <div className="flex flex-col items-center">
@@ -3463,7 +3257,9 @@ export default function PoliticasProgramacion() {
                   
                   {/* Duración */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Duración *</label>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Duración <span className="text-red-500">*</span>
+                    </label>
                     <div className="flex flex-col space-y-2">
                       <div className="flex space-x-2 items-center">
                         <div className="flex flex-col items-center">
@@ -3553,17 +3349,26 @@ export default function PoliticasProgramacion() {
                   
                   {/* Descripción */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripción *</label>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Descripción <span className="text-red-500">*</span>
+                    </label>
                     <textarea 
                       name="descripcion" 
                       value={localFormData.descripcion || ''} 
                       onChange={handleChange} 
-                      rows="3" 
+                      rows="4" 
                       className={inputClass} 
                       required 
                       placeholder="Descripción del evento..." 
                     />
-                    {errors.descripcion && <p className="mt-1 text-sm text-red-600">{errors.descripcion}</p>}
+                    {errors.descripcion && (
+                      <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{errors.descripcion}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Campos adicionales para Cartucho Fijo */}
@@ -3571,7 +3376,9 @@ export default function PoliticasProgramacion() {
                     <>
                       {/* ID Media */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ID Media *</label>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          ID Media <span className="text-red-500">*</span>
+                        </label>
                         <input 
                           type="text" 
                           name="idMedia" 
@@ -3586,7 +3393,9 @@ export default function PoliticasProgramacion() {
 
                       {/* Categoría */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          Categoría <span className="text-red-500">*</span>
+                        </label>
                         <select 
                           name="categoria" 
                           value={localFormData.categoria || ''} 
@@ -3607,282 +3416,23 @@ export default function PoliticasProgramacion() {
                     </>
                   )}
 
-                  {/* Campo adicional para Exact Time Marker */}
-                  {eventType?.type === 'exact-time-marker' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipo ETM *</label>
-                      <select 
-                        name="tipoETM" 
-                        value={localFormData.tipoETM || ''} 
-                        onChange={handleChange} 
-                        className={inputClass} 
-                        required
-                      >
-                        <option value="">Seleccionar tipo ETM</option>
-                        <option value="ETM_00">ETM 00</option>
-                        <option value="ETM_15">ETM 15</option>
-                        <option value="ETM_30">ETM 30</option>
-                        <option value="ETM_45">ETM 45</option>
-                      </select>
-                      {errors.tipoETM && <p className="mt-1 text-sm text-red-600">{errors.tipoETM}</p>}
-                    </div>
-                  )}
 
-                  {/* Campo adicional para Comando Automatización */}
-                  {eventType?.type === 'comando-automatizacion' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Comando DAS *</label>
-                      <select 
-                        name="comandoDAS" 
-                        value={localFormData.comandoDAS || ''} 
-                        onChange={handleChange} 
-                        className={inputClass} 
-                        required
-                      >
-                        <option value="">Seleccionar comando DAS</option>
-                        <option value="DAS_CMD_1">DAS Comando 1</option>
-                        <option value="DAS_CMD_2">DAS Comando 2</option>
-                        <option value="DAS_CMD_3">DAS Comando 3</option>
-                        <option value="DAS_CMD_4">DAS Comando 4</option>
-                        <option value="DAS_CMD_5">DAS Comando 5</option>
-                        <option value="DAS_CMD_6">DAS Comando 6</option>
-                      </select>
-                      {errors.comandoDAS && <p className="mt-1 text-sm text-red-600">{errors.comandoDAS}</p>}
-                    </div>
-                  )}
 
-                  {/* Campos adicionales para Twofer */}
-                  {eventType?.type === 'twofer' && (
-                    <>
-                      {/* Característica */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Característica *</label>
-                        <select 
-                          name="caracteristica" 
-                          value={localFormData.caracteristica || ''} 
-                          onChange={handleChange} 
-                          className={inputClass} 
-                          required
-                        >
-                          <option value="">Seleccionar característica</option>
-                          <option value="CARACT_1">Característica 1</option>
-                          <option value="CARACT_2">Característica 2</option>
-                          <option value="CARACT_3">Característica 3</option>
-                          <option value="CARACT_4">Característica 4</option>
-                        </select>
-                        {errors.caracteristica && <p className="mt-1 text-sm text-red-600">{errors.caracteristica}</p>}
-                      </div>
 
-                      {/* Twofer el valor */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Twofer el valor *</label>
-                        <select 
-                          name="twoferValor" 
-                          value={localFormData.twoferValor || ''} 
-                          onChange={handleChange} 
-                          className={inputClass} 
-                          required
-                        >
-                          <option value="">Seleccionar valor</option>
-                          <option value="TWOFER_1">Twofer 1</option>
-                          <option value="TWOFER_2">Twofer 2</option>
-                          <option value="TWOFER_3">Twofer 3</option>
-                          <option value="TWOFER_4">Twofer 4</option>
-                        </select>
-                        {errors.twoferValor && <p className="mt-1 text-sm text-red-600">{errors.twoferValor}</p>}
-                      </div>
-
-                      {/* Todas las categorías */}
-                      <div>
-                        <label className="flex items-center space-x-2">
-                          <input 
-                            type="checkbox" 
-                            name="todasCategorias" 
-                            checked={localFormData.todasCategorias || true} 
-                            onChange={(e) => handleChange({ target: { name: 'todasCategorias', value: e.target.checked } })} 
-                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          />
-                          <span className="text-sm font-medium text-gray-700">Todas las categorías</span>
-                        </label>
-                      </div>
-
-                      {/* Categorías a usar */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Categorías a usar</label>
-                        <select 
-                          name="categoriasUsar" 
-                          value={localFormData.categoriasUsar || ''} 
-                          onChange={handleChange} 
-                          className={inputClass} 
-                          disabled={localFormData.todasCategorias}
-                        >
-                          <option value="">Seleccionar categorías</option>
-                          <option value="CAT_1">Categoría 1</option>
-                          <option value="CAT_2">Categoría 2</option>
-                          <option value="CAT_3">Categoría 3</option>
-                          <option value="CAT_4">Categoría 4</option>
-                        </select>
-                        {errors.categoriasUsar && <p className="mt-1 text-sm text-red-600">{errors.categoriasUsar}</p>}
-                      </div>
-
-                      {/* Grupos reglas a ignorar */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Grupos reglas a ignorar</label>
-                        <select 
-                          name="gruposReglasIgnorar" 
-                          value={localFormData.gruposReglasIgnorar || ''} 
-                          onChange={handleChange} 
-                          className={inputClass}
-                        >
-                          <option value="">Seleccionar grupos</option>
-                          <option value="GRUPO_1">Grupo 1</option>
-                          <option value="GRUPO_2">Grupo 2</option>
-                          <option value="GRUPO_3">Grupo 3</option>
-                          <option value="GRUPO_4">Grupo 4</option>
-                        </select>
-                        {errors.gruposReglasIgnorar && <p className="mt-1 text-sm text-red-600">{errors.gruposReglasIgnorar}</p>}
-                      </div>
-
-                      {/* Clasificaciones del evento */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Clasificaciones del evento</label>
-                        <select 
-                          name="clasificacionesEvento" 
-                          value={localFormData.clasificacionesEvento || ''} 
-                          onChange={handleChange} 
-                          className={inputClass}
-                        >
-                          <option value="">Seleccionar clasificación</option>
-                          <option value="CLASIF_1">Clasificación 1</option>
-                          <option value="CLASIF_2">Clasificación 2</option>
-                          <option value="CLASIF_3">Clasificación 3</option>
-                          <option value="CLASIF_4">Clasificación 4</option>
-                        </select>
-                        {errors.clasificacionesEvento && <p className="mt-1 text-sm text-red-600">{errors.clasificacionesEvento}</p>}
-                      </div>
-                    </>
-                  )}
-
-                  {/* Campos adicionales para Característica Específica */}
-                  {eventType?.type === 'caracteristica-especifica' && (
-                    <>
-                      {/* Característica */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Característica *</label>
-                        <select 
-                          name="caracteristicaEspecifica" 
-                          value={localFormData.caracteristicaEspecifica || ''} 
-                          onChange={handleChange} 
-                          className={inputClass} 
-                          required
-                        >
-                          <option value="">Seleccionar característica</option>
-                          <option value="CARACT_ESP_1">Característica Específica 1</option>
-                          <option value="CARACT_ESP_2">Característica Específica 2</option>
-                          <option value="CARACT_ESP_3">Característica Específica 3</option>
-                          <option value="CARACT_ESP_4">Característica Específica 4</option>
-                        </select>
-                        {errors.caracteristicaEspecifica && <p className="mt-1 text-sm text-red-600">{errors.caracteristicaEspecifica}</p>}
-                      </div>
-
-                      {/* Valor deseado */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Valor deseado *</label>
-                        <input 
-                          type="text" 
-                          name="valorDeseado" 
-                          value={localFormData.valorDeseado || ''} 
-                          onChange={handleChange} 
-                          className={inputClass} 
-                          required 
-                          placeholder="Ingrese el valor deseado" 
-                        />
-                        {errors.valorDeseado && <p className="mt-1 text-sm text-red-600">{errors.valorDeseado}</p>}
-                      </div>
-
-                      {/* Usar todas las categorías */}
-                      <div>
-                        <label className="flex items-center space-x-2">
-                          <input 
-                            type="checkbox" 
-                            name="usarTodasCategorias" 
-                            checked={localFormData.usarTodasCategorias || true} 
-                            onChange={(e) => handleChange({ target: { name: 'usarTodasCategorias', value: e.target.checked } })} 
-                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          />
-                          <span className="text-sm font-medium text-gray-700">Usar todas las categorías</span>
-                        </label>
-                      </div>
-
-                      {/* Categorías a usar */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Categorías a usar</label>
-                        <select 
-                          name="categoriasUsarEspecifica" 
-                          value={localFormData.categoriasUsarEspecifica || ''} 
-                          onChange={handleChange} 
-                          className={inputClass} 
-                          disabled={localFormData.usarTodasCategorias}
-                        >
-                          <option value="">Seleccionar categorías</option>
-                          <option value="CAT_ESP_1">Categoría Específica 1</option>
-                          <option value="CAT_ESP_2">Categoría Específica 2</option>
-                          <option value="CAT_ESP_3">Categoría Específica 3</option>
-                          <option value="CAT_ESP_4">Categoría Específica 4</option>
-                        </select>
-                        {errors.categoriasUsarEspecifica && <p className="mt-1 text-sm text-red-600">{errors.categoriasUsarEspecifica}</p>}
-                      </div>
-
-                      {/* Grupos reglas a ignorar */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Grupos reglas a ignorar</label>
-                        <select 
-                          name="gruposReglasIgnorarEspecifica" 
-                          value={localFormData.gruposReglasIgnorarEspecifica || ''} 
-                          onChange={handleChange} 
-                          className={inputClass}
-                        >
-                          <option value="">Seleccionar grupos</option>
-                          <option value="GRUPO_ESP_1">Grupo Específico 1</option>
-                          <option value="GRUPO_ESP_2">Grupo Específico 2</option>
-                          <option value="GRUPO_ESP_3">Grupo Específico 3</option>
-                          <option value="GRUPO_ESP_4">Grupo Específico 4</option>
-                        </select>
-                        {errors.gruposReglasIgnorarEspecifica && <p className="mt-1 text-sm text-red-600">{errors.gruposReglasIgnorarEspecifica}</p>}
-                      </div>
-
-                      {/* Clasificaciones del evento */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Clasificaciones del evento</label>
-                        <select 
-                          name="clasificacionesEventoEspecifica" 
-                          value={localFormData.clasificacionesEventoEspecifica || ''} 
-                          onChange={handleChange} 
-                          className={inputClass}
-                        >
-                          <option value="">Seleccionar clasificación</option>
-                          <option value="CLASIF_ESP_1">Clasificación Específica 1</option>
-                          <option value="CLASIF_ESP_2">Clasificación Específica 2</option>
-                          <option value="CLASIF_ESP_3">Clasificación Específica 3</option>
-                          <option value="CLASIF_ESP_4">Clasificación Específica 4</option>
-                        </select>
-                        {errors.clasificacionesEventoEspecifica && <p className="mt-1 text-sm text-red-600">{errors.clasificacionesEventoEspecifica}</p>}
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
               
-              {/* Footer with Action Buttons */}
-              <div className="bg-gray-50 border-t border-gray-300 px-6 py-4 flex justify-end space-x-3">
+              {/* Footer with Action Buttons - Mejorado */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t-2 border-gray-300 px-8 py-5 flex justify-end gap-4 shadow-inner">
                 <button 
                   type="button" 
                   onClick={onCancel} 
                   disabled={isLoading} 
-                  className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                  className="min-w-[140px] px-8 py-4 bg-red-600 text-white rounded-xl hover:bg-red-700 active:bg-red-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-red-300"
+                  aria-label="Cancelar y cerrar formulario"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                   <span>Cancelar</span>
                 </button>
@@ -3890,13 +3440,14 @@ export default function PoliticasProgramacion() {
                   type="button" 
                   onClick={handleSubmit} 
                   disabled={isLoading} 
-                  className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                  className="min-w-[140px] px-8 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-green-300"
+                  aria-label={isLoading ? 'Guardando evento' : 'Agregar evento al reloj'}
                 >
                   {isLoading ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-[3px] border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                   <span>{isLoading ? 'Guardando...' : 'Agregar Evento'}</span>
@@ -3929,23 +3480,102 @@ export default function PoliticasProgramacion() {
   handleEditReloj,
   handleViewReloj,
   handleDeleteReloj,
+  handleToggleRelojHabilitado,
   handleNewDiaModelo,
   handleEditDiaModelo,
   handleViewDiaModelo,
   handleDeleteDiaModelo,
   handleSaveDiaModelo,
+  handleToggleDiaModeloHabilitado,
   getEventColor,
   relojEvents,
   calculateTotalDuration,
   getSelectedRelojEvents,
   getSelectedRelojDuration,
-  politicas
+  politicas,
+  handleNewRegla,
+  reglasPolitica,
+  loadingReglas,
+  loadReglasPolitica,
+  handleToggleReglaHabilitada
 }) {
   
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [activeTab, setActiveTab] = useState(propActiveTab !== undefined ? propActiveTab : 0);
   const [editingDiaModeloIndex, setEditingDiaModeloIndex] = useState(null);
+  const [selectedDiaModeloInTable, setSelectedDiaModeloInTable] = useState(null);
+
+  // Helper para calcular duración total en segundos desde formato HH:MM:SS
+  const parseDurationToSecondsLocal = (durationStr) => {
+    if (!durationStr) return 0;
+    
+    // Si es un número, ya está en segundos
+    if (typeof durationStr === 'number') {
+      return durationStr;
+    }
+    
+    // Si es string con formato HH:MM:SS
+    if (typeof durationStr === 'string' && durationStr.includes(':')) {
+      const parts = durationStr.split(':');
+      if (parts.length === 3) {
+        const hours = parseInt(parts[0], 10) || 0;
+        const minutes = parseInt(parts[1], 10) || 0;
+        const seconds = parseInt(parts[2], 10) || 0;
+        return hours * 3600 + minutes * 60 + seconds;
+      }
+    }
+    
+    // Si es string numérico, tratar como segundos
+    if (typeof durationStr === 'string') {
+      return parseInt(durationStr, 10) || 0;
+    }
+    
+    return 0;
+  };
+
+  // Helper para formatear segundos a HH:MM:SS
+  const formatSecondsToTimeLocal = (totalSeconds) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Función para calcular la duración total de un reloj basándose en sus eventos
+  const calculateRelojDurationLocal = (reloj) => {
+    if (!reloj || !reloj.eventos || reloj.eventos.length === 0) {
+      return '00:00:00';
+    }
+    
+    let totalSeconds = 0;
+    reloj.eventos.forEach(evento => {
+      totalSeconds += parseDurationToSecondsLocal(evento.duracion);
+    });
+    
+    return formatSecondsToTimeLocal(totalSeconds);
+  };
+  
+  // Estados para el modal de reglas
+  const [showReglaForm, setShowReglaForm] = useState(false);
+  const [selectedRegla, setSelectedRegla] = useState(null);
+  const [reglaFormMode, setReglaFormMode] = useState('new'); // 'new', 'edit', 'view'
+  const [reglaFormData, setReglaFormData] = useState({
+    posicion: 0,
+    tipoRegla: 'Separación Mínima',
+    caracteristica: 'Inquebrantable',
+    caracteristica2: '',
+    setReglas: false,
+    reglaHabilitada: true,
+    caracteristicaDetalle: '',
+    horario: false,
+    horaInicial: '',
+    horaFinal: '',
+    tipoSeparacion: 'Tiempo - Segundos',
+    soloVerificarDia: false,
+    descripcion: '',
+    separaciones: []
+  });
   const [showDiaModeloForm, setShowDiaModeloForm] = useState(false);
 
   // Sincronizar el estado local con las props cuando cambien
@@ -3962,10 +3592,193 @@ export default function PoliticasProgramacion() {
     }
   }, [activeTab, propSetActiveTab]);
 
+  // Debug: monitorear cambios en showReglaForm
+  useEffect(() => {
+    console.log('🔍 showReglaForm cambió a:', showReglaForm);
+  }, [showReglaForm]);
+
   // Funciones locales para manejar días modelo
   const handleNewDiaModeloLocal = () => {
     setEditingDiaModeloIndex(null);
     setShowDiaModeloForm(true);
+  };
+
+  // Funciones para el formulario de reglas
+  const handleNewReglaLocal = () => {
+    console.log('🔍 handleNewReglaLocal ejecutándose...');
+    setSelectedRegla(null);
+    setReglaFormMode('new');
+    setReglaFormData({
+      tipoRegla: 'Separación Mínima',
+      reglaHabilitada: true,
+      caracteristicaDetalle: 'ID de Canción',
+      horario: false,
+      horaInicial: '',
+      horaFinal: '',
+      tipoSeparacion: 'Tiempo - Segundos',
+      soloVerificarDia: false,
+      descripcion: '',
+      separaciones: []
+    });
+    setShowReglaForm(true);
+  };
+
+  const handleEditReglaLocal = () => {
+    if (!selectedRegla) {
+      alert('Por favor, selecciona una regla para editar');
+      return;
+    }
+    console.log('🔍 handleEditReglaLocal - Regla seleccionada:', selectedRegla);
+    setReglaFormMode('edit');
+    setReglaFormData({
+      tipoRegla: selectedRegla.tipo_regla || 'Separación Mínima',
+      reglaHabilitada: selectedRegla.habilitada ?? true,
+      caracteristicaDetalle: selectedRegla.caracteristica || 'ID de Canción',
+      horario: selectedRegla.horario || false,
+      horaInicial: '',
+      horaFinal: '',
+      tipoSeparacion: selectedRegla.tipo_separacion || 'Tiempo - Segundos',
+      soloVerificarDia: selectedRegla.solo_verificar_dia || false,
+      descripcion: selectedRegla.descripcion || '',
+      separaciones: selectedRegla.separaciones?.map(sep => ({
+        valor: sep.valor || '',
+        separacion: sep.separacion || 0
+      })) || []
+    });
+    setShowReglaForm(true);
+  };
+
+  const handleConsultarRegla = () => {
+    if (!selectedRegla) {
+      alert('Por favor, selecciona una regla para consultar');
+      return;
+    }
+    console.log('🔍 handleConsultarRegla - Regla seleccionada:', selectedRegla);
+    setReglaFormMode('view');
+    setReglaFormData({
+      tipoRegla: selectedRegla.tipo_regla || 'Separación Mínima',
+      reglaHabilitada: selectedRegla.habilitada ?? true,
+      caracteristicaDetalle: selectedRegla.caracteristica || 'ID de Canción',
+      horario: selectedRegla.horario || false,
+      horaInicial: '',
+      horaFinal: '',
+      tipoSeparacion: selectedRegla.tipo_separacion || 'Tiempo - Segundos',
+      soloVerificarDia: selectedRegla.solo_verificar_dia || false,
+      descripcion: selectedRegla.descripcion || '',
+      separaciones: selectedRegla.separaciones?.map(sep => ({
+        valor: sep.valor || '',
+        separacion: sep.separacion || 0
+      })) || []
+    });
+    setShowReglaForm(true);
+  };
+
+  const handleDeleteReglaLocal = async () => {
+    if (!selectedRegla) {
+      alert('Por favor, selecciona una regla para eliminar');
+      return;
+    }
+    
+    if (!confirm(`¿Estás seguro de que deseas eliminar la regla "${selectedRegla.tipo_regla}"?`)) {
+      return;
+    }
+    
+    try {
+      await deleteRegla(selectedRegla.id);
+      console.log('✅ Regla eliminada exitosamente');
+      
+      // Recargar las reglas de la política
+      await loadReglasPolitica(politica?.id || 1);
+      
+      // Limpiar selección
+      setSelectedRegla(null);
+      
+    } catch (error) {
+      console.error('❌ Error al eliminar regla:', error);
+      alert('Error al eliminar la regla. Por favor, inténtalo de nuevo.');
+    }
+  };
+
+  const handleReglaFormChange = (field, value) => {
+    setReglaFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSeparacionChange = (index, field, value) => {
+    setReglaFormData(prev => ({
+      ...prev,
+      separaciones: prev.separaciones.map((sep, i) => 
+        i === index ? { ...sep, [field]: value } : sep
+      )
+    }));
+  };
+
+  const addSeparacion = () => {
+    setReglaFormData(prev => ({
+      ...prev,
+      separaciones: [...prev.separaciones, { valor: '', separacion: 0 }]
+    }));
+  };
+
+  const removeSeparacion = (index) => {
+    setReglaFormData(prev => ({
+      ...prev,
+      separaciones: prev.separaciones.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleReglaSave = async () => {
+    try {
+      console.log('💾 Guardando regla:', reglaFormData);
+      
+      // Preparar datos para enviar a la API
+      const reglaData = {
+        politica_id: politica?.id || 1, // Usar la política actual o un ID por defecto
+        tipo_regla: reglaFormData.tipoRegla,
+        caracteristica: reglaFormData.caracteristicaDetalle,
+        tipo_separacion: reglaFormData.tipoSeparacion,
+        descripcion: reglaFormData.descripcion,
+        horario: reglaFormData.horario,
+        solo_verificar_dia: reglaFormData.soloVerificarDia,
+        habilitada: reglaFormData.reglaHabilitada,
+        separaciones: reglaFormData.separaciones.map(sep => ({
+          valor: sep.valor,
+          separacion: parseInt(sep.separacion) || 0
+        }))
+      };
+      
+      // Crear la regla
+      const nuevaRegla = await createRegla(reglaData);
+      console.log('✅ Regla creada:', nuevaRegla);
+      
+      // Cerrar el modal y limpiar el formulario
+      setShowReglaForm(false);
+      setReglaFormData({
+        tipoRegla: 'Separación Mínima',
+        caracteristica: '',
+        tipoSeparacion: 'Tiempo - Segundos',
+        horario: false,
+        soloVerificarDia: false,
+        habilitada: true,
+        separaciones: []
+      });
+      
+      // Mostrar notificación de éxito
+      console.log('✅ Regla guardada exitosamente');
+      
+      // Recargar las reglas de la política
+      await loadReglasPolitica(politica?.id || 1);
+      
+    } catch (error) {
+      console.error('❌ Error al guardar regla:', error);
+      console.error('❌ Error al guardar la regla. Por favor, inténtalo de nuevo.');
+    }
+  };
+
+  const handleReglaCancel = () => {
+    setShowReglaForm(false);
   };
 
   const handleEditDiaModeloLocal = (diaModelo) => {
@@ -4129,15 +3942,6 @@ export default function PoliticasProgramacion() {
     },
     { 
       id: 1, 
-      name: 'Sets de reglas', 
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-      )
-    },
-    { 
-      id: 2, 
       name: 'Reglas', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4147,7 +3951,7 @@ export default function PoliticasProgramacion() {
       )
     },
     { 
-      id: 3, 
+      id: 2, 
       name: 'Orden de asignación', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4156,7 +3960,7 @@ export default function PoliticasProgramacion() {
       )
     },
     { 
-      id: 4, 
+      id: 3, 
       name: 'Relojes', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4165,7 +3969,7 @@ export default function PoliticasProgramacion() {
       )
     },
     { 
-      id: 5, 
+      id: 4, 
       name: 'Días modelo', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4212,6 +4016,16 @@ export default function PoliticasProgramacion() {
     setIsLoading(true);
     
     try {
+      // Si estamos en la pestaña de Orden de asignación (2), persistir categorías antes
+      if (activeTab === 2 && politica?.id) {
+        try {
+          const categoriasNombres = categoriasSeleccionadas.map(c => typeof c === 'string' ? c : c.nombre)
+          await guardarCategoriasPolitica(politica.id, categoriasNombres)
+          console.log('✅ Categorías de política guardadas:', categoriasNombres)
+        } catch (err) {
+          console.error('Error guardando categorías de política:', err)
+        }
+      }
       console.log('🔍 FormData antes de enviar:', formData);
       
       // Convertir cadenas vacías a null para los días modelo
@@ -4261,12 +4075,12 @@ export default function PoliticasProgramacion() {
     }
   };
 
-  const inputClass = `w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-    isReadOnly ? 'bg-gray-50 text-gray-600' : 'bg-white text-gray-900'
+  const inputClass = `w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+    isReadOnly ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : 'bg-white text-gray-900 hover:border-gray-400'
   }`;
 
-  const selectClass = `w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-    isReadOnly ? 'bg-gray-50 text-gray-600' : 'bg-white text-gray-900'
+  const selectClass = `w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+    isReadOnly ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : 'bg-white text-gray-900 hover:border-gray-400'
   }`;
 
   const renderTabContent = () => {
@@ -4275,16 +4089,16 @@ export default function PoliticasProgramacion() {
         return (
           <div className="space-y-6">
             {/* Habilitada checkbox */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
               <input
                 type="checkbox"
                 name="habilitada"
                 checked={formData.habilitada}
                 onChange={handleChange}
                 disabled={isReadOnly}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded transition-all cursor-pointer disabled:cursor-not-allowed"
               />
-              <label className="text-sm font-medium text-gray-700">Política habilitada</label>
+              <label className="text-base font-semibold text-gray-700 cursor-pointer">Política habilitada</label>
             </div>
 
             {/* Form fields */}
@@ -4292,8 +4106,8 @@ export default function PoliticasProgramacion() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Clave *
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Clave <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -4306,13 +4120,18 @@ export default function PoliticasProgramacion() {
                     placeholder="Ej: DIARIO"
                   />
                   {errors.clave && (
-                    <p className="mt-1 text-sm text-red-600">{errors.clave}</p>
+                    <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{errors.clave}</span>
+                    </p>
                   )}
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Difusora *
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Difusora <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="difusora"
@@ -4330,13 +4149,18 @@ export default function PoliticasProgramacion() {
                     ))}
                   </select>
                   {errors.difusora && (
-                    <p className="mt-1 text-sm text-red-600">{errors.difusora}</p>
+                    <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{errors.difusora}</span>
+                    </p>
                   )}
                 </div>
                 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre *
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Nombre <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -4349,20 +4173,23 @@ export default function PoliticasProgramacion() {
                     placeholder="Ej: Política Diaria"
                   />
                   {errors.nombre && (
-                    <p className="mt-1 text-sm text-red-600">{errors.nombre}</p>
+                    <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{errors.nombre}</span>
+                    </p>
                   )}
                 </div>
                 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
-                  </label>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Descripción</label>
                   <textarea
                     name="descripcion"
                     value={formData.descripcion || ''}
                     onChange={handleChange}
                     readOnly={isReadOnly}
-                    rows="3"
+                    rows="4"
                     className={inputClass}
                     placeholder="Descripción de la política..."
                   />
@@ -4372,40 +4199,162 @@ export default function PoliticasProgramacion() {
           </div>
         );
 
-      case 1: // Sets de reglas
+
+      case 1: // Reglas
         return (
           <div className="space-y-4">
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Reglas</h3>
+              <div className="flex space-x-2">
+                <button 
+                  onClick={() => {
+                    console.log('🔍 Botón Añadir clickeado');
+                    handleNewReglaLocal();
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
+                  <span>Añadir</span>
+                </button>
+                <button 
+                  onClick={handleEditReglaLocal}
+                  className="flex items-center space-x-2 px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span>Editar</span>
+                </button>
+                <button 
+                  onClick={handleConsultarRegla}
+                  className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors border-2 border-green-500"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <span>Consultar</span>
+                </button>
+                <button 
+                  onClick={handleDeleteReglaLocal}
+                  className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span>Eliminar</span>
+                </button>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Sets de Reglas</h3>
-              <p className="text-gray-600">Configuración de sets de reglas para esta política</p>
-              <p className="text-sm text-gray-500 mt-2">Funcionalidad en desarrollo</p>
+            </div>
+            
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Habilitada
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tipo de Regla
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Descripción
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Característica
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tipo Separación
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Valor
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Separación
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loadingReglas ? (
+                      <tr>
+                        <td colSpan="7" className="px-4 py-8 text-center">
+                          <div className="flex justify-center items-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                            <span className="ml-2 text-gray-500">Cargando reglas...</span>
+              </div>
+                        </td>
+                      </tr>
+                    ) : reglasPolitica.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                          No hay reglas configuradas para esta política
+                        </td>
+                      </tr>
+                    ) : (
+                      reglasPolitica.map((regla, index) => (
+                        <tr 
+                          key={regla.id} 
+                          className={`hover:bg-gray-50 cursor-pointer ${selectedRegla?.id === regla.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
+                          onClick={() => setSelectedRegla(regla)}
+                        >
+                          <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center">
+                              <input 
+                                type="checkbox" 
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                                checked={regla.habilitada ?? true}
+                                onChange={(e) => {
+                                  if (handleToggleReglaHabilitada) {
+                                    handleToggleReglaHabilitada(regla.id, e.target.checked);
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{regla.tipo_regla}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="text-sm text-gray-900 max-w-xs truncate" title={regla.descripcion || 'Sin descripción'}>
+                              {regla.descripcion || 'Sin descripción'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{regla.caracteristica}</div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{regla.tipo_separacion}</div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {regla.separaciones && regla.separaciones.length > 0 
+                                ? regla.separaciones.map(sep => sep.valor).join(', ')
+                                : 'Sin separaciones'
+                              }
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {regla.separaciones && regla.separaciones.length > 0 
+                                ? regla.separaciones.map(sep => `${sep.separacion} seg`).join(', ')
+                                : '0 seg'
+                              }
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         );
 
-      case 2: // Reglas
-        return (
-          <div className="space-y-4">
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Reglas</h3>
-              <p className="text-gray-600">Configuración de reglas específicas</p>
-              <p className="text-sm text-gray-500 mt-2">Funcionalidad en desarrollo</p>
-            </div>
-          </div>
-        );
-
-      case 3: // Orden de asignación
+      case 2: // Orden de asignación
         return (
           <OrdenAsignacion 
             politicaId={politica?.id || 1} // Usar el ID de la política actual
@@ -4418,123 +4367,196 @@ export default function PoliticasProgramacion() {
           />
         );
 
-      case 4: // Relojes
+      case 3: // Relojes
         return (
           <div className="space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Gestión de Relojes</h3>
-                <p className="text-sm text-gray-600">Administra los relojes de programación</p>
+            {/* Header Mejorado */}
+            <div className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-2xl p-6 border border-purple-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-purple-600 rounded-xl shadow-md">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Gestión de Relojes</h3>
+                    <p className="text-sm text-gray-600 mt-1">Administra los relojes de programación</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-200 text-center">
+                    <div className="text-2xl font-bold text-purple-600">{relojes.length}</div>
+                    <div className="text-xs text-gray-600 uppercase tracking-wide">Relojes</div>
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={() => {
-                  console.log('🔵 Botón Nuevo Reloj clickeado');
-                  console.log('🔵 onNewReloj disponible:', typeof onNewReloj);
-                  if (onNewReloj) {
-                    onNewReloj();
-                  } else {
-                    console.error('❌ onNewReloj no está definido');
-                  }
-                }}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+            </div>
+
+            {/* Action Buttons - Movidos arriba para mejor accesibilidad */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-300 rounded-xl px-8 py-5 flex justify-center gap-6 shadow-md">
+              <button 
+                onClick={handleNewReloj}
+                className="min-w-[180px] px-8 py-5 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-all duration-200 flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-green-300"
+                aria-label="Añadir nuevo reloj"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
                 <span>Nuevo Reloj</span>
+              </button>
+              <button 
+                onClick={() => selectedRelojInTable && handleEditReloj(selectedRelojInTable)}
+                disabled={!selectedRelojInTable}
+                className="min-w-[160px] px-8 py-5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:transform-none"
+                aria-label={selectedRelojInTable ? 'Editar reloj seleccionado' : 'Selecciona un reloj para editar'}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Editar</span>
+              </button>
+              <button 
+                onClick={() => selectedRelojInTable && handleDeleteReloj(selectedRelojInTable.id)}
+                disabled={!selectedRelojInTable}
+                className="min-w-[160px] px-8 py-5 bg-red-600 text-white rounded-xl hover:bg-red-700 active:bg-red-800 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-red-300 disabled:transform-none"
+                aria-label={selectedRelojInTable ? 'Eliminar reloj seleccionado' : 'Selecciona un reloj para eliminar'}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>Eliminar</span>
               </button>
             </div>
 
             {/* Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Panel - Data Grid */}
-              <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="p-4 border-b border-gray-200">
-                  <h4 className="font-medium text-gray-900">Lista de Relojes</h4>
-                                        <p className="text-xs text-gray-500 mt-1">Arrastre una columna aquí para agrupar • Doble click para editar</p>
+              <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Lista de Relojes
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Haz doble click en una fila para editar • Click simple para visualizar
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          <input type="checkbox" className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Habilitado</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clave</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Regla</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Eventos</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duración</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">¡Con Evento</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {relojes.map((reloj, index) => (
-                        <tr 
-                          key={reloj.id} 
-                          className={`${selectedRelojInTable?.id === reloj.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''} hover:bg-gray-50 cursor-pointer`}
-                                                          onClick={() => {
-                                  console.log('🔄 Reloj seleccionado en tabla:', reloj);
-                                  setSelectedRelojInTable(reloj);
-                                }}
-                          onDoubleClick={() => handleEditReloj(reloj)}
-                        >
-                          <td className="px-3 py-2">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-black transform rotate-45"></div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2">
-                            <input 
-                              type="checkbox" 
-                              checked={reloj.habilitado || false} 
-                              onChange={(e) => {
-                                setRelojes(prev => prev.map(r => 
-                                  r.id === reloj.id ? { ...r, habilitado: e.target.checked } : r
-                                ));
-                              }}
-                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-sm font-medium text-gray-900">{reloj.clave}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{reloj.grupo}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{reloj.numeroRegla}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900">{reloj.nombre}</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{reloj.eventos ? reloj.eventos.length : 0} eventos</td>
-                          <td className="px-3 py-2 text-sm text-gray-500">{reloj.duracion}</td>
-                          <td className="px-3 py-2">
-                            <input 
-                              type="checkbox" 
-                              checked={reloj.conEvento || false} 
-                              onChange={(e) => {
-                                setRelojes(prev => prev.map(r => 
-                                  r.id === reloj.id ? { ...r, conEvento: e.target.checked } : r
-                                ));
-                              }}
-                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </td>
+                  {relojes.length === 0 ? (
+                    <div className="text-center py-16">
+                      <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-gray-600 font-medium text-lg mb-2">No hay relojes configurados</p>
+                      <p className="text-gray-500 text-sm mb-4">Crea tu primer reloj para comenzar</p>
+                      <button
+                        onClick={() => onNewReloj && onNewReloj()}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors inline-flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Crear Reloj
+                      </button>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b-2 border-gray-200">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Habilitado</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Clave</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nombre</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"># Eventos</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Duración</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {relojes.map((reloj, index) => (
+                          <tr 
+                            key={reloj.id} 
+                            className={`${selectedRelojInTable?.id === reloj.id ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm' : ''} hover:bg-gray-50 cursor-pointer transition-all duration-150`}
+                            onClick={() => {
+                              console.log('🔄 Reloj seleccionado en tabla:', reloj);
+                              setSelectedRelojInTable(reloj);
+                            }}
+                            onDoubleClick={() => handleEditReloj(reloj)}
+                          >
+                            <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={reloj.habilitado || false} 
+                                onChange={(e) => {
+                                  handleToggleRelojHabilitado(reloj.id, e.target.checked);
+                                }}
+                                className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                <span className="text-sm font-semibold text-gray-900">{reloj.clave}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="text-sm font-medium text-gray-900">{reloj.nombre}</span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="inline-flex items-center px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+                                {reloj.eventos ? reloj.eventos.length : 0} eventos
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="inline-flex items-center px-2.5 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {calculateRelojDurationLocal(reloj)}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
 
               {/* Right Panel - Clock Visualization */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="p-3 border-b border-gray-200">
-                  <h4 className="font-medium text-gray-900 text-sm">Visualización del Reloj</h4>
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 px-5 py-4 border-b border-gray-200">
+                  <h4 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Visualización del Reloj
+                  </h4>
                 </div>
-                <div className="p-4">
-                  <div className="relative w-48 h-48 mx-auto">
-                    {/* Pie Chart */}
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                <div className="p-6">
+                  {!selectedRelojInTable ? (
+                    <div className="text-center py-12">
+                      <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-600 font-medium mb-1">Selecciona un reloj</p>
+                      <p className="text-gray-500 text-sm">Haz click en un reloj de la lista para ver su visualización</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative w-72 h-72 mx-auto mb-6">
+                        {/* Pie Chart */}
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                       {/* Círculo base de 60 minutos */}
                       <circle
                         cx="50"
@@ -4582,8 +4604,6 @@ export default function PoliticasProgramacion() {
                               'Nota Operador': '#f59e0b', // Amarillo
                               'ETM': '#10b981', // Verde
                               'Cartucho Fijo': '#8b5cf6', // Púrpura
-                              'Exact Time Marker': '#06b6d4', // Cyan
-                              'Canción Manual': '#f97316', // Naranja
                               'Comando': '#6366f1', // Índigo
                               'Twofer': '#ec4899', // Rosa
                               'Característica Específica': '#84cc16' // Verde lima
@@ -4682,302 +4702,300 @@ export default function PoliticasProgramacion() {
                     </svg>
                   </div>
                   
-                  {/* Leyenda de colores */}
-                  <div className="mt-4">
-                    <h5 className="text-sm font-medium text-gray-700 mb-3">Leyenda de colores:</h5>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span>Canciones</span>
+                      {/* Leyenda de colores mejorada */}
+                      <div className="mb-6">
+                        <h5 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                          </svg>
+                          Leyenda de colores
+                        </h5>
+                        {(() => {
+                          // Obtener eventos del reloj seleccionado
+                          const events = getSelectedRelojEvents();
+                          
+                          // Obtener categorías únicas presentes en los eventos
+                          const categoriasPresentes = [...new Set(events.map(e => e.categoria))];
+                          
+                          // Mapa de colores para cada categoría
+                          const colorMap = {
+                            'Canciones': { color: 'bg-blue-500', border: 'border-blue-500', nombre: 'Canciones' },
+                            'Corte Comercial': { color: 'bg-red-500', border: 'border-red-500', nombre: 'Corte Comercial' },
+                            'Nota Operador': { color: 'bg-yellow-500', border: 'border-yellow-500', nombre: 'Nota Operador' },
+                            'ETM': { color: 'bg-green-500', border: 'border-green-500', nombre: 'ETM' },
+                            'Cartucho Fijo': { color: 'bg-purple-500', border: 'border-purple-500', nombre: 'Cartucho Fijo' },
+                            'Comando': { color: 'bg-indigo-500', border: 'border-indigo-500', nombre: 'Comando' },
+                            'Twofer': { color: 'bg-pink-500', border: 'border-pink-500', nombre: 'Twofer' },
+                            'Característica Específica': { color: 'bg-lime-500', border: 'border-lime-500', nombre: 'Característica Específica' }
+                          };
+                          
+                          // Filtrar solo las categorías presentes
+                          const categoriasDisponibles = categoriasPresentes
+                            .filter(cat => colorMap[cat])
+                            .map(cat => colorMap[cat]);
+                          
+                          if (categoriasDisponibles.length === 0) {
+                            return (
+                              <div className="text-center py-4">
+                                <p className="text-xs text-gray-500">No hay eventos para mostrar</p>
+                              </div>
+                            );
+                          }
+                          
+                          return (
+                            <div className="space-y-2">
+                              {categoriasDisponibles.map((item, index) => (
+                                <div key={index} className="flex items-center p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-4 h-4 rounded-full ${item.color} border-2 ${item.border}`}></div>
+                                    <span className="text-xs font-medium text-gray-700">{item.nombre}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span>Corte Comercial</span>
+                      
+                      {/* Estadísticas mejoradas */}
+                      <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                              </svg>
+                              <span className="text-sm font-medium text-gray-700">Total:</span>
+                            </div>
+                            <span className="text-lg font-bold text-purple-600">{getSelectedRelojEvents().length} eventos</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="text-sm font-medium text-gray-700">Duración:</span>
+                            </div>
+                            <span className="text-lg font-bold text-green-600">{getSelectedRelojDuration()}</span>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-purple-200">
+                            <div className="text-xs text-gray-600 text-center">
+                              <span className="font-semibold">{selectedRelojInTable?.nombre || 'Sin nombre'}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                        <span>Nota Operador</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span>ETM</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                        <span>Cartucho Fijo</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
-                        <span>Exact Time Marker</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                        <span>Canción Manual</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
-                        <span>Comando</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-pink-500"></div>
-                        <span>Twofer</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                        <span>Característica Específica</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Estadísticas */}
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-700">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-medium">Total:</span>
-                        <span className="font-bold text-purple-600">{getSelectedRelojEvents().length} eventos</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">Duración:</span>
-                        <span className="text-gray-600">{getSelectedRelojDuration()}</span>
-                      </div>
-                      <div className="mt-2 p-2 bg-yellow-100 rounded text-xs">
-                        <strong>Debug:</strong> Reloj seleccionado: {selectedRelojInTable?.nombre || 'Ninguno'} | 
-                        Eventos: {getSelectedRelojEvents().length} | 
-                        Estado relojes: {relojes.length}
-                      </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex space-x-3">
-              <button 
-                onClick={handleNewReloj}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center space-x-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                <span>Añadir</span>
-              </button>
-              <button 
-                onClick={() => selectedRelojInTable && handleEditReloj(selectedRelojInTable)}
-                disabled={!selectedRelojInTable}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <span>Editar</span>
-              </button>
-
-              <button 
-                onClick={() => selectedRelojInTable && handleDeleteReloj(selectedRelojInTable.id)}
-                disabled={!selectedRelojInTable}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span>Eliminar</span>
-              </button>
             </div>
           </div>
         );
 
-      case 5: // Días modelo
+      case 4: // Días modelo
         return (
-          <div className="flex flex-col h-full space-y-4">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Días Modelo</h3>
-                <p className="text-sm text-gray-600">Configuración de días modelo para la programación</p>
-                <p className="text-xs text-gray-400">Total: {diasModelo?.length || 0} días modelo</p>
+          <div className="space-y-6">
+            {/* Header Mejorado */}
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border border-indigo-200 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-indigo-600 rounded-xl shadow-md">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Días Modelo</h3>
+                    <p className="text-sm text-gray-600 mt-1">Configuración de días modelo para la programación</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-200 text-center">
+                  <div className="text-2xl font-bold text-indigo-600">{diasModelo?.length || 0}</div>
+                  <div className="text-xs text-gray-600 uppercase tracking-wide">Días modelo</div>
+                </div>
               </div>
             </div>
 
+            {/* Action Buttons - Mejorados */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-300 rounded-xl px-8 py-5 flex justify-center gap-6 shadow-md">
+              <button
+                onClick={() => handleNewDiaModeloLocal()}
+                className="min-w-[160px] px-8 py-5 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-all duration-200 flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-green-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                disabled={isReadOnly}
+                aria-label="Añadir nuevo día modelo"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span>Nuevo Día Modelo</span>
+              </button>
+              <button
+                onClick={() => selectedDiaModeloInTable && handleViewDiaModeloLocal(selectedDiaModeloInTable)}
+                disabled={!selectedDiaModeloInTable}
+                className="min-w-[160px] px-8 py-5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:transform-none"
+                aria-label={selectedDiaModeloInTable ? 'Consultar día modelo seleccionado' : 'Selecciona un día modelo para consultar'}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>Consultar</span>
+              </button>
+              <button
+                onClick={() => selectedDiaModeloInTable && handleEditDiaModeloLocal(selectedDiaModeloInTable)}
+                disabled={!selectedDiaModeloInTable || isReadOnly}
+                className="min-w-[160px] px-8 py-5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 active:bg-purple-800 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-purple-300 disabled:transform-none"
+                aria-label={selectedDiaModeloInTable ? 'Editar día modelo seleccionado' : 'Selecciona un día modelo para editar'}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Editar</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedDiaModeloInTable && window.confirm(`¿Está seguro de eliminar el día modelo "${selectedDiaModeloInTable.nombre || selectedDiaModeloInTable.clave}"?`)) {
+                    handleDeleteDiaModelo(selectedDiaModeloInTable);
+                  }
+                }}
+                disabled={!selectedDiaModeloInTable || isReadOnly}
+                className="min-w-[160px] px-8 py-5 bg-red-600 text-white rounded-xl hover:bg-red-700 active:bg-red-800 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-red-300 disabled:transform-none"
+                aria-label={selectedDiaModeloInTable ? 'Eliminar día modelo seleccionado' : 'Selecciona un día modelo para eliminar'}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>Eliminar</span>
+              </button>
+            </div>
+
             {/* Content Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 flex-1">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Left/Center Panel - Días Modelo Table */}
-              <div className="xl:col-span-2 bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="p-4 border-b border-gray-200">
-                  <h4 className="font-medium text-gray-900">Lista de Días Modelo</h4>
-                  <p className="text-xs text-gray-500 mt-1">Arrastre una columna aquí para agrupar • Doble click para editar</p>
+              <div className="xl:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                        <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        Lista de Días Modelo
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Haz doble click en una fila para editar • Click simple para seleccionar
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Habilitado</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clave</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {diasModelo.length === 0 ? (
+                  {diasModelo.length === 0 ? (
+                    <div className="text-center py-16">
+                      <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-gray-600 font-medium text-lg mb-2">No hay días modelo configurados</p>
+                      <p className="text-gray-500 text-sm mb-4">Crea tu primer día modelo para comenzar</p>
+                      <button
+                        onClick={() => handleNewDiaModeloLocal()}
+                        disabled={isReadOnly}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Crear Día Modelo
+                      </button>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b-2 border-gray-200">
                         <tr>
-                          <td colSpan="6" className="px-6 py-12 text-center">
-                            <div className="flex flex-col items-center space-y-2">
-                              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              <p className="text-gray-500 font-medium">No hay días modelo configurados</p>
-                              <p className="text-sm text-gray-400">Agrega días modelo para comenzar</p>
-                            </div>
-                          </td>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Habilitado</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Clave</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nombre</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Días</th>
+                          <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Descripción</th>
                         </tr>
-                      ) : (
-                        diasModelo.map((diaModelo, index) => (
-                          <tr key={diaModelo.id || index} className="hover:bg-gray-50">
-                            <td className="px-3 py-2">
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {diasModelo.map((diaModelo, index) => (
+                          <tr 
+                            key={diaModelo.id || index} 
+                            className={`${selectedDiaModeloInTable?.id === diaModelo.id ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500 shadow-sm' : ''} hover:bg-gray-50 cursor-pointer transition-all duration-150`}
+                            onClick={() => {
+                              setSelectedDiaModeloInTable(diaModelo);
+                            }}
+                            onDoubleClick={() => handleEditDiaModeloLocal(diaModelo)}
+                          >
+                            <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={diaModelo.habilitado || false}
                                 onChange={(e) => {
-                                  const updatedDiasModelo = [...diasModelo];
-                                  updatedDiasModelo[index] = { ...diaModelo, habilitado: e.target.checked };
-                                  setDiasModelo(updatedDiasModelo);
+                                  if (handleToggleDiaModeloHabilitado && diaModelo.id) {
+                                    handleToggleDiaModeloHabilitado(diaModelo.id, e.target.checked);
+                                  }
                                 }}
                                 disabled={isReadOnly}
-                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                               />
                             </td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{diaModelo.clave}</td>
-                            <td className="px-3 py-2 text-sm text-gray-900">{diaModelo.nombre}</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">
-                              {[
-                                diaModelo.lunes && 'L',
-                                diaModelo.martes && 'M',
-                                diaModelo.miercoles && 'X',
-                                diaModelo.jueves && 'J',
-                                diaModelo.viernes && 'V',
-                                diaModelo.sabado && 'S',
-                                diaModelo.domingo && 'D'
-                              ].filter(Boolean).join(', ')}
-                            </td>
-                            <td className="px-3 py-2 text-sm text-gray-500 truncate max-w-xs" title={diaModelo.descripcion}>
-                              {diaModelo.descripcion || '-'}
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={() => handleViewDiaModeloLocal(diaModelo)}
-                                  className="text-blue-500 hover:text-blue-700 transition-colors"
-                                  title="Consultar día modelo"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                  </svg>
-                                </button>
-                                {!isReadOnly && (
-                                  <>
-                                    <button
-                                      onClick={() => handleEditDiaModeloLocal(diaModelo)}
-                                      className="text-green-500 hover:text-green-700 transition-colors"
-                                      title="Editar día modelo"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        if (window.confirm(`¿Está seguro de eliminar el día modelo "${diaModelo.nombre || diaModelo.clave}"?`)) {
-                                          handleDeleteDiaModelo(diaModelo);
-                                        }
-                                      }}
-                                      className="text-red-500 hover:text-red-700 transition-colors"
-                                      title="Eliminar día modelo"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
-                                  </>
-                                )}
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                                <span className="text-sm font-semibold text-gray-900">{diaModelo.clave}</span>
                               </div>
                             </td>
+                            <td className="px-4 py-4">
+                              <span className="text-sm font-medium text-gray-900">{diaModelo.nombre}</span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="inline-flex items-center gap-1">
+                                {[
+                                  diaModelo.lunes && { label: 'L', color: 'bg-blue-100 text-blue-800' },
+                                  diaModelo.martes && { label: 'M', color: 'bg-blue-100 text-blue-800' },
+                                  diaModelo.miercoles && { label: 'X', color: 'bg-blue-100 text-blue-800' },
+                                  diaModelo.jueves && { label: 'J', color: 'bg-blue-100 text-blue-800' },
+                                  diaModelo.viernes && { label: 'V', color: 'bg-blue-100 text-blue-800' },
+                                  diaModelo.sabado && { label: 'S', color: 'bg-purple-100 text-purple-800' },
+                                  diaModelo.domingo && { label: 'D', color: 'bg-purple-100 text-purple-800' }
+                                ].filter(Boolean).map((dia, idx) => (
+                                  <span key={idx} className={`px-2 py-1 rounded-full text-xs font-semibold ${dia.color}`}>
+                                    {dia.label}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="text-sm text-gray-600 line-clamp-2" title={diaModelo.descripcion}>
+                                {diaModelo.descripcion || <span className="text-gray-400 italic">Sin descripción</span>}
+                              </span>
+                            </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="p-4 border-t border-gray-200 bg-gray-50">
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleNewDiaModeloLocal()}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center space-x-2"
-                      disabled={isReadOnly}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      <span>Añadir</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (diasModelo.length > 0) {
-                          handleViewDiaModeloLocal(diasModelo[0]); // Consultar el primer día modelo
-                        }
-                      }}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center space-x-2"
-                      disabled={diasModelo.length === 0}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      <span>Consultar</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (diasModelo.length > 0) {
-                          handleEditDiaModeloLocal(diasModelo[0]); // Editar el primer día modelo
-                        }
-                      }}
-                      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors flex items-center space-x-2"
-                      disabled={isReadOnly || diasModelo.length === 0}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      <span>Editar</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (diasModelo.length > 0 && window.confirm('¿Está seguro de eliminar este día modelo?')) {
-                          handleDeleteDiaModelo(diasModelo[0]); // Eliminar el primer día modelo
-                        }
-                      }}
-                      className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center space-x-2"
-                      disabled={isReadOnly || diasModelo.length === 0}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      <span>Eliminar</span>
-                    </button>
-                  </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
 
-              {/* Right Panel - Día Modelo Configuration */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="p-4 border-b border-gray-200">
-                  <h4 className="font-medium text-gray-900">Día Modelo default por día</h4>
+              {/* Right Panel - Día Modelo Configuration Mejorado */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
+                  <h4 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                    <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Día Modelo por Defecto
+                  </h4>
+                  <p className="text-xs text-gray-600 mt-1">Configura el día modelo predeterminado para cada día de la semana</p>
                 </div>
-                <div className="p-4 space-y-4">
+                <div className="p-6 space-y-4">
                   {[
                     { key: 'lunes', label: 'Lunes' },
                     { key: 'martes', label: 'Martes' },
@@ -4986,38 +5004,52 @@ export default function PoliticasProgramacion() {
                     { key: 'viernes', label: 'Viernes' },
                     { key: 'sabado', label: 'Sábado' },
                     { key: 'domingo', label: 'Domingo' }
-                  ].map((dia) => (
-                    <div key={dia.key} className="flex items-center space-x-3">
-                      <label className="text-sm font-medium text-gray-700 min-w-[80px]">
-                        {dia.label}
-                      </label>
-                      <div className="flex-1 relative">
-                        <select
-                          value={formData[dia.key] || ''}
-                          onChange={(e) => {
-                            setFormData(prev => ({
-                              ...prev,
-                              [dia.key]: e.target.value
-                            }));
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 pr-8 appearance-none bg-white"
-                          disabled={isReadOnly}
-                        >
-                          <option value="">Seleccionar día modelo</option>
-                          {diasModelo.map((diaModelo) => (
-                            <option key={diaModelo.id} value={diaModelo.id}>
-                              {diaModelo.nombre || diaModelo.clave}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
+                  ].map((dia) => {
+                    const selectedDiaModelo = diasModelo.find(dm => String(dm.id) === String(formData[dia.key]));
+                    return (
+                      <div key={dia.key} className="group">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          {dia.label}
+                        </label>
+                        <div className="relative">
+                          <select
+                            value={formData[dia.key] || ''}
+                            onChange={(e) => {
+                              setFormData(prev => ({
+                                ...prev,
+                                [dia.key]: e.target.value
+                              }));
+                            }}
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-10 appearance-none bg-white hover:border-gray-400 transition-colors text-sm font-medium"
+                            disabled={isReadOnly}
+                          >
+                            <option value="">Seleccionar día modelo</option>
+                            {diasModelo.map((diaModelo) => (
+                              <option key={diaModelo.id} value={diaModelo.id}>
+                                {diaModelo.nombre || diaModelo.clave}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
                         </div>
+                        {selectedDiaModelo && (
+                          <div className="mt-2 px-3 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                              <span className="text-xs text-indigo-700 font-medium">{selectedDiaModelo.clave}</span>
+                              {selectedDiaModelo.descripcion && (
+                                <span className="text-xs text-indigo-600 truncate">• {selectedDiaModelo.descripcion}</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -5031,66 +5063,76 @@ export default function PoliticasProgramacion() {
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
     >
       <div 
-        className="bg-white border border-gray-300 shadow-lg w-[800px] max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 w-[95vw] max-w-[1400px] h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Window Header */}
-        <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-            <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+        {/* Enhanced Header */}
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-6 py-4 relative overflow-hidden border-b border-blue-800/20">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/90 to-indigo-600/90"></div>
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm shadow-lg">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-white">{title}</h1>
+            </div>
+            <button
+              onClick={onCancel}
+              className="text-white/90 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-all duration-200 hover:scale-110"
+              title="Cerrar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <h1 className="text-lg font-semibold text-gray-800">{title}</h1>
-          <button
-            onClick={onCancel}
-            className="text-gray-600 hover:text-gray-800 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {/* Efecto de partículas decorativas */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
         </div>
 
-        {/* Tabs Navigation */}
+        {/* Enhanced Tabs Navigation */}
         <div className="bg-white border-b border-gray-200">
-          <div className="flex space-x-1 overflow-x-auto">
+          <div className="flex space-x-1 overflow-x-auto px-4">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`group flex items-center space-x-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
+                className={`group flex items-center space-x-2 px-4 py-3 text-sm font-semibold whitespace-nowrap transition-all duration-200 relative ${
                   activeTab === tab.id
-                    ? "text-purple-700 bg-purple-50 border-b-2 border-purple-600"
-                    : "text-gray-600 hover:text-purple-600 hover:bg-purple-50/50"
+                    ? "text-blue-700 bg-blue-50 border-b-2 border-blue-600"
+                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50/50"
                 }`}
               >
                 {tab.icon}
-                <span className="font-semibold">{tab.name}</span>
+                <span>{tab.name}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Form Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white">
+        {/* Enhanced Form Content */}
+        <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-gray-50 via-white to-blue-50/20">
           {renderTabContent()}
         </div>
         
-        {/* Footer with Action Buttons */}
-        <div className="bg-gray-50 border-t border-gray-300 px-6 py-4 flex justify-end space-x-3">
+        {/* Footer with Action Buttons - Mejorado para Accesibilidad */}
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t-2 border-gray-300 px-8 py-5 flex justify-end gap-4 shadow-inner">
           <button
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+            className="min-w-[140px] px-8 py-4 bg-red-600 text-white rounded-xl hover:bg-red-700 active:bg-red-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-red-300"
+            aria-label="Cerrar formulario"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
             <span>Cerrar</span>
           </button>
@@ -5100,13 +5142,14 @@ export default function PoliticasProgramacion() {
               type="button"
               onClick={handleSubmit}
               disabled={isLoading}
-              className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+              className="min-w-[140px] px-8 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-green-300"
+              aria-label={isLoading ? 'Guardando cambios' : 'Guardar y aceptar cambios'}
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-[3px] border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
               )}
               <span>{isLoading ? 'Guardando...' : 'Aceptar'}</span>
@@ -5148,6 +5191,284 @@ export default function PoliticasProgramacion() {
           }}
         />
       )}
+
+      {/* Modal Independiente de Nueva Regla */}
+      {console.log('🔍 Verificando showReglaForm:', showReglaForm)}
+      {showReglaForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200">
+          {console.log('🔍 Modal independiente de nueva regla renderizándose...')}
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 w-[95vw] max-w-[1400px] h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100">
+            {/* Enhanced Header */}
+            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-6 py-4 relative overflow-hidden border-b border-blue-800/20">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/90 to-indigo-600/90"></div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm shadow-lg">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">
+                    {reglaFormMode === 'new' ? 'Nueva Regla de Programación' : 
+                     reglaFormMode === 'edit' ? 'Editar Regla de Programación' : 
+                     'Consultar Regla de Programación'}
+                  </h2>
+                </div>
+                <button
+                  onClick={handleReglaCancel}
+                  className="text-white/90 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-all duration-200 hover:scale-110"
+                  title="Cerrar"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {/* Efecto de partículas decorativas */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
+            </div>
+
+            {/* Enhanced Form Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-gray-50 via-white to-blue-50/20">
+                <div className="space-y-6">
+
+                  {/* Parámetros */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Parámetros</label>
+                    <div className="space-y-2">
+                      <select 
+                        value={reglaFormData.tipoRegla}
+                        onChange={(e) => handleReglaFormChange('tipoRegla', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 hover:border-gray-400"
+                      >
+                        <option value="">Seleccione el tipo de regla</option>
+                        <option value="Separación Mínima">Separación Mínima</option>
+                        <option value="DayPart">DayPart</option>
+                        <option value="Protección de Días Anteriores">Protección de Días Anteriores</option>
+                        <option value="Máxima Diferencia Permitida">Máxima Diferencia Permitida</option>
+                        <option value="Mínima Diferencia Permitida">Mínima Diferencia Permitida</option>
+                        <option value="Canciones máximas en un periodo">Canciones máximas en un periodo</option>
+                        <option value="Máximo de Canciones en Hilera">Máximo de Canciones en Hilera</option>
+                        <option value="Protección de Secuencias">Protección de Secuencias</option>
+                      </select>
+                    </div>
+                    
+                  </div>
+
+
+                  {/* Regla Habilitada */}
+                  <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
+                    <input 
+                      type="checkbox" 
+                      checked={reglaFormData.reglaHabilitada}
+                      onChange={(e) => handleReglaFormChange('reglaHabilitada', e.target.checked)}
+                      className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded transition-all cursor-pointer" 
+                    />
+                    <label className="text-base font-semibold text-gray-700 cursor-pointer">Regla Habilitada</label>
+                  </div>
+
+
+                  {/* Característica Detalle */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Característica</label>
+                    <select 
+                      value={reglaFormData.caracteristicaDetalle}
+                      onChange={(e) => handleReglaFormChange('caracteristicaDetalle', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 hover:border-gray-400"
+                    >
+                      <option value="">Seleccionar característica...</option>
+                      <option value="id_cancion">ID de Canción</option>
+                      <option value="artista">Artista/Intérprete</option>
+                      <option value="titulo">Título de la Canción</option>
+                      <option value="album">Álbum</option>
+                      <option value="genero">Género</option>
+                      <option value="año">Año</option>
+                      <option value="duracion">Duración</option>
+                      <option value="bpm">BPM</option>
+                      <option value="sello_discografico">Sello Discográfico</option>
+                      <option value="categoria">Categoría</option>
+                      <option value="subcategoria">Subcategoría</option>
+                      <option value="idioma">Idioma</option>
+                      <option value="pais">País</option>
+                      <option value="formato">Formato</option>
+                      <option value="calidad">Calidad</option>
+                    </select>
+                  </div>
+
+                  {/* Horario */}
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <input 
+                        type="checkbox" 
+                        checked={reglaFormData.horario}
+                        onChange={(e) => handleReglaFormChange('horario', e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                      />
+                      <label className="text-sm font-medium text-gray-700">Horario</label>
+                    </div>
+                    
+                    {reglaFormData.horario && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Hora Inicial</label>
+                          <input 
+                            type="time" 
+                            value={reglaFormData.horaInicial}
+                            onChange={(e) => handleReglaFormChange('horaInicial', e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 hover:border-gray-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Hora Final</label>
+                          <input 
+                            type="time" 
+                            value={reglaFormData.horaFinal}
+                            onChange={(e) => handleReglaFormChange('horaFinal', e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 hover:border-gray-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Parámetros Generales */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-gray-700">Parámetros Generales</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo Separación</label>
+                        <select 
+                          value={reglaFormData.tipoSeparacion}
+                          onChange={(e) => handleReglaFormChange('tipoSeparacion', e.target.value)}
+                          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white text-gray-900 hover:border-gray-400"
+                        >
+                          <option value="">Seleccionar tipo...</option>
+                          <option value="numero_eventos">Número de Eventos</option>
+                          <option value="numero_canciones">Número de Canciones</option>
+                          <option value="tiempo_segundos">Tiempo - Segundos</option>
+                          <option value="tiempo_dd_hh_mm">Tiempo - DD:HH:MM</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <input 
+                          type="checkbox" 
+                          checked={reglaFormData.soloVerificarDia}
+                          onChange={(e) => handleReglaFormChange('soloVerificarDia', e.target.checked)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" 
+                        />
+                        <label className="text-sm font-medium text-gray-700">Sólo verificar el día que se esté programando</label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Descripción */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-gray-700">Descripción</h4>
+                    <div>
+                      <textarea
+                        value={reglaFormData.descripcion}
+                        onChange={(e) => handleReglaFormChange('descripcion', e.target.value)}
+                        placeholder="Ingrese una descripción para la regla..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md resize-none"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tabla de Separaciones */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Separaciones</h4>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Valor</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Separación</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {reglaFormData.separaciones.map((sep, index) => (
+                            <tr key={index}>
+                              <td className="px-4 py-2">
+                                <select 
+                                  value={sep.valor}
+                                  onChange={(e) => handleSeparacionChange(index, 'valor', e.target.value)}
+                                  className="w-full px-3 py-1 border border-gray-300 rounded-md text-sm"
+                                >
+                                  <option value="">Seleccionar valor...</option>
+                                  <option value="todos">Todos los valores</option>
+                                  <option value="artista_1">Artista 1</option>
+                                  <option value="artista_2">Artista 2</option>
+                                  <option value="artista_3">Artista 3</option>
+                                  <option value="artista_4">Artista 4</option>
+                                  <option value="artista_5">Artista 5</option>
+                                  <option value="artista_6">Artista 6</option>
+                                  <option value="artista_7">Artista 7</option>
+                                  <option value="artista_8">Artista 8</option>
+                                  <option value="artista_9">Artista 9</option>
+                                  <option value="artista_10">Artista 10</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={sep.separacion && sep.separacion !== 0 ? `${sep.separacion} seg` : ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value.replace(' seg', '');
+                                    handleSeparacionChange(index, 'separacion', parseInt(value) || 0);
+                                  }}
+                                  className="w-full px-3 py-1 border border-gray-300 rounded-md text-sm"
+                                  placeholder="0 seg"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+                        <button 
+                          onClick={addSeparacion}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Click here to add a new row
+                        </button>
+                      </div>
+                      
+                    </div>
+                  </div>
+                </div>
+            </div>
+
+            {/* Footer - Mejorado para Accesibilidad */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-t-2 border-gray-300 px-8 py-5 flex justify-end gap-4 shadow-inner">
+              <button
+                onClick={handleReglaCancel}
+                className="min-w-[140px] px-8 py-4 bg-red-600 text-white rounded-xl hover:bg-red-700 active:bg-red-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-red-300"
+                aria-label="Cerrar formulario de regla"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span>Cerrar</span>
+              </button>
+              {reglaFormMode !== 'view' && (
+                <button
+                  onClick={handleReglaSave}
+                  className="min-w-[140px] px-8 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-green-300"
+                  aria-label={reglaFormMode === 'new' ? 'Crear nueva regla' : 'Guardar cambios de la regla'}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Aceptar</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -5179,11 +5500,16 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
   // Cargar relojes existentes cuando se edita un día modelo
   useEffect(() => {
     if (diaModelo && diaModelo.relojes && Array.isArray(diaModelo.relojes)) {
-      setRelojesDiaModelo(diaModelo.relojes);
+      // En edición, completar datos del backend con los relojes completos recibidos en props
+      const merged = diaModelo.relojes.map((r) => {
+        const full = relojes.find(x => (x.id && r.id && x.id === r.id) || (x.clave && r.clave && x.clave === r.clave))
+        return full ? { ...r, ...full } : r
+      })
+      setRelojesDiaModelo(merged);
     } else {
       setRelojesDiaModelo([]);
     }
-  }, [diaModelo, mode]);
+  }, [diaModelo, mode, relojes]);
 
   // Estado para la búsqueda de relojes
   const [relojSearchTerm, setRelojSearchTerm] = useState('');
@@ -5240,8 +5566,8 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
     }
   ];
 
-  const inputClass = `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`;
-  const selectClass = `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`;
+  const inputClass = `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`;
+  const selectClass = `w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${isReadOnly ? 'bg-gray-100' : 'bg-white'}`;
 
   const validateForm = () => {
     const newErrors = {};
@@ -5320,74 +5646,201 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
     }
   };
 
+  // Helper para obtener eventos completos de un reloj
+  const getRelojEventos = (reloj) => {
+    const fullReloj = relojes.find(x => 
+      (x.id && reloj.id && x.id === reloj.id) || 
+      (x.clave && reloj.clave && x.clave === reloj.clave)
+    );
+    return fullReloj?.eventos || reloj.eventos || [];
+  };
+
+  // Helper para contar canciones (música)
+  const countCanciones = (reloj) => {
+    const eventos = getRelojEventos(reloj);
+    return eventos.filter(e => e.categoria === 'Canciones').length;
+  };
+
+  // Helper para contar eventos que NO son música
+  const countEventosNoMusica = (reloj) => {
+    const eventos = getRelojEventos(reloj);
+    return eventos.filter(e => e.categoria !== 'Canciones').length;
+  };
+
+  // Helper para calcular duración total en segundos desde formato HH:MM:SS
+  const parseDurationToSeconds = (durationStr) => {
+    if (!durationStr) return 0;
+    
+    // Si es un número, ya está en segundos
+    if (typeof durationStr === 'number') {
+      return durationStr;
+    }
+    
+    // Si es string con formato HH:MM:SS
+    if (typeof durationStr === 'string' && durationStr.includes(':')) {
+      const parts = durationStr.split(':');
+      if (parts.length === 3) {
+        const hours = parseInt(parts[0], 10) || 0;
+        const minutes = parseInt(parts[1], 10) || 0;
+        const seconds = parseInt(parts[2], 10) || 0;
+        return hours * 3600 + minutes * 60 + seconds;
+      }
+    }
+    
+    // Si es string numérico, tratar como segundos
+    if (typeof durationStr === 'string') {
+      return parseInt(durationStr, 10) || 0;
+    }
+    
+    return 0;
+  };
+
+  // Helper para formatear segundos a HH:MM:SS
+  const formatSecondsToTime = (totalSeconds) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Función para calcular la duración total de un reloj basándose en sus eventos
+  const calculateRelojDuration = (reloj) => {
+    if (!reloj || !reloj.eventos || reloj.eventos.length === 0) {
+      return '00:00:00';
+    }
+    
+    let totalSeconds = 0;
+    reloj.eventos.forEach(evento => {
+      totalSeconds += parseDurationToSeconds(evento.duracion);
+    });
+    
+    return formatSecondsToTime(totalSeconds);
+  };
+
+  // Helper para calcular duración total de eventos por categoría
+  const calculateDuracionByCategoria = (reloj, categoria) => {
+    const eventos = getRelojEventos(reloj);
+    const eventosFiltrados = eventos.filter(e => e.categoria === categoria);
+    const totalSeconds = eventosFiltrados.reduce((acc, e) => {
+      return acc + parseDurationToSeconds(e.duracion);
+    }, 0);
+    return formatSecondsToTime(totalSeconds);
+  };
+
+  // Helper para calcular duración total de eventos que NO son música
+  const calculateDuracionNoMusica = (reloj) => {
+    const eventos = getRelojEventos(reloj);
+    const eventosNoMusica = eventos.filter(e => e.categoria !== 'Canciones');
+    const totalSeconds = eventosNoMusica.reduce((acc, e) => {
+      return acc + parseDurationToSeconds(e.duracion);
+    }, 0);
+    return formatSecondsToTime(totalSeconds);
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 0: // Datos generales
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Checkbox: Día modelo habilitado */}
+              {/* Checkbox: Día modelo habilitado - Mejorado */}
               <div className="md:col-span-2">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="habilitado"
-                    name="habilitado"
-                    checked={formData.habilitado}
-                    onChange={handleChange}
-                    disabled={isReadOnly}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="habilitado" className="text-sm font-medium text-gray-700">
-                    Día modelo habilitado
+                <div className="flex items-center space-x-4 p-5 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-all duration-200 shadow-sm hover:shadow-md">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      id="habilitado"
+                      name="habilitado"
+                      checked={formData.habilitado}
+                      onChange={handleChange}
+                      disabled={isReadOnly}
+                      className="h-6 w-6 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 border-gray-300 rounded-md transition-all cursor-pointer disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  <label htmlFor="habilitado" className="flex items-center space-x-2 text-base font-semibold text-gray-700 cursor-pointer">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Día modelo habilitado</span>
                   </label>
                 </div>
               </div>
 
 
-              {/* Input: Clave */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Clave *</label>
+              {/* Input: Clave - Mejorado */}
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <span>Clave</span>
+                  <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="clave"
                   value={formData.clave || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}
-                  className={inputClass}
-                  placeholder="Clave del día modelo"
+                  className={`${inputClass} transition-all duration-200 ${errors.clave ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'hover:border-blue-300'}`}
+                  placeholder="Ej: DM_LUNES"
                   required={!isReadOnly}
                 />
-                {errors.clave && <p className="text-red-500 text-xs mt-1">{errors.clave}</p>}
+                {errors.clave && (
+                  <p className="flex items-center space-x-1 text-red-500 text-xs mt-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>{errors.clave}</span>
+                  </p>
+                )}
               </div>
 
-              {/* Input: Nombre */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+              {/* Input: Nombre - Mejorado */}
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h10m-7 4h7" />
+                  </svg>
+                  <span>Nombre</span>
+                  <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="nombre"
                   value={formData.nombre || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}
-                  className={inputClass}
-                  placeholder="Nombre del día modelo"
+                  className={`${inputClass} transition-all duration-200 ${errors.nombre ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'hover:border-blue-300'}`}
+                  placeholder="Ej: Lunes"
                   required={!isReadOnly}
                 />
-                {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre}</p>}
+                {errors.nombre && (
+                  <p className="flex items-center space-x-1 text-red-500 text-xs mt-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>{errors.nombre}</span>
+                  </p>
+                )}
               </div>
 
-              {/* Textarea: Descripción */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+              {/* Textarea: Descripción - Mejorado */}
+              <div className="md:col-span-2 space-y-2">
+                <label className="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                  </svg>
+                  <span>Descripción</span>
+                </label>
                 <textarea
                   name="descripcion"
                   value={formData.descripcion || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}
-                  rows={3}
-                  className={inputClass}
-                  placeholder="Descripción del día modelo"
+                  rows={4}
+                  className={`${inputClass} transition-all duration-200 resize-none hover:border-blue-300`}
+                  placeholder="Describe el propósito y características de este día modelo..."
                 />
               </div>
 
@@ -5436,8 +5889,8 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                         relojes.map((reloj, index) => (
                           <tr key={reloj.id || index} className="hover:bg-gray-50">
                             <td className="px-3 py-2 text-sm text-gray-900">{reloj.clave}</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">{reloj.duracion || '0\' 0"'}</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">{reloj.eventos?.length || 0}</td>
+                            <td className="px-3 py-2 text-sm text-gray-500">{calculateRelojDuration(reloj)}</td>
+                            <td className="px-3 py-2 text-sm text-gray-500">{(reloj.eventos?.length) ?? (relojes.find(x=>x.id===reloj.id)?.eventos?.length) ?? 0}</td>
                             <td className="px-3 py-2">
                               <input
                                 type="checkbox"
@@ -5450,7 +5903,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                                   }
                                 }}
                                 disabled={isReadOnly}
-                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
                             </td>
                           </tr>
@@ -5483,15 +5936,13 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duración</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Eventos</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Música</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cortes</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Otros</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">¡Sin</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {relojesDiaModelo.length === 0 ? (
                         <tr>
-                          <td colSpan="10" className="px-6 py-12 text-center">
+                          <td colSpan="8" className="px-6 py-12 text-center">
                             <div className="flex flex-col items-center space-y-2">
                               <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -5507,18 +5958,13 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                             <td className="px-3 py-2 text-sm text-gray-500">0:00:00</td>
                             <td className="px-3 py-2 text-sm text-gray-900">{reloj.clave}</td>
                             <td className="px-3 py-2 text-sm text-gray-500">{reloj.nombre || reloj.descripcion || '-'}</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">{reloj.duracion || '0\' 0"'}</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">{reloj.eventos?.length || 0}</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">0:00:00</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">0:00:00</td>
-                            <td className="px-3 py-2 text-sm text-gray-500">0:00:00</td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="checkbox"
-                                checked={true}
-                                disabled
-                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                              />
+                            <td className="px-3 py-2 text-sm text-gray-500">{calculateRelojDuration(reloj)}</td>
+                            <td className="px-3 py-2 text-sm text-gray-500">{(reloj.eventos?.length) ?? (relojes.find(x=>x.id===reloj.id)?.eventos?.length) ?? 0}</td>
+                            <td className="px-3 py-2 text-sm text-gray-500">
+                              {countCanciones(reloj)} ({calculateDuracionByCategoria(reloj, 'Canciones')})
+                            </td>
+                            <td className="px-3 py-2 text-sm text-gray-500">
+                              {countEventosNoMusica(reloj)} ({calculateDuracionNoMusica(reloj)})
                             </td>
                           </tr>
                         ))
@@ -5533,12 +5979,35 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
             <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
               <div className="flex justify-between items-center text-sm text-gray-600">
                 <div>
-                  <span className="font-medium">{relojesDiaModelo.length} relojes, {relojesDiaModelo.reduce((acc, r) => acc + (r.eventos?.length || 0), 0)} eventos, 0 ms</span>
+                  <span className="font-medium">
+                    {relojesDiaModelo.length} relojes, {relojesDiaModelo.reduce((acc, r) => acc + getRelojEventos(r).length, 0)} eventos
+                  </span>
                 </div>
                 <div className="flex space-x-4">
-                  <span>Música: 0 - 0 ms</span>
-                  <span>Cortes Comerciales: 0 - 0 ms</span>
-                  <span>Otros: 0 - 0 ms</span>
+                  <span>
+                    Música: {relojesDiaModelo.reduce((acc, r) => acc + countCanciones(r), 0)} - {
+                      formatSecondsToTime(
+                        relojesDiaModelo.reduce((acc, r) => {
+                          const eventos = getRelojEventos(r);
+                          const eventosMusica = eventos.filter(e => e.categoria === 'Canciones');
+                          const totalSeconds = eventosMusica.reduce((sum, e) => sum + parseDurationToSeconds(e.duracion), 0);
+                          return acc + totalSeconds;
+                        }, 0)
+                      )
+                    }
+                  </span>
+                  <span>
+                    Otros: {relojesDiaModelo.reduce((acc, r) => acc + countEventosNoMusica(r), 0)} - {
+                      formatSecondsToTime(
+                        relojesDiaModelo.reduce((acc, r) => {
+                          const eventos = getRelojEventos(r);
+                          const eventosNoMusica = eventos.filter(e => e.categoria !== 'Canciones');
+                          const totalSeconds = eventosNoMusica.reduce((sum, e) => sum + parseDurationToSeconds(e.duracion), 0);
+                          return acc + totalSeconds;
+                        }, 0)
+                      )
+                    }
+                  </span>
                 </div>
               </div>
             </div>
@@ -5552,89 +6021,113 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 transition-opacity duration-200"
       onClick={(e) => e.target === e.currentTarget && onCancel()}
     >
       <div 
-        className="bg-white border border-gray-300 shadow-lg w-[95vw] max-w-[1200px] h-[95vh] overflow-hidden flex flex-col"
+        className="bg-white shadow-2xl w-[95vw] max-w-[1400px] h-[92vh] overflow-hidden flex flex-col rounded-2xl border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Window Header */}
-        <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-            <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+        {/* Window Header - Mejorado */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex justify-between items-center shadow-lg">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold text-white">{title}</h1>
           </div>
-          <h1 className="text-lg font-semibold text-gray-800">{title}</h1>
           <button
             onClick={onCancel}
-            className="text-gray-600 hover:text-gray-800 transition-colors"
+            className="text-white/90 hover:text-white hover:bg-white/20 rounded-lg p-2 transition-all duration-200"
+            aria-label="Cerrar"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="flex space-x-1 overflow-x-auto">
+        {/* Tabs Navigation - Mejorado */}
+        <div className="bg-gray-50/50 border-b border-gray-200">
+          <div className="flex space-x-2 overflow-x-auto px-4">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`group flex items-center space-x-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 relative ${
+                className={`group flex items-center space-x-2 px-6 py-4 text-sm font-semibold whitespace-nowrap transition-all duration-200 relative ${
                   activeTab === tab.id
-                    ? "text-purple-700 bg-purple-50 border-b-2 border-purple-600"
-                    : "text-gray-600 hover:text-purple-600 hover:bg-purple-50/50"
+                    ? "text-blue-700 bg-white shadow-sm"
+                    : "text-gray-600 hover:text-blue-600 hover:bg-white/70"
                 }`}
               >
-                {tab.icon}
-                <span className="font-semibold">{tab.name}</span>
+                <span className={`transition-colors ${activeTab === tab.id ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-500'}`}>
+                  {tab.icon}
+                </span>
+                <span>{tab.name}</span>
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+                )}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Form Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white">
-          {renderTabContent()}
+        {/* Form Content - Mejorado */}
+        <div className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-gray-50 to-white">
+          <div className="max-w-7xl mx-auto">
+            {renderTabContent()}
+          </div>
         </div>
         
-        {/* Footer with Action Buttons */}
-        <div className="bg-gray-50 border-t border-gray-300 px-6 py-4 flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            <span>Cerrar</span>
-          </button>
-          
-          {!isReadOnly && (
+        {/* Footer with Action Buttons - Mejorado */}
+        <div className="bg-white border-t border-gray-200 px-8 py-6 flex justify-between items-center shadow-lg">
+          <div className="text-sm text-gray-500">
+            {mode === 'new' ? 'Completa los campos requeridos para crear el día modelo' : mode === 'edit' ? 'Modifica los campos necesarios y guarda los cambios' : 'Vista de solo lectura'}
+          </div>
+          <div className="flex gap-3">
             <button
               type="button"
-              onClick={handleSubmit}
+              onClick={onCancel}
               disabled={isLoading}
-              className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+              className="min-w-[140px] px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold text-sm shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-400"
+              aria-label="Cerrar formulario de día modelo"
             >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              <span>{isLoading ? 'Guardando...' : mode === 'new' ? 'Crear' : 'Guardar'}</span>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Cerrar</span>
             </button>
-          )}
+            
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className="min-w-[160px] px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold text-sm shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-blue-300"
+                aria-label={isLoading ? 'Guardando día modelo' : mode === 'new' ? 'Crear nuevo día modelo' : 'Guardar cambios del día modelo'}
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Guardando...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>{mode === 'new' ? 'Crear Día Modelo' : 'Guardar Cambios'}</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+
     </div>
   );
 }

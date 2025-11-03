@@ -35,8 +35,8 @@ export default function EventosReloj({ onSave, onCancel, categoriasPolitica = []
       setLoadingCortes(true)
       try {
         const response = await getCortes({ activo: true })
-        setCortes(response.cortes || [])
-        console.log('🔍 EventosReloj - Cortes cargados:', response.cortes)
+        setCortes(response || [])
+        console.log('🔍 EventosReloj - Cortes cargados:', response)
       } catch (error) {
         console.error('Error al cargar cortes:', error)
         setCortes([])

@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CategoriasSection, ConjuntosSection, CancionesSection } from './components/CategoriasSections'
+import { CategoriasSection, CancionesSection } from './components/CategoriasSections'
 import SimplePage from '../Programacion/components/SimplePage'
+import MantenimientoCategorias from './components/Categorias/MantenimientoCategorias'
+import MovimientosCategorias from './components/Categorias/MovimientosCategorias'
 import { ImportCSVComponent } from '../Programacion/components/ImportCSV'
 import { MantenimientoCanciones } from './components/Canciones'
 
@@ -46,11 +48,10 @@ export default function CategoriasPage() {
     console.log('========================================')
     switch (selectedSection) {
       case 'mantenimiento-categorias':
-        return <SimplePage title="MANTENIMIENTO DE CATEGORÍAS" color="green" />
+        return <MantenimientoCategorias />
       case 'movimientos-categorias':
-        return <SimplePage title="MOVIMIENTOS ENTRE CATEGORÍAS" color="green" />
-      case 'mantenimiento-conjuntos':
-        return <SimplePage title="MANTENIMIENTO EN CONJUNTOS" color="blue" />
+        return <MovimientosCategorias />
+      // Conjuntos eliminado
       case 'mantenimiento-canciones':
         return <MantenimientoCanciones />
       case 'importar-csv':
@@ -74,10 +75,9 @@ export default function CategoriasPage() {
       </div>
       
       {/* Contenido principal */}
-      <div className="relative z-10 h-full flex items-center justify-center p-6">
-        <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="relative z-10 h-full flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 py-8">
           <CategoriasSection onItemClick={handleItemClick} />
-          <ConjuntosSection onItemClick={handleItemClick} />
           <CancionesSection onItemClick={handleItemClick} />
         </div>
       </div>

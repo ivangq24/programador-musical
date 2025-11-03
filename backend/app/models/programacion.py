@@ -31,6 +31,7 @@ class PoliticaProgramacion(Base):
     # Relaciones
     relojes = relationship("Reloj", back_populates="politica", cascade="all, delete-orphan")
     dias_modelo = relationship("DiaModelo", back_populates="politica", cascade="all, delete-orphan", foreign_keys="DiaModelo.politica_id")
+    reglas = relationship("Regla", back_populates="politica", cascade="all, delete-orphan")
 
 class Reloj(Base):
     __tablename__ = "relojes"
@@ -123,34 +124,38 @@ class RelojDiaModelo(Base):
     dia_modelo = relationship("DiaModelo", back_populates="relojes_dia_modelo")
     reloj = relationship("Reloj", back_populates="relojes_dia_modelo")
 
-class SetRegla(Base):
-    __tablename__ = "sets_reglas"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(100), nullable=False)
-    descripcion = Column(Text)
-    habilitado = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    
-    # Relaciones
-    reglas = relationship("Regla", back_populates="set_regla", cascade="all, delete-orphan")
+
 
 class Regla(Base):
     __tablename__ = "reglas"
     
     id = Column(Integer, primary_key=True, index=True)
-    set_regla_id = Column(Integer, ForeignKey("sets_reglas.id", ondelete="CASCADE"))
-    nombre = Column(String(100), nullable=False)
-    descripcion = Column(Text)
-    tipo = Column(String(50), nullable=False)
-    valor = Column(String(200))
-    habilitado = Column(Boolean, default=True)
+    politica_id = Column(Integer, ForeignKey("politicas_programacion.id", ondelete="CASCADE"), nullable=False)
+    tipo_regla = Column(String(100), nullable=False)  # Separación Mínima, DayPart, etc.
+    caracteristica = Column(String(100), nullable=False)  # Artista, ID de Canción, etc.
+    tipo_separacion = Column(String(50), nullable=False)  # Número de Eventos, Tiempo - Segundos, etc.
+    descripcion = Column(Text, nullable=True)  # Descripción de la regla
+    horario = Column(Boolean, default=False)
+    solo_verificar_dia = Column(Boolean, default=False)
+    habilitada = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     # Relaciones
-    set_regla = relationship("SetRegla", back_populates="reglas")
+    politica = relationship("PoliticaProgramacion", back_populates="reglas")
+    separaciones = relationship("SeparacionRegla", back_populates="regla", cascade="all, delete-orphan")
+
+class SeparacionRegla(Base):
+    __tablename__ = "separaciones_regla"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    regla_id = Column(Integer, ForeignKey("reglas.id", ondelete="CASCADE"), nullable=False)
+    valor = Column(String(200), nullable=False)  # Todos los valores, Artista 1, etc.
+    separacion = Column(Integer, nullable=False)  # Tiempo en segundos
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relaciones
+    regla = relationship("Regla", back_populates="separaciones")
 
 class Programacion(Base):
     __tablename__ = "programacion"

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { GeneralSection } from './components/CatalogosSections'
 import Difusoras from './components/Difusoras'
 import Cortes from './components/Cortes/Cortes'
-import { Building, Database, Clock } from 'lucide-react'
+import { Building } from 'lucide-react'
 
 export default function CatalogosPage() {
   const [currentView, setCurrentView] = useState('main')
@@ -39,72 +39,6 @@ export default function CatalogosPage() {
         return <Difusoras onDifusoraSelect={(difusora) => console.log('Difusora seleccionada:', difusora)} />
       case 'Cortes':
         return <Cortes />
-      case 'Tipo de clasificaciones':
-        return (
-          <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden p-8">
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Tipo de Clasificaciones</h2>
-                <p className="text-lg text-gray-600">Funcionalidad en desarrollo</p>
-              </div>
-            </div>
-          </div>
-        )
-      case 'Clasificaciones':
-        return (
-          <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden p-8">
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Clasificaciones</h2>
-                <p className="text-lg text-gray-600">Funcionalidad en desarrollo</p>
-              </div>
-            </div>
-          </div>
-        )
-      case 'Interpretes':
-        return (
-          <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden p-8">
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Intérpretes</h2>
-                <p className="text-lg text-gray-600">Funcionalidad en desarrollo</p>
-              </div>
-            </div>
-          </div>
-        )
-      case 'Personas':
-        return (
-          <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden p-8">
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Personas</h2>
-                <p className="text-lg text-gray-600">Funcionalidad en desarrollo</p>
-              </div>
-            </div>
-          </div>
-        )
-      case 'Sellos discográficos':
-        return (
-          <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden p-8">
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Sellos Discográficos</h2>
-                <p className="text-lg text-gray-600">Funcionalidad en desarrollo</p>
-              </div>
-            </div>
-          </div>
-        )
-      case 'Dayparts':
-        return (
-          <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-hidden p-8">
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Dayparts</h2>
-                <p className="text-lg text-gray-600">Funcionalidad en desarrollo</p>
-              </div>
-            </div>
-          </div>
-        )
       default:
         return null
     }
@@ -129,8 +63,8 @@ export default function CatalogosPage() {
       </div>
       
       {/* Contenido principal */}
-      <div className="relative z-10 h-full flex items-center justify-center p-6">
-        <div className="w-full max-w-6xl">
+      <div className="relative z-10 h-full flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-5xl py-8">
           <GeneralSection onSectionClick={handleSectionClick} />
         </div>
       </div>

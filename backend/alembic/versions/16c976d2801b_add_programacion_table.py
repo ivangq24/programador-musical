@@ -63,11 +63,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_programacion_id'), 'programacion', ['id'], unique=False)
     op.create_index('ix_programacion_politica', 'programacion', ['politica_id'], unique=False)
     op.create_index('ix_programacion_reloj', 'programacion', ['reloj_id'], unique=False)
-    op.drop_index('ix_sets_reglas_id', table_name='sets_reglas')
-    op.drop_table('sets_reglas')
-    op.drop_index('ix_orden_asignacion_id', table_name='orden_asignacion')
-    op.drop_table('orden_asignacion')
-    op.drop_table('politica_categorias')
+    # op.drop_table('politica_categorias')  # Tabla no existe
     op.add_column('dias_modelo', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True))
     op.create_index(op.f('ix_dias_modelo_difusora'), 'dias_modelo', ['difusora'], unique=False)
     op.add_column('eventos_reloj', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True))
@@ -112,18 +108,7 @@ def upgrade() -> None:
     op.drop_column('politicas_programacion', 'nombre')
     op.drop_column('politicas_programacion', 'alta')
     op.drop_column('politicas_programacion', 'descripcion')
-    op.add_column('reglas', sa.Column('valor', sa.String(length=200), nullable=True))
-    op.add_column('reglas', sa.Column('habilitado', sa.Boolean(), nullable=True))
-    op.add_column('reglas', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True))
-    op.alter_column('reglas', 'nombre',
-               existing_type=sa.VARCHAR(length=200),
-               type_=sa.String(length=100),
-               existing_nullable=False)
-    op.drop_constraint('reglas_set_regla_id_fkey', 'reglas', type_='foreignkey')
-    op.create_foreign_key(None, 'reglas', 'set_reglas', ['set_regla_id'], ['id'], ondelete='CASCADE')
-    op.drop_column('reglas', 'habilitada')
-    op.drop_column('reglas', 'parametros')
-    op.drop_column('reglas', 'orden')
+    # Operaciones de reglas eliminadas - se eliminará la tabla completa
     op.add_column('relojes', sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True))
     op.alter_column('relojes', 'nombre',
                existing_type=sa.VARCHAR(length=200),
@@ -143,6 +128,15 @@ def upgrade() -> None:
                existing_type=sa.INTEGER(),
                nullable=False,
                existing_server_default=sa.text('0'))
+    
+    # Eliminar tablas de sets de reglas y reglas al final
+    op.drop_index('ix_reglas_id', table_name='reglas')
+    op.drop_table('reglas')
+    op.drop_index('ix_sets_reglas_id', table_name='sets_reglas')
+    op.drop_table('sets_reglas')
+    op.drop_index('ix_orden_asignacion_id', table_name='orden_asignacion')
+    op.drop_table('orden_asignacion')
+    
     # ### end Alembic commands ###
 
 

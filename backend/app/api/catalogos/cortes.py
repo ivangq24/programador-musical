@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from typing import List
 from app.core.database import get_db
-from app.models.cortes import Corte
+from app.models.cortes import Corte as CorteModel
 from app.schemas.cortes import CorteCreate, CorteUpdate, Corte
 
 router = APIRouter()
@@ -18,18 +18,18 @@ async def get_cortes(
     db: Session = Depends(get_db)
 ):
     try:
-        query = db.query(Corte)
+        query = db.query(CorteModel)
         
         if search:
             query = query.filter(
                 or_(
-                    Corte.nombre.ilike(f"%{search}%"),
-                    Corte.descripcion.ilike(f"%{search}%")
+                    CorteModel.nombre.ilike(f"%{search}%"),
+                    CorteModel.descripcion.ilike(f"%{search}%")
                 )
             )
         
         if activo is not None:
-            query = query.filter(Corte.activo == activo)
+            query = query.filter(CorteModel.activo == activo)
         
         cortes = query.offset(skip).limit(limit).all()
         return cortes
@@ -40,7 +40,7 @@ async def get_cortes(
 # Obtener un corte específico
 @router.get("/{corte_id}", response_model=Corte)
 async def get_corte(corte_id: int, db: Session = Depends(get_db)):
-    corte = db.query(Corte).filter(Corte.id == corte_id).first()
+    corte = db.query(CorteModel).filter(CorteModel.id == corte_id).first()
     if not corte:
         raise HTTPException(status_code=404, detail="Corte no encontrado")
     return corte
@@ -48,7 +48,14 @@ async def get_corte(corte_id: int, db: Session = Depends(get_db)):
 # Crear un nuevo corte
 @router.post("/", response_model=Corte)
 async def create_corte(corte: CorteCreate, db: Session = Depends(get_db)):
-    db_corte = Corte(**corte.dict())
+    db_corte = CorteModel(
+        nombre=corte.nombre,
+        descripcion=corte.descripcion,
+        duracion=corte.duracion,
+        tipo=corte.tipo,
+        activo=corte.activo,
+        observaciones=corte.observaciones
+    )
     db.add(db_corte)
     db.commit()
     db.refresh(db_corte)
@@ -57,7 +64,7 @@ async def create_corte(corte: CorteCreate, db: Session = Depends(get_db)):
 # Actualizar un corte
 @router.put("/{corte_id}", response_model=Corte)
 async def update_corte(corte_id: int, corte: CorteUpdate, db: Session = Depends(get_db)):
-    db_corte = db.query(Corte).filter(Corte.id == corte_id).first()
+    db_corte = db.query(CorteModel).filter(CorteModel.id == corte_id).first()
     if not db_corte:
         raise HTTPException(status_code=404, detail="Corte no encontrado")
     
@@ -72,7 +79,7 @@ async def update_corte(corte_id: int, corte: CorteUpdate, db: Session = Depends(
 # Eliminar un corte
 @router.delete("/{corte_id}")
 async def delete_corte(corte_id: int, db: Session = Depends(get_db)):
-    corte = db.query(Corte).filter(Corte.id == corte_id).first()
+    corte = db.query(CorteModel).filter(CorteModel.id == corte_id).first()
     if not corte:
         raise HTTPException(status_code=404, detail="Corte no encontrado")
     
@@ -83,8 +90,8 @@ async def delete_corte(corte_id: int, db: Session = Depends(get_db)):
 # Obtener estadísticas de cortes
 @router.get("/stats/summary")
 async def get_cortes_stats(db: Session = Depends(get_db)):
-    total = db.query(Corte).count()
-    activos = db.query(Corte).filter(Corte.activo == True).count()
+    total = db.query(CorteModel).count()
+    activos = db.query(CorteModel).filter(CorteModel.activo == True).count()
     inactivos = total - activos
     
     return {

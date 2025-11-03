@@ -4,6 +4,8 @@ from datetime import datetime
 
 # Categoría schemas
 class CategoriaBase(BaseModel):
+    difusora: Optional[str] = None
+    clave: Optional[str] = None
     nombre: str
     descripcion: Optional[str] = None
     activa: bool = True
@@ -12,6 +14,8 @@ class CategoriaCreate(CategoriaBase):
     pass
 
 class CategoriaUpdate(BaseModel):
+    difusora: Optional[str] = None
+    clave: Optional[str] = None
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     activa: Optional[bool] = None
@@ -52,24 +56,4 @@ class Cancion(CancionBase):
     class Config:
         from_attributes = True
 
-# Conjunto schemas
-class ConjuntoBase(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-    activo: bool = True
-
-class ConjuntoCreate(ConjuntoBase):
-    pass
-
-class ConjuntoUpdate(BaseModel):
-    nombre: Optional[str] = None
-    descripcion: Optional[str] = None
-    activo: Optional[bool] = None
-
-class Conjunto(ConjuntoBase):
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+# (Eliminados schemas de Conjunto)

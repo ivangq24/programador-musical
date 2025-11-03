@@ -69,8 +69,8 @@ export const getCancionesStats = async () => {
 // Obtener categorías únicas de las canciones
 export const getCategoriasCanciones = async () => {
   try {
-    // Temporalmente devolver categorías hardcodeadas hasta que se implemente el endpoint
-    return ['Pop', 'Rock', 'Jazz', 'Balada', 'Salsa', 'Reggaeton']
+    const response = await apiClient.get('/categorias/categorias/items')
+    return response.data
   } catch (error) {
     console.error('Error fetching categorias:', error)
     throw error

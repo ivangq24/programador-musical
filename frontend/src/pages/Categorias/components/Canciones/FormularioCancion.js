@@ -45,9 +45,6 @@ export default function FormularioCancion({ isOpen, onClose, onSave, cancionEdit
     // Clasificaciones
     clasificaciones: [],
     
-    // Conjuntos
-    conjuntos: [],
-    
     // Otros Datos
     daypart: '',
     idusuario1: '',
@@ -98,7 +95,6 @@ export default function FormularioCancion({ isOpen, onClose, onSave, cancionEdit
         lanzamiento: '',
         topCharts: '',
         clasificaciones: [],
-        conjuntos: [],
         daypart: '',
         idusuario1: '',
         idusuario2: '',
@@ -140,7 +136,6 @@ export default function FormularioCancion({ isOpen, onClose, onSave, cancionEdit
         lanzamiento: '',
         topCharts: '',
         clasificaciones: [],
-        conjuntos: [],
         daypart: '',
         idusuario1: '',
         idusuario2: '',
@@ -187,7 +182,6 @@ export default function FormularioCancion({ isOpen, onClose, onSave, cancionEdit
   const tabs = [
     { id: 'datos-generales', label: 'Datos Generales', icon: Music },
     { id: 'clasificaciones', label: 'Clasificaciones', icon: Tag },
-    { id: 'conjuntos', label: 'Conjuntos', icon: Layers },
     { id: 'otros-datos', label: 'Otros Datos', icon: Settings }
   ]
 
@@ -585,57 +579,7 @@ export default function FormularioCancion({ isOpen, onClose, onSave, cancionEdit
               </div>
             )}
 
-            {/* Tab 3: Conjuntos */}
-            {activeTab === 'conjuntos' && (
-              <div className="space-y-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Conjuntos relacionados a la canción</h3>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-1">
-                      <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                        <option value="">Seleccionar conjunto</option>
-                        <option value="conjunto1">Conjunto 1</option>
-                        <option value="conjunto2">Conjunto 2</option>
-                        <option value="conjunto3">Conjunto 3</option>
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Añadir
-                    </button>
-                    <button
-                      type="button"
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      Mantenimiento
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tabla de Conjuntos */}
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nombre Conjunto</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Descripción</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white">
-                      <tr>
-                        <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
-                          No hay información para mostrar
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* Se eliminó la pestaña Conjuntos */}
 
             {/* Tab 4: Otros Datos */}
             {activeTab === 'otros-datos' && (

@@ -4,9 +4,10 @@ Main API router that organizes all endpoints by module
 from fastapi import APIRouter
 
 # Import all endpoint modules
-from app.api.programacion import generar_programacion_completa, politicas, set_reglas
+from app.api.programacion import generar_programacion_completa, politicas, reglas
 from app.api.catalogos import catalogos, difusoras, cortes
 from app.api.categorias import categorias, canciones, import_csv
+from app.api.reportes import estadisticas
 
 # Create main router
 api_router = APIRouter()
@@ -25,10 +26,11 @@ api_router.include_router(
 )
 
 api_router.include_router(
-    set_reglas.router,
-    prefix="/programacion/set-reglas",
+    reglas.router,
+    prefix="/programacion",
     tags=["programacion-reglas"]
 )
+
 
 # Catalogos module routes
 api_router.include_router(
@@ -39,7 +41,7 @@ api_router.include_router(
 
 api_router.include_router(
     difusoras.router,
-    prefix="/catalogos",
+    prefix="/catalogos/general/difusoras",
     tags=["catalogos-difusoras"]
 )
 
@@ -66,4 +68,11 @@ api_router.include_router(
     import_csv.router,
     prefix="/categorias",
     tags=["categorias-import"]
+)
+
+# Reportes module routes
+api_router.include_router(
+    estadisticas.router,
+    prefix="/reportes",
+    tags=["reportes-estadisticas"]
 )

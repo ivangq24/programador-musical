@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Shield, FileText, Target, Clock, Play, History, Upload
+  Shield, FileText, Clock, Play, History, Upload
 } from 'lucide-react';
 
 // Sección Políticas
@@ -16,99 +16,72 @@ export const PoliticasSection = ({ onItemClick }) => {
       iconColor: 'text-purple-600',
       hoverColor: 'hover:bg-purple-50'
     },
-    { 
-      name: 'Reporte de reglas', 
-      icon: FileText, 
-      id: 'reporte-reglas',
-      description: 'Genera reportes de reglas aplicadas',
-      color: 'from-violet-500 to-violet-600',
-      bgColor: 'bg-violet-50',
-      iconColor: 'text-violet-600',
-      hoverColor: 'hover:bg-violet-50'
-    },
-    { 
-      name: 'Grupos de reglas', 
-      icon: Target, 
-      id: 'grupos-reglas',
-      description: 'Administra grupos de reglas',
-      color: 'from-indigo-500 to-indigo-600',
-      bgColor: 'bg-indigo-50',
-      iconColor: 'text-indigo-600',
-      hoverColor: 'hover:bg-indigo-50'
-    },
-    { 
-      name: 'Grupos de relojes', 
-      icon: Clock, 
-      id: 'grupos-relojes',
-      description: 'Gestiona grupos de relojes',
-      color: 'from-blue-500 to-blue-600',
-      bgColor: 'bg-blue-50',
-      iconColor: 'text-blue-600',
-      hoverColor: 'hover:bg-blue-50'
-    }
   ];
 
   return (
-    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
+    <div className="space-y-5 h-full flex flex-col">
       {/* Header con gradiente mejorado */}
-      <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/90 to-violet-600/90"></div>
-        <div className="relative z-10 flex items-center space-x-4">
-          <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-            <Shield className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold text-white">Políticas</h3>
-            <p className="text-purple-100 text-sm">Gestión de políticas y reglas</p>
+      <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden flex-shrink-0">
+        <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 p-5 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/90 to-violet-600/90"></div>
+          <div className="relative z-10 flex items-center space-x-3">
+            <div className="w-11 h-11 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm shadow-md">
+              <Shield className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Políticas</h3>
+              <p className="text-purple-100 text-xs">Gestión de políticas y reglas</p>
+            </div>
           </div>
         </div>
-        {/* Efecto de partículas decorativas */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
       </div>
 
-      {/* Contenido con grid mejorado */}
-      <div className="p-6">
-        <div className="space-y-3">
-          {items.map((item, itemIndex) => {
-            const ItemIcon = item.icon;
-            return (
-              <button 
-                key={itemIndex} 
-                onClick={() => onItemClick && onItemClick(item.id)}
-                className={`group relative p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 text-left bg-white ${item.hoverColor} transform hover:scale-[1.02] hover:-translate-y-1 w-full`}
-              >
-                <div className="flex items-start space-x-4">
-                  <div className={`w-12 h-12 rounded-xl ${item.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
-                    <ItemIcon className={`w-6 h-6 ${item.iconColor}`} />
+      {/* Tarjetas de secciones mejoradas */}
+      <div className="space-y-3 flex-1 overflow-y-auto">
+        {items.map((item, itemIndex) => {
+          const ItemIcon = item.icon;
+          return (
+            <button 
+              key={itemIndex} 
+              onClick={() => onItemClick && onItemClick(item.id)}
+              className={`group relative bg-white rounded-lg shadow-md border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 text-left overflow-hidden w-full flex-shrink-0`}
+            >
+              {/* Background con gradiente sutil */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${item.bgColor} opacity-30 group-hover:opacity-50 transition-opacity duration-300`}></div>
+              
+              {/* Contenido */}
+              <div className="relative p-5">
+                <div className="flex items-start space-x-3">
+                  <div className={`w-14 h-14 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center group-hover:scale-105 transition-transform duration-300 shadow-md flex-shrink-0`}>
+                    <ItemIcon className="w-7 h-7 text-white" />
                   </div>
+                  
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-gray-900 group-hover:text-gray-700 transition-colors text-sm">
+                    <h4 className="text-base font-semibold text-gray-900 group-hover:text-gray-800 transition-colors mb-1">
                       {item.name}
                     </h4>
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                    <p className="text-gray-600 text-xs leading-relaxed">
                       {item.description}
                     </p>
                   </div>
-                </div>
-                
-                {/* Efecto de gradiente en hover */}
-                <div className={`absolute inset-0 rounded-xl bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>
-                
-                {/* Indicador de flecha */}
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                  <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center shadow-sm">
-                    <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                  
+                  {/* Indicador de flecha */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0 flex-shrink-0">
+                    <div className="w-8 h-8 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center shadow-sm">
+                      <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
-              </button>
-            );
-          })}
-        </div>
+              </div>
+              
+              {/* Borde inferior con gradiente en hover */}
+              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+            </button>
+          );
+        })}
       </div>
-
     </div>
   );
 };
@@ -129,66 +102,69 @@ export const ProgramacionSection = ({ onItemClick }) => {
   ];
 
   return (
-    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
+    <div className="space-y-5 h-full flex flex-col">
       {/* Header con gradiente mejorado */}
-      <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-green-600/90 to-emerald-600/90"></div>
-        <div className="relative z-10 flex items-center space-x-4">
-          <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-            <Play className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold text-white">Programación</h3>
-            <p className="text-green-100 text-sm">Generación de programación musical</p>
+      <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden flex-shrink-0">
+        <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 p-5 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-600/90 to-emerald-600/90"></div>
+          <div className="relative z-10 flex items-center space-x-3">
+            <div className="w-11 h-11 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm shadow-md">
+              <Play className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Programación</h3>
+              <p className="text-green-100 text-xs">Generación de programación musical</p>
+            </div>
           </div>
         </div>
-        {/* Efecto de partículas decorativas */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
       </div>
 
-      {/* Contenido con grid mejorado */}
-      <div className="p-6">
-        <div className="space-y-3">
-          {items.map((item, itemIndex) => {
-            const ItemIcon = item.icon;
-            return (
-              <button 
-                key={itemIndex} 
-                onClick={() => onItemClick && onItemClick(item.id)}
-                className={`group relative p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 text-left bg-white ${item.hoverColor} transform hover:scale-[1.02] hover:-translate-y-1 w-full`}
-              >
-                <div className="flex items-start space-x-4">
-                  <div className={`w-12 h-12 rounded-xl ${item.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
-                    <ItemIcon className={`w-6 h-6 ${item.iconColor}`} />
+      {/* Tarjetas de secciones mejoradas */}
+      <div className="space-y-3 flex-1 overflow-y-auto">
+        {items.map((item, itemIndex) => {
+          const ItemIcon = item.icon;
+          return (
+            <button 
+              key={itemIndex} 
+              onClick={() => onItemClick && onItemClick(item.id)}
+              className={`group relative bg-white rounded-lg shadow-md border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 text-left overflow-hidden w-full flex-shrink-0`}
+            >
+              {/* Background con gradiente sutil */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${item.bgColor} opacity-30 group-hover:opacity-50 transition-opacity duration-300`}></div>
+              
+              {/* Contenido */}
+              <div className="relative p-5">
+                <div className="flex items-start space-x-3">
+                  <div className={`w-14 h-14 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center group-hover:scale-105 transition-transform duration-300 shadow-md flex-shrink-0`}>
+                    <ItemIcon className="w-7 h-7 text-white" />
                   </div>
+                  
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-gray-900 group-hover:text-gray-700 transition-colors text-sm">
+                    <h4 className="text-base font-semibold text-gray-900 group-hover:text-gray-800 transition-colors mb-1">
                       {item.name}
                     </h4>
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                    <p className="text-gray-600 text-xs leading-relaxed">
                       {item.description}
                     </p>
                   </div>
-                </div>
-                
-                {/* Efecto de gradiente en hover */}
-                <div className={`absolute inset-0 rounded-xl bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>
-                
-                {/* Indicador de flecha */}
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                  <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center shadow-sm">
-                    <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                  
+                  {/* Indicador de flecha */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0 flex-shrink-0">
+                    <div className="w-8 h-8 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center shadow-sm">
+                      <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
-              </button>
-            );
-          })}
-        </div>
+              </div>
+              
+              {/* Borde inferior con gradiente en hover */}
+              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+            </button>
+          );
+        })}
       </div>
-
     </div>
   );
 };
@@ -239,69 +215,72 @@ export const LogfilesSection = ({ onItemClick }) => {
   ];
 
   return (
-    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
+    <div className="space-y-5 h-full flex flex-col">
       {/* Header con gradiente mejorado */}
-      <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 p-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-600/90 to-amber-600/90"></div>
-        <div className="relative z-10 flex items-center space-x-4">
-          <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-            <FileText className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold text-white">Logfiles</h3>
-            <p className="text-orange-100 text-sm">Gestión de archivos y auditoría</p>
+      <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 overflow-hidden flex-shrink-0">
+        <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 p-5 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-600/90 to-amber-600/90"></div>
+          <div className="relative z-10 flex items-center space-x-3">
+            <div className="w-11 h-11 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm shadow-md">
+              <FileText className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Logfiles</h3>
+              <p className="text-orange-100 text-xs">Gestión de archivos y auditoría</p>
+            </div>
           </div>
         </div>
-        {/* Efecto de partículas decorativas */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
       </div>
 
-      {/* Contenido con grid mejorado */}
-      <div className="p-6">
-        <div className="space-y-3">
-          {items.map((item, itemIndex) => {
-            const ItemIcon = item.icon;
-            return (
-              <button 
-                key={itemIndex} 
-                onClick={() => {
-                  console.log('Logfiles button clicked:', item.id, item.name)
-                  onItemClick && onItemClick(item.id)
-                }}
-                className={`group relative p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 text-left bg-white ${item.hoverColor} transform hover:scale-[1.02] hover:-translate-y-1 w-full`}
-              >
-                <div className="flex items-start space-x-4">
-                  <div className={`w-12 h-12 rounded-xl ${item.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
-                    <ItemIcon className={`w-6 h-6 ${item.iconColor}`} />
+      {/* Tarjetas de secciones mejoradas */}
+      <div className="space-y-3 flex-1 overflow-y-auto">
+        {items.map((item, itemIndex) => {
+          const ItemIcon = item.icon;
+          return (
+            <button 
+              key={itemIndex} 
+              onClick={() => {
+                console.log('Logfiles button clicked:', item.id, item.name)
+                onItemClick && onItemClick(item.id)
+              }}
+              className={`group relative bg-white rounded-lg shadow-md border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 text-left overflow-hidden w-full flex-shrink-0`}
+            >
+              {/* Background con gradiente sutil */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${item.bgColor} opacity-30 group-hover:opacity-50 transition-opacity duration-300`}></div>
+              
+              {/* Contenido */}
+              <div className="relative p-5">
+                <div className="flex items-start space-x-3">
+                  <div className={`w-14 h-14 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center group-hover:scale-105 transition-transform duration-300 shadow-md flex-shrink-0`}>
+                    <ItemIcon className="w-7 h-7 text-white" />
                   </div>
+                  
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-gray-900 group-hover:text-gray-700 transition-colors text-sm">
+                    <h4 className="text-base font-semibold text-gray-900 group-hover:text-gray-800 transition-colors mb-1">
                       {item.name}
                     </h4>
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                    <p className="text-gray-600 text-xs leading-relaxed">
                       {item.description}
                     </p>
                   </div>
-                </div>
-                
-                {/* Efecto de gradiente en hover */}
-                <div className={`absolute inset-0 rounded-xl bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>
-                
-                {/* Indicador de flecha */}
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                  <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center shadow-sm">
-                    <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                  
+                  {/* Indicador de flecha */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0 flex-shrink-0">
+                    <div className="w-8 h-8 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center shadow-sm">
+                      <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
-              </button>
-            );
-          })}
-        </div>
+              </div>
+              
+              {/* Borde inferior con gradiente en hover */}
+              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+            </button>
+          );
+        })}
       </div>
-
     </div>
   );
 };

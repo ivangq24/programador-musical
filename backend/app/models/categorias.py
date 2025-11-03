@@ -7,6 +7,8 @@ class Categoria(Base):
     __tablename__ = "categorias"
     
     id = Column(Integer, primary_key=True, index=True)
+    difusora = Column(String(10))
+    clave = Column(String(50))
     nombre = Column(String(100), nullable=False)
     descripcion = Column(Text)
     activa = Column(Boolean, default=True)

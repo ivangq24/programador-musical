@@ -8,7 +8,9 @@ from app.models.programacion import (
     Reloj as RelojModel,
     EventoReloj as EventoRelojModel,
     DiaModelo as DiaModeloModel,
-    RelojDiaModelo as RelojDiaModeloModel
+    RelojDiaModelo as RelojDiaModeloModel,
+    Regla as ReglaModel,
+    SeparacionRegla as SeparacionReglaModel
 )
 from app.models.categorias import Cancion as CancionModel, Categoria as CategoriaModel
 from datetime import datetime, time, timedelta
@@ -54,6 +56,11 @@ async def generar_programacion_completa(
         for dia_seleccionado in request.dias_modelo:
             print(f"🔍 DEBUG: Procesando día {dia_seleccionado.fecha} con modelo '{dia_seleccionado.dia_modelo}'")
             logger.info(f"Procesando día {dia_seleccionado.fecha} con modelo '{dia_seleccionado.dia_modelo}'")
+            # Registrar el día modelo seleccionado por fecha para usarlo en el bucle principal
+            try:
+                dias_modelo_por_fecha[dia_seleccionado.fecha] = dia_seleccionado.dia_modelo
+            except Exception:
+                dias_modelo_por_fecha[str(dia_seleccionado.fecha)] = dia_seleccionado.dia_modelo
             dias_modelo_por_fecha[dia_seleccionado.fecha] = dia_seleccionado.dia_modelo
         
         # Obtener día modelo para esta política
@@ -81,9 +88,11 @@ async def generar_programacion_completa(
                 fecha_actual += timedelta(days=1)
                 continue
             
-            # Buscar el día modelo por nombre
+            # Buscar el día modelo por nombre (búsqueda flexible por difusora)
             print(f"🔍 DEBUG: Buscando día modelo '{dia_modelo_nombre}' para política {politica_id}, difusora {difusora}")
             logger.info(f"Buscando día modelo '{dia_modelo_nombre}' para política {politica_id}, difusora {difusora}")
+            
+            # Primero intentar buscar con difusora específica
             dia_modelo = db.query(DiaModeloModel).filter(
                 DiaModeloModel.politica_id == politica_id,
                 DiaModeloModel.difusora == difusora,
@@ -91,12 +100,31 @@ async def generar_programacion_completa(
                 DiaModeloModel.nombre == dia_modelo_nombre
             ).first()
             
+            # Si no se encuentra, buscar sin restricción de difusora (permite "TODAS" o cualquier otra)
+            if not dia_modelo:
+                print(f"⚠️ DEBUG: No encontrado con difusora específica '{difusora}', buscando sin restricción de difusora...")
+                logger.info(f"No encontrado con difusora específica '{difusora}', buscando sin restricción de difusora...")
+                dia_modelo = db.query(DiaModeloModel).filter(
+                    DiaModeloModel.politica_id == politica_id,
+                    DiaModeloModel.habilitado == True,
+                    DiaModeloModel.nombre == dia_modelo_nombre
+                ).first()
+            
+            # Si aún no se encuentra, buscar solo por política y nombre (última opción)
+            if not dia_modelo:
+                print(f"⚠️ DEBUG: No encontrado con filtros anteriores, buscando solo por política y nombre...")
+                logger.info(f"No encontrado con filtros anteriores, buscando solo por política y nombre...")
+                dia_modelo = db.query(DiaModeloModel).filter(
+                    DiaModeloModel.politica_id == politica_id,
+                    DiaModeloModel.nombre == dia_modelo_nombre
+                ).first()
+            
             if dia_modelo:
-                print(f"✅ DEBUG: Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}'")
-                logger.info(f"Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}'")
+                print(f"✅ DEBUG: Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}', difusora='{dia_modelo.difusora}'")
+                logger.info(f"Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}', difusora='{dia_modelo.difusora}'")
             else:
-                print(f"❌ DEBUG: No se encontró día modelo con nombre '{dia_modelo_nombre}'")
-                logger.warning(f"No se encontró día modelo con nombre '{dia_modelo_nombre}'")
+                print(f"❌ DEBUG: No se encontró día modelo con nombre '{dia_modelo_nombre}' para política {politica_id}")
+                logger.warning(f"No se encontró día modelo con nombre '{dia_modelo_nombre}' para política {politica_id}")
             
             if not dia_modelo:
                 logger.warning(f"No se encontró el día modelo '{dia_modelo_nombre}' para {fecha_str}")
@@ -118,8 +146,12 @@ async def generar_programacion_completa(
                 RelojModel.habilitado == True
             ).order_by(RelojDiaModeloModel.orden).all()
             
+            logger.info(f"📋 Día modelo '{dia_modelo.nombre}' (ID: {dia_modelo.id}) tiene {len(relojes_dia)} relojes asociados")
+            print(f"📋 Día modelo '{dia_modelo.nombre}' (ID: {dia_modelo.id}) tiene {len(relojes_dia)} relojes asociados")
+            for r in relojes_dia:
+                print(f"  - Reloj {r.clave} (ID: {r.id}, habilitado: {r.habilitado})")
+            
             if not relojes_dia:
-                logger.warning(f"No hay relojes configurados para {fecha_actual.strftime('%d/%m/%Y')}")
                 dias_procesados.append({
                     "fecha": fecha_actual.strftime("%d/%m/%Y"),
                     "dia_semana": fecha_actual.strftime("%A"),
@@ -169,6 +201,17 @@ async def generar_programacion_completa(
                 })
             
             fecha_actual += timedelta(days=1)
+        
+        # Hacer commit de todos los cambios después de generar toda la programación
+        try:
+            db.commit()
+            logger.info(f"✅ Programación generada y guardada en la base de datos: {dias_generados} días")
+            print(f"✅ DEBUG: Programación generada y guardada en la base de datos: {dias_generados} días")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"❌ Error al hacer commit de la programación: {str(e)}")
+            print(f"❌ DEBUG: Error al hacer commit de la programación: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error al guardar la programación: {str(e)}")
         
         return {
             "message": "Programación generada correctamente",
@@ -234,6 +277,26 @@ async def generar_programacion_dia(
     if not canciones_por_categoria:
         raise ValueError("No hay canciones activas en las categorías seleccionadas")
     
+    # Obtener todas las reglas habilitadas de la política
+    reglas = db.query(ReglaModel).filter(
+        ReglaModel.politica_id == politica_id,
+        ReglaModel.habilitada == True
+    ).all()
+    
+    # Cargar separaciones para cada regla
+    reglas_con_separaciones = {}
+    for regla in reglas:
+        separaciones = db.query(SeparacionReglaModel).filter(
+            SeparacionReglaModel.regla_id == regla.id
+        ).all()
+        reglas_con_separaciones[regla.id] = {
+            'regla': regla,
+            'separaciones': {sep.valor: sep.separacion for sep in separaciones}
+        }
+    
+    logger.info(f"📋 Cargadas {len(reglas_con_separaciones)} reglas habilitadas para la política {politica_id}")
+    print(f"📋 Cargadas {len(reglas_con_separaciones)} reglas habilitadas para la política {politica_id}")
+    
     # Crear pools de canciones sin repetir para cada categoría
     # Cada pool es una lista que se mezcla aleatoriamente
     canciones_pools = {}
@@ -247,52 +310,605 @@ async def generar_programacion_dia(
             'total': len(pool)
         }
     
-    def obtener_cancion_sin_repetir(categoria_nombre):
-        """Obtiene una canción sin repetir hasta agotar el pool"""
+    # Lista para rastrear eventos programados (para validación de reglas)
+    eventos_programados = []  # Lista de dict con información de cada evento
+    
+    def obtener_valor_caracteristica(cancion, caracteristica):
+        """Obtiene el valor de una característica específica de una canción"""
+        if caracteristica.lower() == 'id_cancion' or caracteristica.lower() == 'id de canción':
+            return str(cancion.id)
+        elif caracteristica.lower() == 'artista':
+            return cancion.artista or ''
+        elif caracteristica.lower() == 'album':
+            return cancion.album or ''
+        elif caracteristica.lower() == 'titulo':
+            return cancion.titulo or ''
+        elif caracteristica.lower() == 'duracion':
+            return str(cancion.duracion) if cancion.duracion else '0'
+        else:
+            # Intentar obtener como atributo
+            return str(getattr(cancion, caracteristica.lower(), ''))
+    
+    def convertir_separacion_a_valor(tipo_separacion, separacion_int, eventos_programados, tiempo_actual):
+        """Convierte el tipo de separación a un valor comparable"""
+        if tipo_separacion == 'Número de Eventos':
+            return separacion_int  # Ya es número de eventos
+        elif tipo_separacion == 'Número de Canciones':
+            # Contar solo eventos que son canciones (mc=True)
+            return separacion_int
+        elif tipo_separacion == 'Tiempo - Segundos':
+            return separacion_int  # Ya es segundos
+        elif tipo_separacion == 'Tiempo - DD:HH:MM':
+            # Convertir DD:HH:MM a segundos
+            # Formato esperado: "DD:HH:MM" o solo el número de segundos
+            return separacion_int  # Por ahora asumimos que ya viene en segundos
+        return separacion_int
+    
+    def validar_separacion_minima(cancion, eventos_programados, regla_info, hora_actual):
+        """Valida la regla de Separación Mínima"""
+        regla = regla_info['regla']
+        separaciones = regla_info['separaciones']
+        caracteristica = regla.caracteristica
+        
+        valor_cancion = obtener_valor_caracteristica(cancion, caracteristica)
+        
+        # Buscar si hay una separación específica para este valor o "Todos los valores" / "todos"
+        separacion_requerida = None
+        if 'Todos los valores' in separaciones or 'todos' in separaciones:
+            separacion_requerida = separaciones.get('Todos los valores') or separaciones.get('todos')
+        elif valor_cancion in separaciones:
+            separacion_requerida = separaciones[valor_cancion]
+        else:
+            # Buscar por coincidencia parcial (ej: "artista_1" para cualquier artista)
+            for key, value in separaciones.items():
+                if key.lower().startswith(caracteristica.lower()) or valor_cancion.lower() in key.lower():
+                    separacion_requerida = value
+                    break
+        
+        if separacion_requerida is None:
+            return True  # No hay restricción para este valor
+        
+        # Convertir separación según tipo
+        separacion_valor = convertir_separacion_a_valor(
+            regla.tipo_separacion, 
+            separacion_requerida, 
+            eventos_programados,
+            hora_actual
+        )
+        
+        # Revisar eventos programados hacia atrás
+        eventos_recientes = eventos_programados[-separacion_valor:] if len(eventos_programados) >= separacion_valor else eventos_programados
+        
+        if regla.tipo_separacion == 'Número de Eventos':
+            # Verificar que no haya otro evento con el mismo valor en los últimos N eventos
+            for evento in eventos_recientes:
+                if evento.get('cancion') and obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                    return False
+        elif regla.tipo_separacion == 'Número de Canciones':
+            # Verificar que no haya otra canción con el mismo valor en las últimas N canciones
+            # Contar solo canciones (no eventos no musicales)
+            canciones_recientes = [e for e in eventos_programados if e.get('cancion')]
+            if len(canciones_recientes) >= separacion_valor:
+                # Revisar las últimas N canciones
+                for evento in canciones_recientes[-separacion_valor:]:
+                    if obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                        return False
+            else:
+                # Si hay menos canciones que el requerimiento, verificar todas
+                for evento in canciones_recientes:
+                    if obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                        return False
+        elif regla.tipo_separacion in ['Tiempo - Segundos', 'Tiempo - DD:HH:MM']:
+            # Verificar que no haya otro evento con el mismo valor en el tiempo especificado
+            tiempo_limite = hora_actual - separacion_valor
+            for evento in reversed(eventos_programados):
+                if evento.get('tiempo_inicio_segundos', 0) < tiempo_limite:
+                    break
+                if evento.get('cancion') and obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                    return False
+        
+        return True
+    
+    def validar_maximo_en_hilera(cancion, eventos_programados, regla_info):
+        """Valida la regla de Máximo de Canciones en Hilera"""
+        regla = regla_info['regla']
+        separaciones = regla_info['separaciones']
+        caracteristica = regla.caracteristica
+        
+        valor_cancion = obtener_valor_caracteristica(cancion, caracteristica)
+        
+        # Obtener el máximo permitido (generalmente está en "Todos los valores" o "todos")
+        max_permitido = separaciones.get('Todos los valores') or separaciones.get('todos') or separaciones.get(valor_cancion)
+        if max_permitido is None:
+            # Buscar por coincidencia parcial
+            for key, value in separaciones.items():
+                if key.lower().startswith(caracteristica.lower()) or valor_cancion.lower() in key.lower():
+                    max_permitido = value
+                    break
+        if max_permitido is None:
+            return True  # No hay restricción
+        
+        # Contar canciones consecutivas con el mismo valor al final de la lista
+        contador = 0
+        for evento in reversed(eventos_programados):
+            if not evento.get('cancion'):
+                break  # Si encontramos un evento que no es canción, romper la hilera
+            if obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                contador += 1
+            else:
+                break
+        
+        # Si ya alcanzamos el máximo, no podemos agregar otra
+        return contador < max_permitido
+    
+    def validar_proteccion_dias_anteriores(cancion, eventos_programados, regla_info, fecha_actual, db_session, hora_actual_segundos=0):
+        """Valida la regla de Protección de Días Anteriores - Evita que se programen canciones si hubo canciones con la misma característica a la misma hora en días consecutivos"""
+        regla = regla_info['regla']
+        caracteristica = regla.caracteristica
+        
+        # Si solo_verificar_dia es True, no verificar días anteriores
+        if regla.solo_verificar_dia:
+            return True
+        
+        # Obtener la hora actual del evento que estamos programando
+        # Usar el parámetro hora_actual_segundos que se pasa desde obtener_cancion_sin_repetir
+        hora_actual_time = time((hora_actual_segundos // 3600) % 24, (hora_actual_segundos % 3600) // 60, hora_actual_segundos % 60)
+        
+        valor_cancion = obtener_valor_caracteristica(cancion, caracteristica)
+        
+        # Verificar días anteriores (máximo 7 días hacia atrás)
+        for dias_atras in range(1, 8):
+            fecha_anterior = fecha_actual - timedelta(days=dias_atras)
+            eventos_anteriores = db_session.query(ProgramacionModel).filter(
+                ProgramacionModel.fecha == fecha_anterior.date(),
+                ProgramacionModel.politica_id == regla.politica_id,
+                ProgramacionModel.mc == True  # Solo canciones
+            ).all()
+            
+            for evento_anterior in eventos_anteriores:
+                if evento_anterior.hora_real == hora_actual_time:
+                    # Verificar si tiene la misma característica
+                    # Verificar según la característica
+                    valor_anterior = None
+                    if caracteristica.lower() in ['id_cancion', 'id de canción']:
+                        valor_anterior = evento_anterior.id_media
+                    elif caracteristica.lower() == 'artista':
+                        valor_anterior = evento_anterior.interprete
+                    elif caracteristica.lower() == 'album':
+                        valor_anterior = evento_anterior.disco
+                    elif caracteristica.lower() == 'titulo':
+                        valor_anterior = evento_anterior.descripcion
+                    # TODO: Agregar más características según necesidad
+                    
+                    # Comparar valores
+                    if valor_anterior and str(valor_anterior).lower() == str(valor_cancion).lower():
+                        return False
+        
+        return True
+    
+    def validar_maxima_diferencia_permitida(cancion, eventos_programados, regla_info):
+        """Valida la regla de Máxima Diferencia Permitida - Para canciones con valores numéricos, evita cambios bruscos"""
+        regla = regla_info['regla']
+        separaciones = regla_info['separaciones']
+        caracteristica = regla.caracteristica
+        
+        # Obtener el valor numérico de la canción para la característica
+        try:
+            valor_actual = float(obtener_valor_caracteristica(cancion, caracteristica))
+        except (ValueError, TypeError):
+            return True  # Si no es numérico, no aplicar esta regla
+        
+        # Obtener el máximo permitido (generalmente está en "Todos los valores" o "todos")
+        max_diferencia = separaciones.get('Todos los valores') or separaciones.get('todos')
+        if max_diferencia is None:
+            return True  # No hay restricción
+        
+        # Verificar diferencias con eventos recientes (últimas 10 canciones)
+        for evento in reversed(eventos_programados[-10:]):
+            if not evento.get('cancion'):
+                continue
+            try:
+                valor_anterior = float(obtener_valor_caracteristica(evento['cancion'], caracteristica))
+                diferencia = abs(valor_actual - valor_anterior)
+                if diferencia > max_diferencia:
+                    return False
+            except (ValueError, TypeError):
+                continue
+        
+        return True
+    
+    def validar_minima_diferencia_permitida(cancion, eventos_programados, regla_info):
+        """Valida la regla de Mínima Diferencia Permitida - Sirve a la inversa de Máxima Diferencia Permitida"""
+        regla = regla_info['regla']
+        separaciones = regla_info['separaciones']
+        caracteristica = regla.caracteristica
+        
+        # Obtener el valor numérico de la canción para la característica
+        try:
+            valor_actual = float(obtener_valor_caracteristica(cancion, caracteristica))
+        except (ValueError, TypeError):
+            return True  # Si no es numérico, no aplicar esta regla
+        
+        # Obtener el mínimo permitido (generalmente está en "Todos los valores" o "todos")
+        min_diferencia = separaciones.get('Todos los valores') or separaciones.get('todos')
+        if min_diferencia is None:
+            return True  # No hay restricción
+        
+        # Verificar diferencias con eventos recientes (últimas 10 canciones)
+        for evento in reversed(eventos_programados[-10:]):
+            if not evento.get('cancion'):
+                continue
+            try:
+                valor_anterior = float(obtener_valor_caracteristica(evento['cancion'], caracteristica))
+                diferencia = abs(valor_actual - valor_anterior)
+                if diferencia < min_diferencia:
+                    return False
+            except (ValueError, TypeError):
+                continue
+        
+        return True
+    
+    def validar_maximas_en_periodo(cancion, eventos_programados, regla_info, hora_actual):
+        """Valida la regla de Canciones Máximas en un Periodo - Evita que en un periodo se programen más de N canciones con la misma característica"""
+        regla = regla_info['regla']
+        separaciones = regla_info['separaciones']
+        caracteristica = regla.caracteristica
+        
+        valor_cancion = obtener_valor_caracteristica(cancion, caracteristica)
+        
+        # Obtener el máximo permitido (generalmente está en "Todos los valores" o "todos")
+        max_permitido = separaciones.get('Todos los valores') or separaciones.get('todos')
+        if max_permitido is None:
+            return True
+        
+        # Para esta regla, el tipo_separacion indica cómo medir el periodo
+        # y el valor en separaciones indica el máximo de canciones permitidas en ese periodo
+        
+        if regla.tipo_separacion in ['Tiempo - Segundos', 'Tiempo - DD:HH:MM']:
+            # El separacion indica el periodo en segundos
+            periodo_segundos = max_permitido
+            tiempo_limite = hora_actual - periodo_segundos
+            
+            # Contar canciones en el periodo con la misma característica
+            contador = 0
+            for evento in reversed(eventos_programados):
+                if evento.get('tiempo_inicio_segundos', 0) < tiempo_limite:
+                    break
+                if evento.get('cancion') and obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                    contador += 1
+            
+            # max_permitido es el número máximo de canciones permitidas en el periodo
+            # Como el periodo y el máximo están en el mismo campo, usamos un valor razonable
+            # Si max_permitido es muy grande (ej: 3600 segundos), es el periodo
+            # Si es pequeño (ej: 3), es el máximo de canciones
+            if max_permitido > 60:  # Probablemente es un tiempo en segundos
+                # Usar un máximo razonable (ej: 3 canciones por hora)
+                max_canciones_permitidas = 3
+            else:
+                # Es el número de canciones máximo
+                max_canciones_permitidas = max_permitido
+            
+            return contador < max_canciones_permitidas
+        else:
+            # Si es "Número de Canciones" o "Número de Eventos", el periodo es el número especificado
+            periodo_canciones = max_permitido
+            
+            # Contar canciones recientes con la misma característica
+            canciones_recientes = [e for e in eventos_programados if e.get('cancion')]
+            contador = 0
+            for evento in canciones_recientes[-periodo_canciones:]:
+                if obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                    contador += 1
+            
+            # max_permitido es el número máximo de canciones permitidas en el periodo
+            return contador < max_permitido
+    
+    def validar_proteccion_secuencias(cancion, eventos_programados, regla_info):
+        """Valida la regla de Protección de Secuencias - Evita que se generen secuencias de canciones con valores específicos"""
+        regla = regla_info['regla']
+        separaciones = regla_info['separaciones']
+        caracteristica = regla.caracteristica
+        
+        valor_cancion = obtener_valor_caracteristica(cancion, caracteristica)
+        
+        # Obtener el valor del evento anterior (si existe)
+        if not eventos_programados:
+            return True  # No hay evento anterior, no hay secuencia que validar
+        
+        # Buscar la última canción programada
+        ultimo_evento = None
+        for evento in reversed(eventos_programados):
+            if evento.get('cancion'):
+                ultimo_evento = evento
+                break
+        
+        if not ultimo_evento:
+            return True  # No hay canción anterior
+        
+        valor_anterior = obtener_valor_caracteristica(ultimo_evento['cancion'], caracteristica)
+        
+        # Las separaciones pueden contener secuencias prohibidas
+        # Formato esperado: "valor_anterior->valor_siguiente" o similar
+        # Por ejemplo: "Artista A->Artista B" significa que no puede ir B después de A
+        secuencia_actual = f"{valor_anterior}->{valor_cancion}"
+        secuencia_inversa = f"{valor_cancion}->{valor_anterior}"
+        
+        # Verificar si esta secuencia está prohibida
+        for key, value in separaciones.items():
+            # Verificar si la clave representa una secuencia prohibida
+            if '->' in key or '->' in str(value):
+                secuencia_prohibida = key if '->' in key else str(value)
+                if secuencia_actual.lower() == secuencia_prohibida.lower() or \
+                   secuencia_inversa.lower() == secuencia_prohibida.lower():
+                    return False
+        
+        # Si hay un valor específico en separaciones y coincide con el valor anterior,
+        # y el valor actual también está en las separaciones, podría ser una secuencia prohibida
+        # Por ahora, si no hay configuración específica, permitir la secuencia
+        return True
+    
+    def validar_proteccion_secuencias_iguales(cancion, eventos_programados, regla_info):
+        """Valida la regla de Protección de Secuencias Iguales - Evita secuencias de canciones iguales según la característica"""
+        regla = regla_info['regla']
+        caracteristica = regla.caracteristica
+        
+        valor_cancion = obtener_valor_caracteristica(cancion, caracteristica)
+        
+        # Contar cuántas canciones consecutivas con el mismo valor hay al final
+        contador = 1  # Incluir la canción actual
+        for evento in reversed(eventos_programados):
+            if not evento.get('cancion'):
+                break
+            if obtener_valor_caracteristica(evento['cancion'], caracteristica) == valor_cancion:
+                contador += 1
+            else:
+                break
+        
+        # No permitir más de 2 consecutivas (secuencia igual)
+        return contador <= 2
+    
+    def validar_proteccion_conjuntos_iguales(cancion, eventos_programados, regla_info):
+        """Valida la regla de Protección de Conjuntos Iguales - Evita conjuntos de canciones iguales según la característica"""
+        regla = regla_info['regla']
+        separaciones = regla_info['separaciones']
+        caracteristica = regla.caracteristica
+        
+        valor_cancion = obtener_valor_caracteristica(cancion, caracteristica)
+        
+        # Obtener el tamaño máximo del conjunto permitido (generalmente está en "Todos los valores" o "todos")
+        max_conjunto = separaciones.get('Todos los valores') or separaciones.get('todos') or 3  # Por defecto 3
+        
+        # Verificar las últimas N canciones (donde N es el tamaño del conjunto)
+        conjunto_actual = [cancion]
+        for evento in reversed(eventos_programados[-max_conjunto:]):
+            if evento.get('cancion'):
+                conjunto_actual.append(evento['cancion'])
+        
+        # Si todas las canciones del conjunto tienen el mismo valor, es un conjunto igual prohibido
+        if len(conjunto_actual) >= max_conjunto:
+            valores_conjunto = [obtener_valor_caracteristica(c, caracteristica) for c in conjunto_actual]
+            if len(set(valores_conjunto)) == 1:  # Todos tienen el mismo valor
+                return False
+        
+        return True
+    
+    def obtener_cancion_sin_repetir(categoria_nombre, hora_actual_segundos=0):
+        """Obtiene una canción sin repetir hasta agotar el pool, validando reglas"""
         if categoria_nombre not in canciones_pools:
             return None
         
         pool_info = canciones_pools[categoria_nombre]
+        intentos_maximos = pool_info['total'] * 2  # Intentar el doble de veces antes de rendirse
+        intentos = 0
         
-        # Si llegamos al final del pool, reiniciar y mezclar
-        if pool_info['index'] >= pool_info['total']:
-            random.shuffle(pool_info['pool'])
-            pool_info['index'] = 0
+        while intentos < intentos_maximos:
+            # Si llegamos al final del pool, reiniciar y mezclar
+            if pool_info['index'] >= pool_info['total']:
+                random.shuffle(pool_info['pool'])
+                pool_info['index'] = 0
+            
+            # Obtener la siguiente canción
+            cancion = pool_info['pool'][pool_info['index']]
+            pool_info['index'] += 1
+            intentos += 1
+            
+            # Validar todas las reglas
+            cumple_todas_las_reglas = True
+            
+            for regla_id, regla_info in reglas_con_separaciones.items():
+                regla = regla_info['regla']
+                
+                if regla.tipo_regla == 'Separación Mínima':
+                    if not validar_separacion_minima(cancion, eventos_programados, regla_info, hora_actual_segundos):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Máximo de Canciones en Hilera':
+                    if not validar_maximo_en_hilera(cancion, eventos_programados, regla_info):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Protección de Días Anteriores':
+                    if not validar_proteccion_dias_anteriores(cancion, eventos_programados, regla_info, fecha, db, hora_actual_segundos):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Máxima Diferencia Permitida':
+                    if not validar_maxima_diferencia_permitida(cancion, eventos_programados, regla_info):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Mínima Diferencia Permitida':
+                    if not validar_minima_diferencia_permitida(cancion, eventos_programados, regla_info):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Canciones máximas en un periodo':
+                    if not validar_maximas_en_periodo(cancion, eventos_programados, regla_info, hora_actual_segundos):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Protección de Secuencias':
+                    if not validar_proteccion_secuencias(cancion, eventos_programados, regla_info):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Protección de Secuencias Iguales':
+                    if not validar_proteccion_secuencias_iguales(cancion, eventos_programados, regla_info):
+                        cumple_todas_las_reglas = False
+                        break
+                elif regla.tipo_regla == 'Protección de Conjuntos Iguales':
+                    if not validar_proteccion_conjuntos_iguales(cancion, eventos_programados, regla_info):
+                        cumple_todas_las_reglas = False
+                        break
+            
+            if cumple_todas_las_reglas:
+                return cancion
         
-        # Obtener la siguiente canción
-        cancion = pool_info['pool'][pool_info['index']]
-        pool_info['index'] += 1
-        
-        return cancion
+        # Si no encontramos ninguna canción que cumpla las reglas, devolver la primera disponible
+        logger.warning(f"⚠️ No se encontró canción que cumpla todas las reglas después de {intentos_maximos} intentos. Usando primera disponible.")
+        pool_info['index'] = 0
+        return pool_info['pool'][0]
     
     # Ordenar relojes por su clave (R00, R01, ..., R23)
     relojes_ordenados = sorted(relojes, key=lambda r: r.clave)
     
+    print(f"📋 Total de relojes a procesar: {len(relojes_ordenados)}")
+    for r in relojes_ordenados:
+        print(f"  - Reloj {r.clave} (ID: {r.id}, habilitado: {r.habilitado})")
+    
     # Variable para rastrear el tiempo real de finalización del reloj anterior
     tiempo_fin_reloj_anterior = 0
+    
+    # Variable para llevar registro de la última canción entre relojes (para procesar ETM entre relojes)
+    ultima_cancion_entre_relojes = None
+    ultima_cancion_tiempo_inicio_global = None
+    ultima_cancion_duracion_original_global = None
+    
+    # Función auxiliar para obtener offset en segundos
+    def get_offset_seconds(offset_str):
+        try:
+            parts = offset_str.split(':')
+            if len(parts) == 3:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            return 0
+        except:
+            return 0
     
     for idx, reloj in enumerate(relojes_ordenados):
         # Cada reloj debe comenzar en su hora programada (00:00, 01:00, 02:00, etc.)
         hora_programada_reloj = idx * 3600  # 0, 3600, 7200, ... segundos
         
-        # Si el reloj anterior terminó después de la hora programada, ajustar
-        tiempo_inicio_segundos = max(hora_programada_reloj, tiempo_fin_reloj_anterior)
+        # Obtener eventos del reloj ANTES de establecer tiempo_inicio_segundos
+        # para poder verificar si hay un ETM al inicio que corte la canción anterior
+        eventos_reloj_raw = db.query(EventoRelojModel).filter(
+            EventoRelojModel.reloj_id == reloj.id
+        ).all()
+        
+        # Ordenar eventos por offset_value (tiempo en el reloj)
+        def get_offset_seconds(offset_str):
+            try:
+                parts = offset_str.split(':')
+                if len(parts) == 3:
+                    return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                return 0
+            except:
+                return 0
+        
+        eventos_reloj = sorted(eventos_reloj_raw, key=lambda e: get_offset_seconds(e.offset_value or '00:00:00'))
+        
+        # Verificar PRIMERO si el primer evento es un ETM con "cortar" al inicio del reloj (offset 00:00:00)
+        # Si es así, el reloj DEBE empezar exactamente en su hora programada, ignorando el fin del reloj anterior
+        tiene_etm_cortar_inicio = False
+        if eventos_reloj:  # Verificar para todos los relojes, no solo idx > 0
+            primer_evento = eventos_reloj[0]
+            offset_primer_evento = get_offset_seconds(primer_evento.offset_value or '00:00:00')
+            es_etm_inicio = (primer_evento.categoria == 'ETM' or primer_evento.tipo == 'ETM' or primer_evento.tipo == '6')
+            accion_etm_inicio = primer_evento.tipo_etm if primer_evento.tipo_etm else None
+            
+            # Si es ETM al inicio y tiene acción "cortar", o si es ETM al inicio sin acción definida (asumir cortar por defecto)
+            if es_etm_inicio and offset_primer_evento == 0:
+                # Normalizar la acción para comparación (case-insensitive, sin espacios)
+                accion_normalizada = accion_etm_inicio.lower().strip() if accion_etm_inicio else None
+                if accion_normalizada in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']:
+                    tiene_etm_cortar_inicio = True
+                    print(f"  ✅ ETM al inicio detectado con acción '{accion_etm_inicio}' (normalizada: '{accion_normalizada}')")
+                elif accion_etm_inicio is None or accion_etm_inicio == '':
+                    # Si no hay acción definida, asumir "cortar" por defecto para ETM al inicio
+                    tiene_etm_cortar_inicio = True
+                    print(f"  ℹ️ ETM al inicio sin acción definida, asumiendo 'cortar' por defecto")
+        
+        # Establecer tiempo_inicio_segundos según si hay ETM que corta o no
+        if tiene_etm_cortar_inicio:
+            # Si hay ETM "cortar" al inicio, el reloj DEBE empezar exactamente en su hora programada
+            tiempo_inicio_segundos = hora_programada_reloj
+            print(f"🔪 Reloj {reloj.clave} tiene ETM 'cortar' al inicio - Forzando inicio a hora programada: {hora_programada_reloj//3600}:00:00")
+        else:
+            # Si no hay ETM que corte, ajustar según el fin del reloj anterior
+            tiempo_inicio_segundos = max(hora_programada_reloj, tiempo_fin_reloj_anterior)
         
         # El tiempo disponible es 1 hora desde el inicio real del reloj
         tiempo_disponible_segundos = 3600  # 1 hora por reloj
         
         # Log para debugging
         hora_inicio_hhmmss = f"{tiempo_inicio_segundos//3600:02d}:{(tiempo_inicio_segundos%3600)//60:02d}:{tiempo_inicio_segundos%60:02d}"
-        print(f"🕐 Reloj {reloj.clave} (índice {idx}) - Inicio: {hora_inicio_hhmmss}")
-        
-        # Obtener eventos del reloj
-        eventos_reloj = db.query(EventoRelojModel).filter(
-            EventoRelojModel.reloj_id == reloj.id
-        ).order_by(EventoRelojModel.numero).all()
+        print(f"🕐 Reloj {reloj.clave} (índice {idx}) - Inicio: {hora_inicio_hhmmss}, Eventos configurados: {len(eventos_reloj)}")
         
         if not eventos_reloj:
             # Si no hay eventos configurados, llenar con canciones aleatorias
             eventos_reloj = []
+            print(f"⚠️ Reloj {reloj.clave} no tiene eventos configurados")
+        
+        # Ahora procesar el ETM al inicio y cortar la canción anterior si es necesario
+        if tiene_etm_cortar_inicio:
+            # Hay un ETM "cortar" al inicio del reloj, cortar la última canción del reloj anterior
+            print(f"🔍 FORZANDO corte con ETM 'cortar' al inicio del reloj {reloj.clave}: hora_programada_reloj={hora_programada_reloj} ({hora_programada_reloj//3600}:00:00)")
+            if ultima_cancion_entre_relojes and ultima_cancion_tiempo_inicio_global:
+                tiempo_etm_segundos = hora_programada_reloj  # Exactamente en la hora programada
+                tiempo_transcurrido = tiempo_etm_segundos - ultima_cancion_tiempo_inicio_global
+                
+                # Obtener la duración ORIGINAL de la canción (antes de cualquier corte)
+                # Si no tenemos la original guardada, intentar calcularla desde la canción seleccionada
+                duracion_original_real = ultima_cancion_duracion_original_global
+                if duracion_original_real == 0:
+                    # Si no tenemos la original, usar la duración actual como fallback
+                    duracion_actual = convertir_duracion_a_segundos(ultima_cancion_entre_relojes.duracion_real or '00:00:00')
+                    if duracion_actual > 0:
+                        duracion_original_real = duracion_actual
+                        print(f"  ⚠️ No se encontró duración original, usando duración actual como fallback: {duracion_original_real}s")
+                
+                print(f"  📊 Canción anterior: inicio={ultima_cancion_tiempo_inicio_global} (hora {ultima_cancion_tiempo_inicio_global//3600}:{(ultima_cancion_tiempo_inicio_global%3600)//60:02d}:{ultima_cancion_tiempo_inicio_global%60:02d}), duración_original={duracion_original_real}s, tiempo_transcurrido={tiempo_transcurrido}s")
+                
+                if tiempo_transcurrido > 0:
+                    # FORZAR el corte: SIEMPRE cortar la canción en el tiempo del ETM
+                    # El ETM "cortar" fuerza el corte en su hora programada, sin importar si la canción ya debería haber terminado
+                    nueva_duracion_segundos = tiempo_transcurrido
+                    
+                    # Asegurar que no sea mayor que la duración original
+                    if nueva_duracion_segundos > duracion_original_real:
+                        nueva_duracion_segundos = duracion_original_real
+                        print(f"  ⚠️ Tiempo transcurrido ({tiempo_transcurrido}s) > duración original ({duracion_original_real}s), cortando a duración original")
+                    else:
+                        print(f"  ✂️ FORZANDO corte: duración original {duracion_original_real}s -> nueva duración {nueva_duracion_segundos}s")
+                    
+                    dur_horas = nueva_duracion_segundos // 3600
+                    dur_minutos = (nueva_duracion_segundos % 3600) // 60
+                    dur_segundos = nueva_duracion_segundos % 60
+                    nueva_duracion_str = f"{dur_horas:02d}:{dur_minutos:02d}:{dur_segundos:02d}"
+                    
+                    # FORZAR la actualización de la entrada anterior EN LA BASE DE DATOS
+                    ultima_cancion_entre_relojes.duracion_real = nueva_duracion_str
+                    ultima_cancion_entre_relojes.duracion_planeada = nueva_duracion_str
+                    db.add(ultima_cancion_entre_relojes)  # Asegurar que se guarde en la DB
+                    db.flush()  # Forzar el flush inmediato para asegurar que los cambios se reflejen
+                    
+                    logger.info(f"✂️ ETM al inicio del reloj ({accion_etm_inicio}): Canción FORZADA a cortarse a {nueva_duracion_str} en {tiempo_etm_segundos} segundos")
+                    print(f"✂️ ETM al inicio del reloj ({accion_etm_inicio}): Canción FORZADA a cortarse a {nueva_duracion_str} en hora {hora_programada_reloj//3600}:00:00")
+                else:
+                    print(f"  ⚠️ El ETM está antes del inicio de la canción anterior (tiempo_transcurrido={tiempo_transcurrido}), no se corta")
+                
+                # Asegurar que tiempo_inicio_segundos esté en la hora programada (ya debería estar así)
+                tiempo_inicio_segundos = hora_programada_reloj
+                tiempo_fin_reloj_anterior = hora_programada_reloj
+                print(f"  ✅ tiempo_inicio_segundos FORZADO a: {tiempo_inicio_segundos} (hora {tiempo_inicio_segundos//3600}:00:00)")
+            else:
+                # No hay canción anterior
+                print(f"  ℹ️ No hay canción anterior del reloj previo para cortar")
+                tiempo_inicio_segundos = hora_programada_reloj
+                tiempo_fin_reloj_anterior = hora_programada_reloj
         
         # Generar eventos hasta llenar el tiempo disponible (1 hora exacta)
         # NO forzar 60 minutos si no hay tiempo suficiente
@@ -300,46 +916,233 @@ async def generar_programacion_dia(
         hora_actual_segundos = tiempo_inicio_segundos
         evento_idx = 0
         
+        # Variable para llevar registro del último evento de canción (para procesar ETM)
+        ultima_cancion_entry = None
+        ultima_cancion_tiempo_inicio = None
+        ultima_cancion_duracion_original = None
+        
+        # Variable para rastrear si el evento anterior fue un ETM "cortar" al inicio
+        evento_anterior_etm_cortar_inicio = False
+        
         # Generar solo los eventos configurados en el reloj
+        print(f"🔄 Reloj {reloj.clave}: Procesando {len(eventos_reloj)} eventos...")
         for evento_idx, evento in enumerate(eventos_reloj):
+            print(f"  ▶️ Procesando evento {evento_idx+1}/{len(eventos_reloj)}: tipo={evento.tipo}, categoria={evento.categoria}, offset={evento.offset_value}")
             duracion_evento_segundos = convertir_duracion_a_segundos(evento.duracion)
             tipo_evento = evento.tipo
             categoria_evento = evento.categoria
+            accion_etm = evento.tipo_etm if evento.tipo_etm else None  # Acción ETM (cortar, fadeout, espera)
             
-            # Si el evento excede el tiempo disponible, cortarlo
-            tiempo_restante = tiempo_disponible_segundos - tiempo_usado
-            if duracion_evento_segundos > tiempo_restante:
-                duracion_evento_segundos = tiempo_restante
-                if duracion_evento_segundos <= 0:
-                    break
+            # Verificar si este evento es un ETM y procesar la acción
+            es_etm = categoria_evento == 'ETM' or tipo_evento == 'ETM' or tipo_evento == '6'
             
-            # Seleccionar canción sin repetir de la categoría específica del evento
+            # Calcular el tiempo absoluto del evento usando su offset_value
+            offset_evento_segundos = get_offset_seconds(evento.offset_value or '00:00:00')
+            
+            print(f"  📐 Offset del evento: offset_value='{evento.offset_value}', offset_evento_segundos={offset_evento_segundos}, tiempo_inicio_segundos={tiempo_inicio_segundos}, hora_programada_reloj={hora_programada_reloj}")
+            print(f"  📐 Verificación ETM: es_etm={es_etm}, evento_idx={evento_idx}, accion_etm={accion_etm}, tiene_etm_cortar_inicio={tiene_etm_cortar_inicio}")
+            
+            # Inicializar tiempo_evento_absoluto por defecto
+            tiempo_evento_absoluto = tiempo_inicio_segundos + offset_evento_segundos
+            
+            # Si es ETM "cortar" al inicio (offset 0, primer evento), 
+            # FORZAR que use la hora programada del reloj, ignorando cualquier ajuste anterior
+            # IMPORTANTE: Usar tiene_etm_cortar_inicio como condición principal ya que verifica correctamente
+            accion_etm_normalizada = accion_etm.lower().strip() if accion_etm else None
+            if es_etm and offset_evento_segundos == 0 and evento_idx == 0 and tiene_etm_cortar_inicio:
+                # FORZAR tiempo_inicio_segundos a la hora programada del reloj ANTES de calcular tiempo_evento_absoluto
+                tiempo_inicio_segundos = hora_programada_reloj
+                # Para ETM al inicio, el tiempo absoluto es exactamente la hora programada (offset = 0)
+                tiempo_evento_absoluto = hora_programada_reloj  # offset_evento_segundos = 0, así que no se suma
+                print(f"  🔪 FORZANDO ETM al inicio (usando tiene_etm_cortar_inicio): tiempo_inicio_segundos={tiempo_inicio_segundos} ({tiempo_inicio_segundos//3600}:00:00), tiempo_evento_absoluto={tiempo_evento_absoluto} ({tiempo_evento_absoluto//3600}:00:00)")
+            elif es_etm and offset_evento_segundos == 0 and evento_idx == 0 and accion_etm_normalizada in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']:
+                # Fallback: si accion_etm está definida pero tiene_etm_cortar_inicio no se activó
+                print(f"  🔪 FORZANDO ETM al inicio (usando accion_etm normalizada): tiempo_inicio_segundos={tiempo_inicio_segundos} -> {hora_programada_reloj}")
+                tiempo_inicio_segundos = hora_programada_reloj
+                tiempo_evento_absoluto = hora_programada_reloj
+                print(f"  🔪 ETM forzado: tiempo_inicio_segundos={tiempo_inicio_segundos}, tiempo_evento_absoluto={tiempo_evento_absoluto}")
+            elif es_etm:
+                print(f"  ⚠️ ETM NO al inicio: usando tiempo_evento_absoluto={tiempo_evento_absoluto} (tiempo_inicio_segundos={tiempo_inicio_segundos} + offset={offset_evento_segundos})")
+            
+            # Inicializar cancion_seleccionada como None (se establece solo para eventos normales)
             cancion_seleccionada = None
             categoria_nombre = None
-            if tipo_evento == 'cancion' or tipo_evento == '1':
-                # Usar la categoría específica del evento (descripción del evento)
-                categoria_nombre = evento.descripcion if evento_idx < len(eventos_reloj) else "Rock"
+            
+            # Procesar ETM con acción "cortar canción"
+            accion_etm_procesar = accion_etm.lower().strip() if accion_etm else None
+            if es_etm and accion_etm_procesar in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']:
+                # Asegurar que no hay canción seleccionada para ETM
+                cancion_seleccionada = None
                 
-                # Verificar que la categoría esté disponible en las categorías de la política
-                if categoria_nombre in canciones_por_categoria:
-                    # Obtener canción sin repetir del pool de esa categoría específica
-                    cancion_seleccionada = obtener_cancion_sin_repetir(categoria_nombre)
+                # Si hay una canción anterior en este reloj, cortarla
+                if ultima_cancion_entry and ultima_cancion_tiempo_inicio:
+                    tiempo_etm_segundos = tiempo_evento_absoluto
+                    tiempo_transcurrido = tiempo_etm_segundos - ultima_cancion_tiempo_inicio
+                    if tiempo_transcurrido > 0 and tiempo_transcurrido < ultima_cancion_duracion_original:
+                        # Ajustar la duración de la canción anterior
+                        nueva_duracion_segundos = tiempo_transcurrido
+                        dur_horas = nueva_duracion_segundos // 3600
+                        dur_minutos = (nueva_duracion_segundos % 3600) // 60
+                        dur_segundos = nueva_duracion_segundos % 60
+                        nueva_duracion_str = f"{dur_horas:02d}:{dur_minutos:02d}:{dur_segundos:02d}"
+                        
+                        # Actualizar la entrada anterior
+                        ultima_cancion_entry.duracion_real = nueva_duracion_str
+                        ultima_cancion_entry.duracion_planeada = nueva_duracion_str
+                        
+                        logger.info(f"✂️ ETM ({accion_etm}): Canción cortada a {nueva_duracion_str}")
+                        print(f"✂️ ETM ({accion_etm}): Canción cortada a {nueva_duracion_str} en offset {evento.offset_value}")
+                
+                # Si es ETM al inicio del reloj (offset 0), también cortar la última canción del reloj anterior
+                # ESTO ES REDUNDANTE si ya se procesó arriba, pero por si acaso lo verificamos de nuevo
+                if offset_evento_segundos == 0 and idx > 0 and ultima_cancion_entre_relojes and ultima_cancion_tiempo_inicio_global:
+                    # Ya se procesó arriba en la sección "tiene_etm_cortar_inicio", pero verificamos aquí también
+                    # para asegurar que la canción esté cortada
+                    tiempo_etm_segundos = hora_programada_reloj
+                    tiempo_transcurrido = tiempo_etm_segundos - ultima_cancion_tiempo_inicio_global
+                    print(f"  🔄 Verificación adicional de corte: tiempo_transcurrido={tiempo_transcurrido}, duración_original={ultima_cancion_duracion_original_global}")
                     
-                    # Usar la duración real de la canción si está disponible
-                    if cancion_seleccionada and cancion_seleccionada.duracion:
-                        duracion_evento_segundos = cancion_seleccionada.duracion
-                else:
-                    # Si la categoría no está disponible, usar una aleatoria como fallback
-                    categoria_nombre = random.choice(list(canciones_por_categoria.keys()))
-                    cancion_seleccionada = obtener_cancion_sin_repetir(categoria_nombre)
-                    if cancion_seleccionada and cancion_seleccionada.duracion:
-                        duracion_evento_segundos = cancion_seleccionada.duracion
+                    if tiempo_transcurrido > 0:
+                        # SIEMPRE cortar si el ETM está después del inicio de la canción
+                        # No importa si la canción ya debería haber terminado - el ETM fuerza el corte
+                        nueva_duracion_segundos = min(tiempo_transcurrido, ultima_cancion_duracion_original_global)
+                        if nueva_duracion_segundos != convertir_duracion_a_segundos(ultima_cancion_entre_relojes.duracion_real or '00:00:00'):
+                            dur_horas = nueva_duracion_segundos // 3600
+                            dur_minutos = (nueva_duracion_segundos % 3600) // 60
+                            dur_segundos = nueva_duracion_segundos % 60
+                            nueva_duracion_str = f"{dur_horas:02d}:{dur_minutos:02d}:{dur_segundos:02d}"
+                            
+                            # Actualizar la entrada anterior
+                            ultima_cancion_entre_relojes.duracion_real = nueva_duracion_str
+                            ultima_cancion_entre_relojes.duracion_planeada = nueva_duracion_str
+                            db.add(ultima_cancion_entre_relojes)  # Asegurar que se guarde
+                            
+                            logger.info(f"✂️ ETM al inicio ({accion_etm}) - Corte adicional: Canción cortada a {nueva_duracion_str}")
+                            print(f"✂️ ETM al inicio ({accion_etm}) - Corte adicional: Canción cortada a {nueva_duracion_str}")
+                
+                # Para ETM "cortar", no avanzar tiempo (su duración es 0)
+                # La siguiente canción debe empezar inmediatamente después del ETM
+                duracion_evento_segundos = 0
+                # Actualizar tiempo_usado para que la siguiente canción empiece en el tiempo del ETM
+                tiempo_usado = offset_evento_segundos
+                # Marcar que este fue un ETM "cortar" al inicio para el siguiente evento
+                evento_anterior_etm_cortar_inicio = (offset_evento_segundos == 0)
+            elif es_etm and accion_etm_procesar in ['espera', 'esperar']:
+                # Asegurar que no hay canción seleccionada para ETM
+                cancion_seleccionada = None
+                
+                # ETM con acción "espera": la canción anterior termina completamente
+                if ultima_cancion_entry and ultima_cancion_tiempo_inicio:
+                    # Esperar: la canción anterior termina completamente, el siguiente evento empieza después
+                    tiempo_usado = ultima_cancion_tiempo_inicio - tiempo_inicio_segundos + ultima_cancion_duracion_original
+                    hora_actual_segundos = tiempo_inicio_segundos + tiempo_usado
+                    logger.info(f"⏳ ETM ({accion_etm}): Esperando a que termine la canción anterior")
+                    print(f"⏳ ETM ({accion_etm}): Esperando a que termine la canción anterior")
+                
+                # Para ETM "espera", no avanzar tiempo (su duración es 0)
+                duracion_evento_segundos = 0
+                # Resetear el flag ya que este ETM no es de tipo "cortar" al inicio
+                evento_anterior_etm_cortar_inicio = False
+            elif es_etm:
+                # Asegurar que no hay canción seleccionada para ETM
+                cancion_seleccionada = None
+                # ETM sin acción específica
+                duracion_evento_segundos = 0
+                # Resetear el flag ya que este ETM no es de tipo "cortar" al inicio
+                evento_anterior_etm_cortar_inicio = False
+            else:
+                # Procesar evento normal
+                # Si el evento excede el tiempo disponible, cortarlo
+                tiempo_restante = tiempo_disponible_segundos - tiempo_usado
+                if duracion_evento_segundos > tiempo_restante:
+                    duracion_evento_segundos = tiempo_restante
+                    if duracion_evento_segundos <= 0:
+                        print(f"⚠️ Reloj {reloj.clave}: Evento {evento_idx+1} tiene duración <= 0, saltando...")
+                        continue  # Continuar con el siguiente evento en lugar de romper el bucle
+                
+                # Seleccionar canción sin repetir de la categoría específica del evento
+                cancion_seleccionada = None
+                categoria_nombre = None
+                if tipo_evento == 'cancion' or tipo_evento == '1':
+                    # Usar la categoría específica del evento (descripción del evento)
+                    categoria_nombre = evento.descripcion if evento_idx < len(eventos_reloj) else "Rock"
+                    
+                    # Verificar que la categoría esté disponible en las categorías de la política
+                    if categoria_nombre in canciones_por_categoria:
+                        # Obtener canción sin repetir del pool de esa categoría específica, validando reglas
+                        # Calcular tiempo para reglas: usar tiempo_evento_absoluto si está disponible
+                        tiempo_para_reglas = tiempo_evento_absoluto
+                        cancion_seleccionada = obtener_cancion_sin_repetir(categoria_nombre, tiempo_para_reglas)
+                        
+                        # Usar la duración real de la canción si está disponible
+                        if cancion_seleccionada and cancion_seleccionada.duracion:
+                            duracion_evento_segundos = cancion_seleccionada.duracion
+                    else:
+                        # Si la categoría no está disponible, usar una aleatoria como fallback
+                        categoria_nombre = random.choice(list(canciones_por_categoria.keys()))
+                        tiempo_para_reglas = tiempo_evento_absoluto
+                        cancion_seleccionada = obtener_cancion_sin_repetir(categoria_nombre, tiempo_para_reglas)
+                        if cancion_seleccionada and cancion_seleccionada.duracion:
+                            duracion_evento_segundos = cancion_seleccionada.duracion
+                    
+                    # Guardar información de la canción para posible procesamiento de ETM
+                    ultima_cancion_duracion_original = duracion_evento_segundos
+                    # Usar el offset del evento o tiempo_usado acumulado, el que sea mayor
+                    ultima_cancion_tiempo_inicio = max(tiempo_evento_absoluto, tiempo_inicio_segundos + tiempo_usado)
             
             # Calcular hora real del evento
-            hora_real_segundos = tiempo_inicio_segundos + tiempo_usado
+            # Para ETM con offset 0 al inicio del reloj con acción "cortar", usar SIEMPRE la hora programada del reloj
+            # Para otros ETM, usar su offset_value (hora programada del reloj + offset)
+            # Para eventos normales después de ETM "cortar", empezar inmediatamente en el tiempo del ETM
+            if es_etm:
+                # Si es ETM al inicio (offset 0) con acción "cortar", debe estar EXACTAMENTE a la hora programada del reloj
+                # NO importa si hay atraso del reloj anterior - el ETM siempre empieza a su hora
+                # IMPORTANTE: Usar hora_programada_reloj directamente, NO tiempo_inicio_segundos ni tiempo_evento_absoluto
+                accion_etm_normalizada_hora = accion_etm.lower().strip() if accion_etm else None
+                if offset_evento_segundos == 0 and (tiene_etm_cortar_inicio or accion_etm_normalizada_hora in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout'] or accion_etm is None) and evento_idx == 0:
+                    # ETM al inicio del reloj: FORZAR hora programada del reloj DIRECTAMENTE
+                    # Esto asegura que siempre aparezca a las 01:00:00, 02:00:00, etc., sin importar atrasos
+                    # El offset es 0, así que hora_real = hora_programada directamente (sin sumar offset)
+                    hora_real_segundos = hora_programada_reloj  # offset_evento_segundos = 0, así que no se suma
+                    # Asegurar que tiempo_inicio_segundos también esté en la hora programada para eventos siguientes
+                    tiempo_inicio_segundos = hora_programada_reloj
+                    print(f"  ⏰ ETM FORZADO al inicio: hora_real_segundos = {hora_real_segundos} ({hora_real_segundos//3600}:00:00) usando SOLO hora_programada={hora_programada_reloj} (offset={offset_evento_segundos} no se suma)")
+                elif offset_evento_segundos == 0 and accion_etm_normalizada_hora in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']:
+                    # ETM "cortar" en otro momento del reloj: usar tiempo absoluto
+                    hora_real_segundos = tiempo_evento_absoluto
+                else:
+                    # Otros ETM: usar tiempo absoluto (hora programada + offset del evento)
+                    hora_real_segundos = tiempo_evento_absoluto
+            else:
+                # Para eventos normales después de un ETM "cortar", la canción debe empezar inmediatamente
+                # en el tiempo donde está el ETM. Si tiempo_usado fue ajustado por un ETM, usar ese tiempo.
+                if offset_evento_segundos > 0:
+                    # Si el evento tiene un offset específico, usar ese offset desde el inicio del reloj
+                    # Si el evento anterior fue un ETM "cortar" al inicio, usar hora_programada como base
+                    if evento_anterior_etm_cortar_inicio and evento_idx == 1:
+                        # Primer evento después de ETM "cortar" al inicio: usar hora_programada + offset
+                        hora_real_segundos = hora_programada_reloj + offset_evento_segundos
+                    else:
+                        # Otros eventos con offset: usar tiempo_inicio_segundos + offset
+                        hora_real_segundos = tiempo_inicio_segundos + offset_evento_segundos
+                else:
+                    # Si no tiene offset, empezar donde terminó el evento anterior
+                    # Si el evento anterior fue un ETM "cortar" al inicio, empezar inmediatamente en hora_programada
+                    if evento_anterior_etm_cortar_inicio and evento_idx == 1:
+                        # Primer evento después de ETM "cortar" al inicio: empezar exactamente a la hora programada del reloj
+                        hora_real_segundos = hora_programada_reloj
+                    else:
+                        # Otros eventos: empezar donde terminó el anterior o en su offset, el que sea mayor
+                        tiempo_fin_anterior = tiempo_inicio_segundos + tiempo_usado
+                        hora_real_segundos = max(tiempo_evento_absoluto, tiempo_fin_anterior)
+            
             hora_real_horas = hora_real_segundos // 3600
             hora_real_minutos = (hora_real_segundos % 3600) // 60
             hora_real_seg = hora_real_segundos % 60
+            
+            # Log adicional para ETM al inicio para verificar el cálculo
+            if es_etm and offset_evento_segundos == 0 and evento_idx == 0 and (tiene_etm_cortar_inicio or accion_etm_normalizada in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']):
+                print(f"  ✅ VALOR FINAL ETM: hora_real_segundos={hora_real_segundos}, hora_real={hora_real_horas:02d}:{hora_real_minutos:02d}:{hora_real_seg:02d}")
             
             # Convertir duración a formato HH:MM:SS
             dur_horas = duracion_evento_segundos // 3600
@@ -347,8 +1150,30 @@ async def generar_programacion_dia(
             dur_segundos = duracion_evento_segundos % 60
             duracion_str = f"{dur_horas:02d}:{dur_minutos:02d}:{dur_segundos:02d}"
             
-            # Obtener la categoría de la canción seleccionada
-            categoria_nombre = categoria_nombre if cancion_seleccionada else (categoria_evento if evento_idx < len(eventos_reloj) else "Sin categoría")
+            # Obtener la categoría de la canción seleccionada o del evento
+            if es_etm:
+                categoria_nombre = categoria_evento  # Para ETM, usar la categoría del evento ('ETM')
+            elif cancion_seleccionada:
+                categoria_nombre = categoria_nombre
+            else:
+                categoria_nombre = categoria_evento if evento_idx < len(eventos_reloj) else "Sin categoría"
+            
+            # Calcular la descripción del evento
+            if cancion_seleccionada:
+                descripcion_evento = cancion_seleccionada.titulo
+            elif es_etm:
+                # Para ETM (guillotina), mostrar la acción específica
+                accion_etm_desc = accion_etm.lower().strip() if accion_etm else None
+                if accion_etm_desc in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon']:
+                    descripcion_evento = "Guillotina"
+                elif accion_etm_desc == 'fadeout':
+                    descripcion_evento = "Fadeout"
+                elif accion_etm_desc in ['espera', 'esperar']:
+                    descripcion_evento = "Esperar a terminar"
+                else:
+                    descripcion_evento = "Guillotina"  # Por defecto para ETM
+            else:
+                descripcion_evento = evento.descripcion if evento_idx < len(eventos_reloj) and evento.descripcion else f"Evento {evento_idx + 1}"
             
             # Crear entrada de programación
             programacion_entry = ProgramacionModel(
@@ -362,7 +1187,7 @@ async def generar_programacion_dia(
                 duracion_planeada=duracion_str,
                 categoria=categoria_nombre,
                 id_media=str(cancion_seleccionada.id) if cancion_seleccionada else (evento.id_media if evento_idx < len(eventos_reloj) else f"AUTO_{idx}_{evento_idx}"),
-                descripcion=cancion_seleccionada.titulo if cancion_seleccionada else (evento.descripcion if evento_idx < len(eventos_reloj) else f"Canción {evento_idx + 1}"),
+                descripcion=descripcion_evento,
                 lenguaje="Español" if cancion_seleccionada else "",
                 interprete=cancion_seleccionada.artista if cancion_seleccionada else "",
                 disco=cancion_seleccionada.album if cancion_seleccionada else "",
@@ -380,12 +1205,127 @@ async def generar_programacion_dia(
             db.add(programacion_entry)
             eventos_generados.append(programacion_entry)
             
-            # Avanzar tiempo
-            tiempo_usado += duracion_evento_segundos
-            hora_actual_segundos += duracion_evento_segundos
+            # Agregar a eventos_programados para validación de reglas
+            eventos_programados.append({
+                'cancion': cancion_seleccionada,
+                'tiempo_inicio_segundos': hora_real_segundos,
+                'categoria': categoria_nombre,
+                'programacion_entry': programacion_entry
+            })
+            
+            # Log para depuración de eventos generados
+            if evento_idx == 0 or es_etm:
+                hora_log = f"{hora_real_horas:02d}:{hora_real_minutos:02d}:{hora_real_seg:02d}"
+                print(f"  📝 Evento {evento_idx+1} del reloj {reloj.clave}: {categoria_nombre} - {descripcion_evento} - Hora: {hora_log}")
+            
+            # Guardar referencia a la última canción para procesamiento de ETM
+            if cancion_seleccionada:
+                ultima_cancion_entry = programacion_entry
+            elif not es_etm:
+                # Si no es ETM ni canción, resetear la referencia
+                ultima_cancion_entry = None
+            
+            # Avanzar tiempo: actualizar tiempo_usado al final del evento actual
+            if es_etm:
+                # Para ETM, tiempo_usado ya fue establecido arriba según la acción
+                # tiempo_usado ya está en offset_evento_segundos para "cortar" y ajustado para "espera"
+                # Solo asegurar que esté correctamente establecido para casos no manejados arriba
+                accion_etm_avanzar = accion_etm.lower().strip() if accion_etm else None
+                if accion_etm_avanzar not in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout', 'espera', 'esperar']:
+                    # ETM sin acción específica, mantener tiempo_usado en el offset
+                    tiempo_usado = offset_evento_segundos
+                hora_actual_segundos = tiempo_inicio_segundos + tiempo_usado
+            else:
+                # Para eventos normales, avanzar según su duración desde hora_real_segundos
+                # Si el evento anterior fue un ETM "cortar", hora_real_segundos ya está en el tiempo del ETM
+                tiempo_usado = (hora_real_segundos - tiempo_inicio_segundos) + duracion_evento_segundos
+                hora_actual_segundos = tiempo_inicio_segundos + tiempo_usado
+                # Resetear el flag ya que este no es un ETM
+                evento_anterior_etm_cortar_inicio = False
         
-        # Al finalizar el reloj, actualizar el tiempo de finalización para el siguiente reloj
+        # Actualizar registro global de la última canción para el siguiente reloj
+        if ultima_cancion_entry:
+            ultima_cancion_entre_relojes = ultima_cancion_entry
+            # Calcular el tiempo absoluto de inicio de la última canción (desde inicio del día)
+            if ultima_cancion_entry.hora_real:
+                ultima_cancion_tiempo_inicio_global = (
+                    ultima_cancion_entry.hora_real.hour * 3600 + 
+                    ultima_cancion_entry.hora_real.minute * 60 + 
+                    ultima_cancion_entry.hora_real.second
+                )
+            else:
+                ultima_cancion_tiempo_inicio_global = ultima_cancion_tiempo_inicio if ultima_cancion_tiempo_inicio else (tiempo_inicio_segundos + tiempo_usado)
+            
+            # Calcular la duración ORIGINAL (antes de cualquier corte) de la última canción
+            # Esto es importante para que el ETM del siguiente reloj pueda calcular correctamente cuánto cortar
+            if ultima_cancion_duracion_original:
+                # Usar la duración original que se guardó cuando se seleccionó la canción
+                ultima_cancion_duracion_original_global = ultima_cancion_duracion_original
+            elif ultima_cancion_entry.duracion_real:
+                # Si no tenemos la original, usar la actual (puede estar cortada)
+                ultima_cancion_duracion_original_global = convertir_duracion_a_segundos(ultima_cancion_entry.duracion_real)
+            else:
+                ultima_cancion_duracion_original_global = 0
+            
+            print(f"  📝 Última canción guardada: inicio={ultima_cancion_tiempo_inicio_global}s, duración_original={ultima_cancion_duracion_original_global}s, duración_actual={convertir_duracion_a_segundos(ultima_cancion_entry.duracion_real or '00:00:00')}s")
+        
+        # Calcular tiempo_fin_reloj_anterior inicialmente basado en donde terminó el reloj
         tiempo_fin_reloj_anterior = tiempo_inicio_segundos + tiempo_usado
+        
+        # ANTES de terminar este reloj, verificar si el siguiente reloj tiene ETM "cortar" al inicio
+        # Si es así, cortar la canción anterior AHORA y ajustar tiempo_fin_reloj_anterior
+        if idx < len(relojes_ordenados) - 1:  # No es el último reloj
+            siguiente_reloj = relojes_ordenados[idx + 1]
+            siguiente_hora_programada = (idx + 1) * 3600
+            eventos_siguiente_reloj_raw = db.query(EventoRelojModel).filter(
+                EventoRelojModel.reloj_id == siguiente_reloj.id
+            ).all()
+            eventos_siguiente_reloj = sorted(eventos_siguiente_reloj_raw, key=lambda e: get_offset_seconds(e.offset_value or '00:00:00'))
+            
+            if eventos_siguiente_reloj and ultima_cancion_entre_relojes and ultima_cancion_tiempo_inicio_global:
+                primer_evento_siguiente = eventos_siguiente_reloj[0]
+                offset_primer_siguiente = get_offset_seconds(primer_evento_siguiente.offset_value or '00:00:00')
+                es_etm_siguiente = (primer_evento_siguiente.categoria == 'ETM' or primer_evento_siguiente.tipo == 'ETM' or primer_evento_siguiente.tipo == '6')
+                accion_etm_siguiente = primer_evento_siguiente.tipo_etm if primer_evento_siguiente.tipo_etm else None
+                
+                # Si el siguiente reloj tiene ETM "cortar" al inicio, cortar la canción AHORA
+                accion_etm_siguiente_norm = accion_etm_siguiente.lower().strip() if accion_etm_siguiente else None
+                if es_etm_siguiente and offset_primer_siguiente == 0 and (accion_etm_siguiente_norm in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout'] or accion_etm_siguiente is None):
+                    tiempo_corte = siguiente_hora_programada
+                    tiempo_transcurrido = tiempo_corte - ultima_cancion_tiempo_inicio_global
+                    
+                    # Obtener duración original
+                    duracion_original = ultima_cancion_duracion_original_global
+                    if duracion_original == 0:
+                        duracion_actual = convertir_duracion_a_segundos(ultima_cancion_entre_relojes.duracion_real or '00:00:00')
+                        if duracion_actual > 0:
+                            duracion_original = duracion_actual
+                    
+                    print(f"  🔍 Verificando corte: canción inicio={ultima_cancion_tiempo_inicio_global}s, duración_original={duracion_original}s, tiempo_corte={tiempo_corte}s, tiempo_transcurrido={tiempo_transcurrido}s")
+                    
+                    if tiempo_transcurrido > 0 and tiempo_transcurrido <= duracion_original:
+                        # Cortar la canción al tiempo del siguiente reloj
+                        nueva_duracion_segundos = tiempo_transcurrido
+                        dur_horas = nueva_duracion_segundos // 3600
+                        dur_minutos = (nueva_duracion_segundos % 3600) // 60
+                        dur_segundos = nueva_duracion_segundos % 60
+                        nueva_duracion_str = f"{dur_horas:02d}:{dur_minutos:02d}:{dur_segundos:02d}"
+                        
+                        # Actualizar la canción
+                        ultima_cancion_entre_relojes.duracion_real = nueva_duracion_str
+                        ultima_cancion_entre_relojes.duracion_planeada = nueva_duracion_str
+                        db.add(ultima_cancion_entre_relojes)
+                        db.flush()
+                        
+                        # AJUSTAR tiempo_fin_reloj_anterior para que el siguiente reloj empiece en su hora programada
+                        tiempo_fin_reloj_anterior = siguiente_hora_programada
+                        
+                        print(f"  ✂️ CORTE ANTICIPADO: Canción cortada a {nueva_duracion_str} para ETM del reloj {siguiente_reloj.clave} a las {siguiente_hora_programada//3600}:00:00")
+                        logger.info(f"✂️ CORTE ANTICIPADO: Canción cortada a {nueva_duracion_str} para ETM del reloj {siguiente_reloj.clave}")
+        
+        # Log de eventos generados para este reloj
+        eventos_del_reloj = [e for e in eventos_generados if e.reloj_id == reloj.id]
+        print(f"📊 Reloj {reloj.clave}: {len(eventos_del_reloj)} eventos generados")
         
         # Log para debugging
         hora_fin_hhmmss = f"{tiempo_fin_reloj_anterior//3600:02d}:{(tiempo_fin_reloj_anterior%3600)//60:02d}:{tiempo_fin_reloj_anterior%60:02d}"
@@ -393,7 +1333,17 @@ async def generar_programacion_dia(
         print(f"✅ Reloj {reloj.clave} completado - Programado: {hora_programada_hhmmss}, Inicio real: {hora_inicio_hhmmss}, Fin: {hora_fin_hhmmss}")
     
     # Guardar en la base de datos
+    print(f"💾 Guardando {len(eventos_generados)} eventos en la base de datos...")
     db.commit()
+    print(f"✅ {len(eventos_generados)} eventos guardados exitosamente")
+    
+    # Verificar cuántos eventos se guardaron realmente
+    eventos_guardados = db.query(ProgramacionModel).filter(
+        ProgramacionModel.difusora == difusora,
+        ProgramacionModel.politica_id == politica_id,
+        ProgramacionModel.fecha == fecha.date()
+    ).count()
+    print(f"✅ Verificación: {eventos_guardados} eventos en la BD para fecha {fecha.date()}")
     
     return eventos_generados
 
@@ -555,8 +1505,10 @@ async def obtener_programacion_detallada(
         # Convertir fecha
         fecha_dt = datetime.strptime(fecha, "%d/%m/%Y").date()
         
-        # Obtener todos los registros de programación para este día
-        programacion = db.query(ProgramacionModel).filter(
+        # Obtener todos los registros de programación para este día con join a Reloj
+        programacion = db.query(ProgramacionModel, RelojModel).join(
+            RelojModel, ProgramacionModel.reloj_id == RelojModel.id, isouter=True
+        ).filter(
             ProgramacionModel.difusora == difusora,
             ProgramacionModel.politica_id == politica_id,
             ProgramacionModel.fecha == fecha_dt
@@ -565,6 +1517,10 @@ async def obtener_programacion_detallada(
             ProgramacionModel.id
         ).all()
         
+        logger.info(f"📊 Consulta programación: difusora={difusora}, politica_id={politica_id}, fecha={fecha_dt}")
+        logger.info(f"📊 Total de eventos encontrados en BD: {len(programacion)}")
+        print(f"📊 Total de eventos encontrados en BD: {len(programacion)}")
+        
         if not programacion:
             return {
                 "programacion": [],
@@ -572,13 +1528,31 @@ async def obtener_programacion_detallada(
                 "mensaje": "No hay programación para esta fecha"
             }
         
+        # Generar números secuenciales de reloj basados en reloj_id único
+        # Primero, obtener todos los relojes únicos ordenados por primera aparición
+        relojes_unicos = {}
+        relojes_orden = []
+        numero_reloj_contador = 1
+        
+        for prog, reloj in programacion:
+            reloj_id = prog.reloj_id if prog.reloj_id else None
+            if reloj_id and reloj_id not in relojes_unicos:
+                relojes_unicos[reloj_id] = numero_reloj_contador
+                relojes_orden.append(reloj_id)
+                numero_reloj_contador += 1
+        
         # Formatear respuesta
         eventos = []
-        for prog in programacion:
+        for prog, reloj in programacion:
+            reloj_id = prog.reloj_id if prog.reloj_id else None
+            numero_reloj = relojes_unicos.get(reloj_id, 0) if reloj_id else 0
+            clave_reloj = reloj.clave if reloj else (prog.numero_reloj if prog.numero_reloj else "")
+            
             eventos.append({
                 "id": prog.id,
                 "mc": prog.mc,
-                "numero_reloj": prog.numero_reloj,
+                "numero_reloj": numero_reloj,  # Número secuencial (1, 2, 3...)
+                "clave_reloj": clave_reloj,  # Clave/Nombre del reloj
                 "hora_real": prog.hora_real.strftime("%H:%M:%S") if prog.hora_real else "",
                 "hora_transmision": prog.hora_transmision.strftime("%H:%M:%S") if prog.hora_transmision else "",
                 "duracion_real": prog.duracion_real or "",
@@ -672,17 +1646,18 @@ async def eliminar_programacion(
         logger.info(f"Eliminando programación para difusora: {difusora}, política: {politica_id}, fecha: {fecha}")
         
         # Buscar la programación a eliminar
-        programacion = db.query(Programacion).filter(
-            Programacion.difusora == difusora,
-            Programacion.politica_id == politica_id,
-            Programacion.fecha == fecha
-        ).first()
+        programacion = db.query(ProgramacionModel).filter(
+            ProgramacionModel.difusora == difusora,
+            ProgramacionModel.politica_id == politica_id,
+            ProgramacionModel.fecha == fecha
+        ).all()
         
-        if not programacion:
+        if not programacion or len(programacion) == 0:
             raise HTTPException(status_code=404, detail="No se encontró programación para eliminar")
         
-        # Eliminar la programación
-        db.delete(programacion)
+        # Eliminar todas las entradas de programación
+        for entrada in programacion:
+            db.delete(entrada)
         db.commit()
         
         logger.info(f"Programación eliminada exitosamente")
@@ -709,10 +1684,10 @@ async def generar_carta_tiempo(
         logger.info(f"Generando carta de tiempo para difusora: {difusora}, política: {politica_id}, fecha: {fecha}")
         
         # Buscar la programación
-        programacion = db.query(Programacion).filter(
-            Programacion.difusora == difusora,
-            Programacion.politica_id == politica_id,
-            Programacion.fecha == fecha
+        programacion = db.query(ProgramacionModel).filter(
+            ProgramacionModel.difusora == difusora,
+            ProgramacionModel.politica_id == politica_id,
+            ProgramacionModel.fecha == fecha
         ).first()
         
         if not programacion:
@@ -734,5 +1709,72 @@ async def generar_carta_tiempo(
     except Exception as e:
         logger.error(f"Error al generar carta de tiempo: {str(e)}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+
+@router.put("/programacion/{programacion_id}/cancion")
+async def actualizar_cancion_programacion(
+    programacion_id: int,
+    cancion_id: int = Query(..., description="ID de la nueva canción"),
+    db: Session = Depends(get_db)
+):
+    """
+    Actualizar la canción asignada a una entrada de programación
+    """
+    try:
+        logger.info(f"Actualizando canción en programación ID {programacion_id} con canción ID {cancion_id}")
+        
+        # Buscar la entrada de programación
+        programacion_entry = db.query(ProgramacionModel).filter(
+            ProgramacionModel.id == programacion_id
+        ).first()
+        
+        if not programacion_entry:
+            raise HTTPException(status_code=404, detail="Entrada de programación no encontrada")
+        
+        # Buscar la nueva canción
+        cancion = db.query(CancionModel).filter(CancionModel.id == cancion_id).first()
+        
+        if not cancion:
+            raise HTTPException(status_code=404, detail="Canción no encontrada")
+        
+        # Actualizar los campos de la programación con los datos de la nueva canción
+        programacion_entry.id_media = str(cancion.id)
+        programacion_entry.descripcion = cancion.titulo
+        programacion_entry.interprete = cancion.artista
+        programacion_entry.disco = cancion.album
+        
+        # Actualizar duración si está disponible
+        if cancion.duracion:
+            horas = cancion.duracion // 3600
+            minutos = (cancion.duracion % 3600) // 60
+            segundos = cancion.duracion % 60
+            programacion_entry.duracion_real = f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+            programacion_entry.duracion_planeada = f"{horas:02d}:{minutos:02d}:{segundos:02d}"
+        
+        # Marcar como que tiene canción asignada
+        programacion_entry.mc = True
+        
+        # Guardar cambios
+        db.commit()
+        db.refresh(programacion_entry)
+        
+        logger.info(f"✅ Canción actualizada exitosamente en programación ID {programacion_id}")
+        
+        return {
+            "id": programacion_entry.id,
+            "id_media": programacion_entry.id_media,
+            "descripcion": programacion_entry.descripcion,
+            "interprete": programacion_entry.interprete,
+            "disco": programacion_entry.disco,
+            "duracion_real": programacion_entry.duracion_real,
+            "mensaje": "Canción actualizada exitosamente"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error al actualizar canción en programación: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 

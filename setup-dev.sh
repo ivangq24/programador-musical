@@ -31,6 +31,19 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Detectar comando de Docker Compose (docker-compose o docker compose)
+DOCKER_COMPOSE_CMD=""
+detect_docker_compose() {
+    if command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+    elif docker compose version &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker compose"
+    else
+        return 1
+    fi
+    return 0
+}
+
 # Verificar que Docker y Docker Compose estén instalados
 check_docker() {
     print_message "Verificando instalación de Docker..."
@@ -40,12 +53,12 @@ check_docker() {
         exit 1
     fi
     
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+    if ! detect_docker_compose; then
         print_error "Docker Compose no está instalado. Por favor instala Docker Compose primero."
         exit 1
     fi
     
-    print_success "Docker y Docker Compose están instalados"
+    print_success "Docker y Docker Compose están instalados (usando: $DOCKER_COMPOSE_CMD)"
 }
 
 # Crear archivos .env si no existen
@@ -111,7 +124,9 @@ EOF
         print_message "Creando frontend/.env.local..."
         cat > frontend/.env.local << EOF
 # API Configuration
-NEXT_PUBLIC_API_URL=http://localhost/api
+# Si nginx está configurado, usar: http://localhost/api
+# Si accedes directamente al backend: http://localhost:8000/api/v1
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 
 # Development Configuration
 NODE_ENV=development
@@ -127,7 +142,7 @@ cleanup() {
     print_message "Limpiando contenedores y volúmenes existentes..."
     
     # Detener y eliminar contenedores
-    docker-compose down --remove-orphans 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD down --remove-orphans 2>/dev/null || true
     
     # Eliminar volúmenes huérfanos
     docker volume prune -f 2>/dev/null || true
@@ -141,11 +156,11 @@ start_services() {
     
     # Construir imágenes
     print_message "Construyendo imágenes de Docker..."
-    docker-compose build --no-cache
+    $DOCKER_COMPOSE_CMD build
     
     # Ejecutar servicios en modo detached
     print_message "Iniciando servicios..."
-    docker-compose up -d
+    $DOCKER_COMPOSE_CMD up -d
     
     print_success "Servicios iniciados en modo detached"
 }
@@ -161,27 +176,34 @@ check_services() {
     # Verificar estado de los contenedores
     echo ""
     print_message "Estado de los contenedores:"
-    docker-compose ps
+    $DOCKER_COMPOSE_CMD ps
     
     echo ""
     print_message "Verificando conectividad..."
     
     # Verificar backend
-    if curl -s http://localhost:8000/health > /dev/null; then
+    if curl -s http://localhost:8000/health > /dev/null 2>&1; then
         print_success "✅ Backend (FastAPI) está funcionando en http://localhost:8000"
     else
         print_warning "⚠️  Backend no responde aún, puede estar iniciando..."
     fi
     
     # Verificar frontend
-    if curl -s http://localhost:3000 > /dev/null; then
+    if curl -s http://localhost:3000 > /dev/null 2>&1; then
         print_success "✅ Frontend (Next.js) está funcionando en http://localhost:3000"
     else
         print_warning "⚠️  Frontend no responde aún, puede estar iniciando..."
     fi
     
+    # Verificar nginx
+    if curl -s http://localhost/health > /dev/null 2>&1; then
+        print_success "✅ Nginx está funcionando en http://localhost"
+    else
+        print_warning "⚠️  Nginx no responde aún, puede estar iniciando..."
+    fi
+    
     # Verificar base de datos
-    if docker-compose exec -T db pg_isready -U postgres > /dev/null 2>&1; then
+    if $DOCKER_COMPOSE_CMD exec -T db pg_isready -U postgres > /dev/null 2>&1; then
         print_success "✅ Base de datos PostgreSQL está funcionando"
     else
         print_warning "⚠️  Base de datos no responde aún, puede estar iniciando..."
@@ -202,10 +224,10 @@ show_info() {
     echo "   • Base de datos:  localhost:5433"
     echo ""
     echo "📚 Comandos útiles:"
-    echo "   • Ver logs:       docker-compose logs -f"
-    echo "   • Parar servicios: docker-compose down"
-    echo "   • Reiniciar:      docker-compose restart"
-    echo "   • Estado:         docker-compose ps"
+    echo "   • Ver logs:       $DOCKER_COMPOSE_CMD logs -f"
+    echo "   • Parar servicios: $DOCKER_COMPOSE_CMD down"
+    echo "   • Reiniciar:      $DOCKER_COMPOSE_CMD restart"
+    echo "   • Estado:         $DOCKER_COMPOSE_CMD ps"
     echo ""
     echo "🔧 Para desarrollo:"
     echo "   • Los cambios en el código se reflejan automáticamente"
