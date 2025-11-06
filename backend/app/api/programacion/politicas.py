@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from app.core.database import get_db
+from app.core.auth import get_current_user, get_user_difusoras
+from app.models.auth import Usuario
+from typing import List
 from app.models.programacion import (
     PoliticaProgramacion as PoliticaProgramacionModel, 
     Reloj as RelojModel, 
@@ -33,6 +36,8 @@ router = APIRouter()
 @router.get("/", response_model=List[PoliticaProgramacion])
 async def get_politicas(
     db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: List[str] = Depends(get_user_difusoras),
     skip: int = Query(0, ge=0, description="Número de registros a omitir"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros a retornar"),
     search: Optional[str] = Query(None, description="Término de búsqueda"),
@@ -42,6 +47,10 @@ async def get_politicas(
     """Obtener lista de políticas de programación con filtros opcionales"""
     try:
         query = db.query(PoliticaProgramacionModel)
+        
+        # Filtrar por difusoras permitidas (a menos que sea admin)
+        if usuario.rol != "admin":
+            query = query.filter(PoliticaProgramacionModel.difusora.in_(difusoras_allowed))
         
         if search:
             search_term = f"%{search}%"

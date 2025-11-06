@@ -9,6 +9,8 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.core.auth import get_current_user, get_user_difusoras
+from app.models.auth import Usuario
 from app.models.programacion import Programacion as ProgramacionModel, PoliticaProgramacion
 from app.models.categorias import Cancion, Categoria
 
@@ -129,7 +131,9 @@ def get_base_filters(
     fecha_inicio: Optional[date] = None,
     fecha_fin: Optional[date] = None,
     difusora: Optional[str] = None,
-    politica_id: Optional[int] = None
+    politica_id: Optional[int] = None,
+    difusoras_allowed: Optional[list] = None,
+    usuario_rol: Optional[str] = None
 ):
     """Obtiene los filtros base para las consultas"""
     query = db.query(ProgramacionModel)
@@ -141,6 +145,10 @@ def get_base_filters(
             ProgramacionModel.fecha <= fecha_fin
         )
     )
+    
+    # Filtrar por difusoras permitidas (a menos que sea admin)
+    if usuario_rol != "admin" and difusoras_allowed:
+        query = query.filter(ProgramacionModel.difusora.in_(difusoras_allowed))
     
     if difusora:
         query = query.filter(ProgramacionModel.difusora == difusora)
@@ -157,11 +165,16 @@ async def get_estadisticas_general(
     fecha_fin: Optional[date] = Query(None, description="Fecha de fin (YYYY-MM-DD)"),
     difusora: Optional[str] = Query(None, description="Filtrar por difusora"),
     politica_id: Optional[int] = Query(None, description="Filtrar por política"),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras),
     db: Session = Depends(get_db)
 ):
     """Obtiene estadísticas generales de la programación"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id)
+        query = get_base_filters(
+            db, fecha_inicio, fecha_fin, difusora, politica_id,
+            difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol
+        )
         
         total_eventos = query.count()
         total_canciones = query.filter(ProgramacionModel.mc == True).filter(

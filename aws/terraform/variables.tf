@@ -105,3 +105,29 @@ variable "restrict_to_ip" {
   type        = bool
   default     = true
 }
+
+variable "google_client_id" {
+  description = "Google OAuth Client ID"
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth Client Secret"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "apple_client_id" {
+  description = "Apple OAuth Client ID (Service ID)"
+  type        = string
+  default     = ""
+}
+
+variable "apple_client_secret" {
+  description = "Apple OAuth Client Secret (Key ID)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

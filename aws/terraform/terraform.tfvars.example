@@ -30,3 +30,10 @@ enable_deletion_protection = false  # Set to true for production
 # IP Access Restriction
 restrict_to_ip = true
 allowed_ip_addresses = ["YOUR_IP_ADDRESS/32"]  # Replace with your actual IP address
+
+# Cognito OAuth Providers (opcional)
+# Para habilitar Google/Apple login, configura estos valores
+google_client_id = ""
+google_client_secret = ""
+apple_client_id = ""
+apple_client_secret = ""

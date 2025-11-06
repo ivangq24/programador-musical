@@ -1,15 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import CatalogosPage from "@/pages/Catalogos/catalogos";
 import CategoriasPage from "@/pages/Categorias/categorias";
 import ProgramacionPage from "@/pages/Programacion/programacion";
 import ReportesPage from "@/pages/Reportes/reportes";
 import VariosPage from "@/pages/Varios/varios";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("programacion");
+  const { user, loading, authenticated, logout } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirigir a login si no está autenticado (solo si Cognito está configurado)
+    const cognitoEnabled = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && 
+                          process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID !== '';
+    
+    if (!loading && cognitoEnabled && !authenticated) {
+      router.push('/auth/login');
+    }
+  }, [loading, authenticated, router]);
 
   const handleTabClick = (tabId) => {
     // Si la tab ya está activa, navegar al menú principal
@@ -90,12 +104,31 @@ export default function Home() {
     }
   };
 
+  // Mostrar loading mientras verifica autenticación
+  const cognitoEnabled = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && 
+                        process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID !== '';
+  
+  if (loading && cognitoEnabled) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50/30">
+        <div className="text-center">
+          <svg className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-gray-600">Verificando autenticación...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-gradient-to-br from-gray-50 to-blue-50/30 overflow-hidden">
       {/* Enhanced Navigation */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="px-6">
-          <div className="flex space-x-1 overflow-x-auto">
+          <div className="flex items-center justify-between">
+            <div className="flex space-x-1 overflow-x-auto flex-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -123,6 +156,33 @@ export default function Home() {
                 )}
               </button>
             ))}
+            </div>
+            
+            {/* User menu - solo mostrar si Cognito está habilitado */}
+            {process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && 
+             process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID !== '' && 
+             authenticated && user && (
+              <div className="flex items-center space-x-3 ml-4">
+                <div className="flex items-center space-x-2 px-3 py-2 bg-blue-50 rounded-lg">
+                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                    {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="text-sm">
+                    <div className="font-medium text-gray-700">{user.name || user.email}</div>
+                    <div className="text-xs text-gray-500 capitalize">{user.rol}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={logout}
+                  className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                  title="Cerrar sesión"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>

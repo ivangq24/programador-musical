@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.core.database import get_db
+from app.core.auth import get_current_user, get_user_difusoras
+from app.models.auth import Usuario
 from app.schemas.programacion import GenerarProgramacionRequest
 from app.models.programacion import (
     Programacion as ProgramacionModel,
@@ -38,10 +40,18 @@ async def generar_programacion_completa(
     politica_id: int = Query(..., description="ID de la política"),
     fecha_inicio: str = Query(..., description="Fecha de inicio (DD/MM/YYYY)"),
     fecha_fin: str = Query(..., description="Fecha de fin (DD/MM/YYYY)"),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras),
     db: Session = Depends(get_db)
 ):
     """Generar programación completa basada en 24 relojes con corte automático"""
     try:
+        # Verificar que el usuario tenga acceso a la difusora
+        if usuario.rol != "admin" and difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para generar programación para la difusora {difusora}"
+            )
         # Convertir fechas
         fecha_inicio_dt = datetime.strptime(fecha_inicio, "%d/%m/%Y")
         fecha_fin_dt = datetime.strptime(fecha_fin, "%d/%m/%Y")

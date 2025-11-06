@@ -8,6 +8,7 @@ from app.api.programacion import generar_programacion_completa, politicas, regla
 from app.api.catalogos import catalogos, difusoras, cortes
 from app.api.categorias import categorias, canciones, import_csv
 from app.api.reportes import estadisticas
+from app.api.auth import auth
 
 # Create main router
 api_router = APIRouter()
@@ -75,4 +76,11 @@ api_router.include_router(
     estadisticas.router,
     prefix="/reportes",
     tags=["reportes-estadisticas"]
+)
+
+# Auth module routes
+api_router.include_router(
+    auth.router,
+    prefix="/auth",
+    tags=["auth"]
 )

@@ -23,11 +23,21 @@ const apiClient = axios.create({
   },
 });
 
-// Interceptor para logging de requests
+// Interceptor para agregar token de autenticación y logging
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Obtener token del localStorage o de Cognito
+    if (typeof window !== 'undefined') {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
+    }
+    
+    // Logging
     console.log('🔍 API Request:', config.method?.toUpperCase(), config.url);
     console.log('🔍 Full URL:', config.baseURL + config.url);
+    
     return config;
   },
   (error) => {
@@ -36,16 +46,29 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Interceptor para manejar errores
+// Interceptor para manejar errores y logging
 apiClient.interceptors.response.use(
   (response) => {
     console.log('✅ API Response:', response.status, response.config.url);
     return response;
   },
-  (error) => {
+  async (error) => {
     console.error('API Error:', error);
     console.error('Error URL:', error.config?.url);
     console.error('Error Response:', error.response?.data);
+    
+    // Manejar errores de autenticación
+    if (error.response?.status === 401) {
+      // Token expirado o inválido
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('idToken');
+        localStorage.removeItem('refreshToken');
+        // Redirigir a login
+        window.location.href = '/auth/login';
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
