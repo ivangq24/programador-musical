@@ -13,8 +13,8 @@ app = FastAPI(
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for production
+    allow_credentials=False,  # Set to False when using allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -28,7 +28,30 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "message": "API funcionando correctamente"}
+    """Enhanced health check for production deployment"""
+    try:
+        from app.core.database import get_db
+        from sqlalchemy import text
+        
+        # Test database connection
+        db = next(get_db())
+        result = db.execute(text("SELECT 1"))
+        result.fetchone()
+        db.close()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "message": "All systems operational",
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "message": "Service degraded"
+        }
 
 if __name__ == "__main__":
     import uvicorn

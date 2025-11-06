@@ -5,13 +5,14 @@ import {
   relojesApi, 
   eventosRelojApi 
 } from '../../../../api/programacion/politicasApi';
+import { buildApiUrl } from '../../../../utils/apiConfig';
 import {
   getReglasByPolitica,
   createRegla,
   updateRegla,
   deleteRegla
 } from '../../../../api/reglas';
-import { guardarCategoriasPolitica } from '../../../../api/canciones';
+import { guardarCategoriasPolitica, obtenerCategoriasPolitica } from '../../../../api/canciones';
 import OrdenAsignacion from './OrdenAsignacion'
 import EventosReloj from './EventosReloj';
 
@@ -135,6 +136,36 @@ export default function PoliticasProgramacion() {
 
   // ===== FUNCIONES AUXILIARES =====
   
+  // Función para cargar categorías de una política - Memoizada
+  const loadCategoriasPolitica = useCallback(async (politicaId) => {
+    if (!politicaId) {
+      console.log('ℹ️ No hay política ID - limpiando categorías');
+      setCategoriasSeleccionadas([]);
+      return;
+    }
+    
+    try {
+      console.log('🔄 Cargando categorías para política ID:', politicaId);
+      const categoriasData = await obtenerCategoriasPolitica(politicaId);
+      console.log('✅ Categorías cargadas desde API:', categoriasData);
+      
+      if (categoriasData?.categorias && Array.isArray(categoriasData.categorias)) {
+        // Si las categorías son strings, usarlas directamente; si son objetos, extraer el nombre
+        const categoriasNombres = categoriasData.categorias.map(c => 
+          typeof c === 'string' ? c : c.nombre || c
+        );
+        setCategoriasSeleccionadas(categoriasNombres);
+        console.log('✅ Categorías seleccionadas actualizadas:', categoriasNombres);
+      } else {
+        console.log('ℹ️ No hay categorías guardadas para esta política');
+        setCategoriasSeleccionadas([]);
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar categorías:', error);
+      setCategoriasSeleccionadas([]);
+    }
+  }, []);
+
   // Función para manejar el guardado de categorías desde OrdenAsignacion - Memoizada
   const handleCategoriasSaved = useCallback((configuracion) => {
     console.log('Configuración de orden de asignación:', configuracion);
@@ -525,7 +556,7 @@ export default function PoliticasProgramacion() {
   }, []);
 
   // Función para obtener estadísticas ordenadas - Memoizada
-  const getSortedCategoryStats = useMemo(() => {
+  const getSortedCategoryStats = useCallback(() => {
     const stats = getCategoryStats();
     const entries = Object.entries(stats);
     
@@ -778,6 +809,17 @@ export default function PoliticasProgramacion() {
       return;
     }
     
+    // Determinar qué política usar
+    const politicaToUse = selectedPolitica;
+    const politicaId = politicaToUse?.id;
+    
+    // Cargar categorías de la política
+    if (politicaId) {
+      await loadCategoriasPolitica(politicaId);
+    } else {
+      setCategoriasSeleccionadas([]);
+    }
+    
     setSelectedReloj(null);
     setRelojFormMode('new');
     
@@ -787,13 +829,27 @@ export default function PoliticasProgramacion() {
     
     setShowRelojForm(true); // Mostrar el RelojForm modal
     console.log('🔵 handleNewReloj - FIN - Modal abierto');
-  }, [selectedPolitica, showForm, formMode]);
+  }, [selectedPolitica, showForm, formMode, loadCategoriasPolitica]);
 
-  const handleEditReloj = useCallback((reloj) => {
+  const handleEditReloj = useCallback(async (reloj) => {
     console.log('🟡 handleEditReloj - INICIO - Reloj recibido:', reloj);
     console.log('🟡 handleEditReloj - Eventos del reloj:', reloj.eventos);
     setSelectedReloj(reloj);
     setRelojFormMode('edit');
+    
+    // Cargar categorías de la política asociada al reloj
+    const politicaId = reloj.politica_id || reloj.politica?.id;
+    if (politicaId) {
+      await loadCategoriasPolitica(politicaId);
+    } else {
+      // Si no hay política en el reloj, usar la política seleccionada
+      const politicaIdFromSelected = selectedPolitica?.id;
+      if (politicaIdFromSelected) {
+        await loadCategoriasPolitica(politicaIdFromSelected);
+      } else {
+        setCategoriasSeleccionadas([]);
+      }
+    }
     
     // Mapear eventos del backend al formato del frontend
     const eventosMapeados = reloj.eventos ? reloj.eventos.map(evento => ({
@@ -820,7 +876,7 @@ export default function PoliticasProgramacion() {
     console.log('🟡 handleEditReloj - Eventos mapeados al estado:', eventosMapeados);
     setShowRelojForm(true);
     console.log('🟡 handleEditReloj - FIN - Modal abierto para edición');
-  }, []);
+  }, [selectedPolitica, loadCategoriasPolitica]);
 
   const handleViewReloj = useCallback((reloj) => {
     console.log('🔄 handleViewReloj - Reloj recibido:', reloj);
@@ -2045,7 +2101,7 @@ export default function PoliticasProgramacion() {
           const loadCortes = async () => {
             setLoadingCortes(true);
             try {
-              const response = await fetch('http://localhost:8000/api/v1/catalogos/general/cortes/?activo=true');
+              const response = await fetch(buildApiUrl('/catalogos/general/cortes/?activo=true'));
               const data = await response.json();
               setCortes(data || []);
               console.log('🔍 RelojForm - Cortes cargados:', data);
@@ -3907,7 +3963,7 @@ export default function PoliticasProgramacion() {
   const loadDifusoras = async () => {
     try {
       console.log('🔍 Cargando difusoras desde API...');
-      const response = await fetch('http://localhost:8000/api/v1/catalogos/general/difusoras/');
+      const response = await fetch(buildApiUrl('/catalogos/general/difusoras/'));
       const data = await response.json();
       console.log('✅ Difusoras cargadas desde API:', data);
       

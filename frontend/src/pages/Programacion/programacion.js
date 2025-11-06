@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PoliticasSection, ProgramacionSection, LogfilesSection } from './components/ProgramacionSections'
+import { ProgramacionSection } from './components/ProgramacionSections'
 import { PoliticasProgramacion } from './components/Politicas'
 import { GenerarProgramacionComponent } from './components/Programacion'
-import { GenerarLogfilesComponent } from './components/Logfiles'
 import SimplePage from './components/SimplePage'
 
 export default function ProgramacionPage() {
@@ -50,8 +49,6 @@ export default function ProgramacionPage() {
         return <PoliticasProgramacion />
       case 'generar-programacion':
         return <GenerarProgramacionComponent />
-      case 'generar-logfiles':
-        return <GenerarLogfilesComponent />
       default:
         return null
     }
@@ -71,11 +68,9 @@ export default function ProgramacionPage() {
       </div>
       
       {/* Contenido principal */}
-      <div className="relative z-10 h-full flex items-center justify-center p-5">
-        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-5 h-full max-h-[calc(100vh-120px)]">
-          <PoliticasSection onItemClick={handleItemClick} />
+      <div className="relative z-10 h-full flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-5xl py-8">
           <ProgramacionSection onItemClick={handleItemClick} />
-          <LogfilesSection onItemClick={handleItemClick} />
         </div>
       </div>
     </div>

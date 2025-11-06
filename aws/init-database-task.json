@@ -1,0 +1,46 @@
+{
+  "family": "pm-prod-db-init",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::247220132821:role/pm-prod-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::247220132821:role/pm-prod-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "db-init",
+      "image": "postgres:15-alpine",
+      "essential": true,
+      "environment": [
+        {
+          "name": "PGHOST",
+          "value": "pm-prod-db.cm944o06ss90.us-east-1.rds.amazonaws.com"
+        },
+        {
+          "name": "PGUSER",
+          "value": "programador_user"
+        },
+        {
+          "name": "PGDATABASE",
+          "value": "programador_musical"
+        },
+        {
+          "name": "PGPASSWORD",
+          "value": "D+WpQ#bUnXTyv1#vW-21"
+        }
+      ],
+      "command": [
+        "sh", "-c", 
+        "echo 'Connecting to database...' && psql -c 'SELECT version();' && echo 'Database connection successful!'"
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/pm-prod/db-init",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

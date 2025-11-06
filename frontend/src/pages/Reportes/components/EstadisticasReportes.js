@@ -911,7 +911,7 @@ const EstadisticasReportes = () => {
                 <div className="mx-6 mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg">
                   <p className="text-sm text-blue-800 font-medium">
                     <Filter className="w-4 h-4 inline mr-2" />
-                    Filtro activo: Mostrando solo canciones de la categoría <strong>"{categoriaFiltro}"</strong>
+                    Filtro activo: Mostrando solo canciones de la categoría <strong>&quot;{categoriaFiltro}&quot;</strong>
                   </p>
                 </div>
               )}

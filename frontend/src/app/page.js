@@ -9,7 +9,7 @@ import ReportesPage from "@/pages/Reportes/reportes";
 import VariosPage from "@/pages/Varios/varios";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("catalogos");
+  const [activeTab, setActiveTab] = useState("programacion");
 
   const handleTabClick = (tabId) => {
     // Si la tab ya está activa, navegar al menú principal
@@ -27,11 +27,11 @@ export default function Home() {
 
   const tabs = [
     {
-      id: "catalogos",
-      label: "Catálogos",
+      id: "programacion",
+      label: "Programación",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       )
     },
@@ -45,11 +45,11 @@ export default function Home() {
       )
     },
     {
-      id: "programacion",
-      label: "Programación",
+      id: "catalogos",
+      label: "Catálogos",
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
       )
     },
@@ -128,8 +128,8 @@ export default function Home() {
       </nav>
 
       {/* Content Area */}
-      <main className="relative h-full overflow-hidden">
-        <div className="transition-opacity duration-300 ease-in-out h-full">
+      <main className="relative h-[calc(100vh-70px)] overflow-y-auto allow-scroll">
+        <div className="transition-opacity duration-300 ease-in-out min-h-full">
           {renderTabContent()}
         </div>
       </main>

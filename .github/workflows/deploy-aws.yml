@@ -1,0 +1,120 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [ main, production ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: programador-musical
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push Frontend image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ env.PROJECT_NAME }}/frontend
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f frontend/Dockerfile.prod -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./frontend
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+    - name: Build and push Backend image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ env.PROJECT_NAME }}/backend
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f backend/Dockerfile.prod -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./backend
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+    - name: Build and push Nginx image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ env.PROJECT_NAME }}/nginx
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f nginx/Dockerfile.prod -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest ./nginx
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.0
+
+    - name: Terraform Init
+      working-directory: ./aws/terraform
+      run: terraform init
+
+    - name: Create/Update Secrets
+      run: |
+        chmod +x aws/manage-secrets.sh
+        # Check if secrets exist, create if they don't
+        if ! aws secretsmanager describe-secret --secret-id programador-musical-production-app-secrets --region ${{ env.AWS_REGION }} 2>/dev/null; then
+          echo "Creating new secrets..."
+          ./aws/manage-secrets.sh create
+        else
+          echo "Secrets already exist, skipping creation"
+        fi
+
+    - name: Terraform Plan
+      working-directory: ./aws/terraform
+      env:
+        TF_VAR_database_password: ${{ secrets.DATABASE_PASSWORD }}
+        TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+        TF_VAR_domain_name: ${{ secrets.DOMAIN_NAME }}
+      run: terraform plan
+
+    - name: Terraform Apply
+      working-directory: ./aws/terraform
+      env:
+        TF_VAR_database_password: ${{ secrets.DATABASE_PASSWORD }}
+        TF_VAR_jwt_secret_key: ${{ secrets.JWT_SECRET_KEY }}
+        TF_VAR_domain_name: ${{ secrets.DOMAIN_NAME }}
+      run: terraform apply -auto-approve
+
+    - name: Update ECS Service
+      run: |
+        aws ecs update-service \
+          --cluster ${{ env.PROJECT_NAME }}-production-cluster \
+          --service ${{ env.PROJECT_NAME }}-production-app \
+          --force-new-deployment \
+          --region ${{ env.AWS_REGION }}
+
+    - name: Wait for deployment
+      run: |
+        aws ecs wait services-stable \
+          --cluster ${{ env.PROJECT_NAME }}-production-cluster \
+          --services ${{ env.PROJECT_NAME }}-production-app \
+          --region ${{ env.AWS_REGION }}
+
+    - name: Get deployment URL
+      run: |
+        cd aws/terraform
+        echo "Application deployed to: $(terraform output -raw application_url)"

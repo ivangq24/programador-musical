@@ -969,7 +969,7 @@ const ConsultarProgramacionComponent = ({
                   <p className="text-gray-700 text-lg font-semibold mb-2">No se encontraron canciones</p>
                   <p className="text-gray-500 text-sm mb-4">
                     {searchTerm ? (
-                      <>No hay canciones que coincidan con <span className="font-medium">"{searchTerm}"</span></>
+                      <>No hay canciones que coincidan con <span className="font-medium">&quot;{searchTerm}&quot;</span></>
                     ) : (
                       <>No hay canciones en la categoría <span className="font-medium">{selectedCategory}</span></>
                     )}

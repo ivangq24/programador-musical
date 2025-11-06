@@ -23,11 +23,29 @@ const apiClient = axios.create({
   },
 });
 
+// Interceptor para logging de requests
+apiClient.interceptors.request.use(
+  (config) => {
+    console.log('🔍 API Request:', config.method?.toUpperCase(), config.url);
+    console.log('🔍 Full URL:', config.baseURL + config.url);
+    return config;
+  },
+  (error) => {
+    console.error('Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
 // Interceptor para manejar errores
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ API Response:', response.status, response.config.url);
+    return response;
+  },
   (error) => {
     console.error('API Error:', error);
+    console.error('Error URL:', error.config?.url);
+    console.error('Error Response:', error.response?.data);
     return Promise.reject(error);
   }
 );

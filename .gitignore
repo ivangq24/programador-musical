@@ -1,3 +1,149 @@
+# Environment files (NO subir archivos .env con valores reales)
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.prod.example
+.env.local
+.env.prod
+.env.production
+.env.staging
+.env.development
+.env.test
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Terraform
+# Directorio de plugins y módulos
+aws/terraform/.terraform/
+aws/terraform/.terraform.*/
+
+# Archivos de estado (contienen información sensible)
+aws/terraform/*.tfstate
+aws/terraform/*.tfstate.*
+aws/terraform/*.tfstate.backup
+**/*.tfstate
+**/*.tfstate.*
+
+# Archivos de variables con valores reales (NO subir)
+# IMPORTANTE: Las excepciones deben ir después de las reglas generales
+**/*.tfvars
+!**/*.tfvars.example
+!**/terraform.tfvars.example
+aws/terraform/terraform.tfvars
+aws/terraform/*.tfvars.json
+
+# Archivos de plan
+aws/terraform/*.tfplan
+aws/terraform/tfplan
+aws/terraform/*.tfplan.*
+**/*.tfplan
+
+# Lock file (a veces se incluye, pero mejor ignorarlo por seguridad)
+aws/terraform/.terraform.lock.hcl
+
+# Archivos de override
+**/*.override.tf
+**/*.override.tfvars
+
+# Archivos de crash
+aws/terraform/crash.log
+aws/terraform/crash.*.log
+
+# Archivos de debug
+aws/terraform/debug.tf
+aws/terraform/debug.tfvars
+
+# Docker
+.dockerignore
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
 # Python
 __pycache__/
 *.py[cod]
@@ -21,94 +167,129 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
+# PyInstaller
+*.manifest
+*.spec
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# Next.js
-.next/
-out/
-build/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-logs/
-*.log
-
-# Database
-*.db
-*.sqlite3
-
-# Docker
-.dockerignore
-
-# Database backups (keep only the main database.sql)
-postgres/backups/
-
-# Testing
-coverage/
-.nyc_output/
+# Unit test / coverage reports
+htmlcov/
+.tox/
 .coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
 .pytest_cache/
 
-# Temporary files
-*.tmp
-*.temp
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Project specific
-# Keep database.sql but ignore backups
-postgres/backups/
+# pyenv
+.python-version
 
-# Keep env.example files but ignore actual .env files
-# (already covered above)
+# celery beat schedule file
+celerybeat-schedule
 
-# Docker volumes
-postgres_data/
+# SageMath parsed files
+*.sage.py
 
-# IDE specific
+# Environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# SSL certificates and keys (NUNCA subir)
+ssl/
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+
+# AWS credentials and configuration
+.aws/
+aws-credentials
+aws-config
+*.aws
+~/.aws/credentials
+~/.aws/config
+
+# SSH keys
+*.rsa
+*.rsa.pub
+*.ed25519
+*.ed25519.pub
+id_rsa*
+id_ed25519*
+known_hosts
+.ssh/
+
+# Backups and database dumps (may contain sensitive data)
+backups/
+*.sql
+*.dump
+*.db
+*.sqlite
+*.sqlite3
+*.backup.sql
+*.bak
+*.backup
+*.old
+
+# Local development overrides
+docker-compose.override.local.yml
+docker-compose.override.yml
+
+# IDE and editor files with potentially sensitive data
 .vscode/settings.json
-.vscode/launch.json
-.vscode/extensions.json
+.idea/workspace.xml
+*.code-workspace
 
-# macOS
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Linux
+# Backup and temporary editor files
 *~
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS specific files (already covered above, but keeping for clarity)
+# Note: Some entries may be duplicated from earlier sections
+
+# Package manager lock files (optional, but sometimes contain paths)
+# Uncomment if you want to ignore them:
+# package-lock.json
+# yarn.lock
+# poetry.lock
+
+# Local configuration overrides
+config.local.*
+settings.local.*
+*.local.*
+!*.local.example.*

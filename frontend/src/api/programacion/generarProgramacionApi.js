@@ -1,9 +1,9 @@
 // API para Generar Programación
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { buildApiUrl } from '../../utils/apiConfig';
 
 // Función helper para hacer peticiones HTTP
 const apiRequest = async (endpoint, options = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = buildApiUrl(endpoint);
   
   const defaultOptions = {
     headers: {

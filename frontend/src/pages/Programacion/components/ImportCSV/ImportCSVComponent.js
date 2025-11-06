@@ -273,16 +273,16 @@ export default function ImportCSVComponent({ onBack }) {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/50 overflow-hidden relative">
+      <div className="w-full min-h-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-100/50 relative py-6">
         {/* Fondo decorativo */}
-        <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-200/20 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-indigo-200/20 rounded-full blur-3xl"></div>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-200/10 rounded-full blur-2xl"></div>
         </div>
 
         <div className="relative z-10 p-6">
-          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20">
             {/* Enhanced Header */}
             <div className="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/90 to-indigo-600/90"></div>
@@ -418,7 +418,7 @@ export default function ImportCSVComponent({ onBack }) {
                   <h2 className="text-lg font-bold text-gray-900">Vista Previa de Datos</h2>
                 </div>
                 
-                <div className="overflow-x-auto bg-white rounded-xl shadow-lg border border-gray-200">
+                <div className="overflow-x-auto overflow-y-auto max-h-[400px] bg-white rounded-xl shadow-lg border border-gray-200 allow-scroll data-table">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gradient-to-r from-gray-100 to-gray-50 sticky top-0 z-10">
                       <tr>
@@ -455,7 +455,7 @@ export default function ImportCSVComponent({ onBack }) {
                   <h2 className="text-lg font-bold text-gray-900">Mapeo Automático de Columnas</h2>
                 </div>
                 
-                <div className="overflow-x-auto bg-white rounded-xl shadow-lg border border-gray-200">
+                <div className="overflow-x-auto overflow-y-auto max-h-[500px] bg-white rounded-xl shadow-lg border border-gray-200 allow-scroll data-table">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gradient-to-r from-gray-100 to-gray-50 sticky top-0 z-10">
                       <tr>

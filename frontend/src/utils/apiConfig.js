@@ -19,9 +19,12 @@ export const buildApiUrl = (endpoint) => {
   const baseUrl = getApiBaseUrl();
   // Asegurar que el endpoint empiece con /
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  // Remover /api/v1 del baseUrl si ya está incluido
-  const baseUrlClean = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
-  return `${baseUrlClean}${cleanEndpoint}`;
+  // Si baseUrl ya termina con /api/v1, solo agregar el endpoint
+  // Si no, agregar /api/v1 antes del endpoint
+  if (baseUrl.endsWith('/api/v1')) {
+    return `${baseUrl}${cleanEndpoint}`;
+  }
+  return `${baseUrl}/api/v1${cleanEndpoint}`;
 };
 
 // Helper para fetch requests con configuración estándar
