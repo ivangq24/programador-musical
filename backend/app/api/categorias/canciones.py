@@ -36,7 +36,7 @@ async def get_canciones(
         
         # Filtro por categoría
         if categoria:
-            query = query.join(Categoria).filter(Categoria.nombre == categoria)
+            query = query.join(Categoria).filter(Categoria.nnombre == categoria)
         
         # Aplicar paginación
         total = query.count()
@@ -120,18 +120,18 @@ async def create_cancion(
             activa=True
         )
         
-        db.add(nueva_cancion)
+        db.add(nnueva_cancion)
         db.commit()
-        db.refresh(nueva_cancion)
+        db.refresh(nnueva_cancion)
         
         return {
-            "id": nueva_cancion.id,
-            "titulo": nueva_cancion.titulo,
-            "artista": nueva_cancion.artista,
-            "album": nueva_cancion.album,
-            "duracion": nueva_cancion.duracion,
-            "categoria_id": nueva_cancion.categoria_id,
-            "activa": nueva_cancion.activa,
+            "id": nnueva_cancion.id,
+            "titulo": nnueva_cancion.titulo,
+            "artista": nnueva_cancion.artista,
+            "album": nnueva_cancion.album,
+            "duracion": nnueva_cancion.duracion,
+            "categoria_id": nnueva_cancion.categoria_id,
+            "activa": nnueva_cancion.activa,
             "message": "Canción creada exitosamente"
         }
         

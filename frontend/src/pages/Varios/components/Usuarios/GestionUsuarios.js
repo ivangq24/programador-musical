@@ -49,7 +49,7 @@ export default function GestionUsuarios() {
       const data = await usuariosApi.getUsuarios(params)
       setUsuarios(data)
     } catch (err) {
-      console.error('Error cargando usuarios:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al cargar usuarios')
     } finally {
       setLoading(false)
@@ -62,7 +62,7 @@ export default function GestionUsuarios() {
       const data = await getDifusoras({ activa: true })
       setDifusoras(data)
     } catch (err) {
-      console.error('Error cargando difusoras:', err)
+
     }
   }, [])
   
@@ -96,7 +96,7 @@ export default function GestionUsuarios() {
       await usuariosApi.updateUsuario(usuarioId, updates)
       loadUsuarios()
     } catch (err) {
-      console.error('Error actualizando usuario:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al actualizar usuario')
     }
   }

@@ -29,7 +29,7 @@ async def create_categoria(payload: CategoriaCreate, db: Session = Depends(get_d
     db_cat = Categoria(
         difusora=payload.difusora,
         clave=payload.clave,
-        nombre=payload.nombre,
+ombre=payload.nombre,
         descripcion=payload.descripcion,
         activa=payload.activa
     )

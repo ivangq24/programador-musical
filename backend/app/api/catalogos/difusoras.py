@@ -7,9 +7,7 @@ from app.models.auth import Usuario
 from app.models.catalogos import Difusora
 from app.schemas.catalogos import DifusoraCreate, DifusoraUpdate, Difusora as DifusoraSchema
 from typing import List, Optional
-import logging
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/", response_model=List[DifusoraSchema])
@@ -58,7 +56,7 @@ async def get_difusoras(
         return difusoras
         
     except Exception as e:
-        logger.error(f"Error al obtener difusoras: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/{difusora_id}", response_model=DifusoraSchema)
@@ -75,7 +73,7 @@ async def get_difusora(difusora_id: int, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al obtener difusora {difusora_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.post("/", response_model=DifusoraSchema)
@@ -95,14 +93,14 @@ async def create_difusora(difusora: DifusoraCreate, db: Session = Depends(get_db
         db.commit()
         db.refresh(db_difusora)
         
-        logger.info(f"Difusora creada: {db_difusora.siglas} - {db_difusora.nombre}")
+
         return db_difusora
         
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al crear difusora: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.put("/{difusora_id}", response_model=DifusoraSchema)
@@ -137,14 +135,14 @@ async def update_difusora(
         db.commit()
         db.refresh(db_difusora)
         
-        logger.info(f"Difusora actualizada: {db_difusora.siglas} - {db_difusora.nombre}")
+
         return db_difusora
         
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al actualizar difusora {difusora_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.delete("/{difusora_id}")
@@ -162,14 +160,14 @@ async def delete_difusora(difusora_id: int, db: Session = Depends(get_db)):
         db.delete(db_difusora)
         db.commit()
         
-        logger.info(f"Difusora eliminada: {db_difusora.siglas} - {db_difusora.nombre}")
+
         return {"message": "Difusora eliminada correctamente"}
         
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al eliminar difusora {difusora_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/stats/summary")
@@ -189,6 +187,6 @@ async def get_difusoras_stats(db: Session = Depends(get_db)):
         }
         
     except Exception as e:
-        logger.error(f"Error al obtener estadísticas de difusoras: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 

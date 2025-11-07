@@ -22,9 +22,7 @@ from app.schemas.programacion import (
     PoliticaCompleta, PoliticasStats, RelojesStats
 )
 from typing import List, Optional
-import logging
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -72,7 +70,7 @@ async def get_politicas(
         return politicas
         
     except Exception as e:
-        logger.error(f"Error al obtener políticas: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/{politica_id}", response_model=PoliticaCompleta)
@@ -87,7 +85,7 @@ async def get_politica(politica_id: int, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al obtener política {politica_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.post("/", response_model=PoliticaProgramacion)
@@ -109,7 +107,7 @@ async def create_politica(politica: PoliticaProgramacionCreate, db: Session = De
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al crear política: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.put("/{politica_id}", response_model=PoliticaProgramacion)
@@ -132,7 +130,7 @@ async def update_politica(politica_id: int, politica_update: PoliticaProgramacio
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al actualizar política {politica_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.delete("/{politica_id}")
@@ -151,7 +149,7 @@ async def delete_politica(politica_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al eliminar política {politica_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/stats/summary", response_model=PoliticasStats)
@@ -176,7 +174,7 @@ async def get_politicas_stats(db: Session = Depends(get_db)):
         )
         
     except Exception as e:
-        logger.error(f"Error al obtener estadísticas de políticas: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 # ============================================================================
@@ -191,7 +189,7 @@ async def get_relojes_by_politica(politica_id: int, db: Session = Depends(get_db
         return relojes
         
     except Exception as e:
-        logger.error(f"Error al obtener relojes de política {politica_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.post("/{politica_id}/relojes", response_model=Reloj)
@@ -220,7 +218,7 @@ async def create_reloj(politica_id: int, reloj: RelojCreate, db: Session = Depen
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al crear reloj: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.put("/relojes/{reloj_id}", response_model=Reloj)
@@ -243,7 +241,7 @@ async def update_reloj(reloj_id: int, reloj_update: RelojUpdate, db: Session = D
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al actualizar reloj {reloj_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.delete("/relojes/{reloj_id}")
@@ -262,7 +260,7 @@ async def delete_reloj(reloj_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al eliminar reloj {reloj_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 # ============================================================================
@@ -283,7 +281,7 @@ async def get_eventos_by_reloj(reloj_id: int, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al obtener eventos del reloj {reloj_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.post("/relojes/{reloj_id}/eventos", response_model=EventoReloj)
@@ -307,7 +305,7 @@ async def create_evento(reloj_id: int, evento: EventoRelojCreate, db: Session = 
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al crear evento para reloj {reloj_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.put("/eventos/{evento_id}", response_model=EventoReloj)
@@ -330,7 +328,7 @@ async def update_evento(evento_id: int, evento_update: EventoRelojUpdate, db: Se
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al actualizar evento {evento_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.delete("/eventos/{evento_id}")
@@ -349,7 +347,7 @@ async def delete_evento(evento_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al eliminar evento {evento_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.put("/relojes/{reloj_id}/eventos/reordenar")
@@ -376,7 +374,7 @@ async def reordenar_eventos(reloj_id: int, eventos_orden: List[dict], db: Sessio
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al reordenar eventos del reloj {reloj_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 # ============================================================================
@@ -407,7 +405,7 @@ async def get_dias_modelo_by_politica(politica_id: int, db: Session = Depends(ge
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al obtener días modelo de política {politica_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.post("/{politica_id}/dias-modelo", response_model=DiaModelo)
@@ -460,7 +458,7 @@ async def create_dia_modelo(politica_id: int, dia_modelo: DiaModeloCreate, db: S
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al crear día modelo para política {politica_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.put("/dias-modelo/{dia_modelo_id}", response_model=DiaModelo)
@@ -510,7 +508,7 @@ async def update_dia_modelo(dia_modelo_id: int, dia_modelo_update: DiaModeloUpda
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al actualizar día modelo {dia_modelo_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.delete("/dias-modelo/{dia_modelo_id}")
@@ -529,7 +527,7 @@ async def delete_dia_modelo(dia_modelo_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al eliminar día modelo {dia_modelo_id}: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 # ============================================================================
@@ -562,7 +560,7 @@ async def get_relojes_stats(db: Session = Depends(get_db)):
         )
         
     except Exception as e:
-        logger.error(f"Error al obtener estadísticas de relojes: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 

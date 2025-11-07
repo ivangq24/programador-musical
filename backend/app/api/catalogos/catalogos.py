@@ -5,9 +5,7 @@ from app.core.database import get_db
 from app.models.catalogos import Difusora
 from app.schemas.catalogos import Difusora as DifusoraSchema
 from typing import List, Optional
-import logging
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # General endpoints
@@ -48,7 +46,7 @@ async def get_difusoras(
         return difusoras
         
     except Exception as e:
-        logger.error(f"Error al obtener difusoras: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/general/difusoras/stats")
@@ -66,7 +64,7 @@ async def get_difusoras_stats(db: Session = Depends(get_db)):
         }
         
     except Exception as e:
-        logger.error(f"Error al obtener estadísticas de difusoras: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 

@@ -3,11 +3,6 @@
 import React from 'react'
 
 export default function SimplePage({ title, color = 'blue' }) {
-  console.log('=== SIMPLE PAGE RENDERED ===')
-  console.log('Title:', title)
-  console.log('Color:', color)
-  console.log('=============================')
-  
   return (
     <div className={`min-h-screen bg-${color}-500 flex items-center justify-center`}>
       <div className="text-white text-center">

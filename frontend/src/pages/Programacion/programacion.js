@@ -23,14 +23,14 @@ export default function ProgramacionPage() {
   }, [])
 
   const handleItemClick = (itemId) => {
-    console.log('=== NAVIGATION DEBUG ===')
-    console.log('Item clicked:', itemId)
-    console.log('Current view before:', currentView)
-    console.log('Selected section before:', selectedSection)
+
+
+
+
     setSelectedSection(itemId)
     setCurrentView('section')
-    console.log('Navigation state updated')
-    console.log('========================')
+
+
   }
 
   const handleBackToMain = () => {
@@ -40,10 +40,10 @@ export default function ProgramacionPage() {
 
   // Renderizar componente específico según la sección seleccionada
   const renderSection = () => {
-    console.log('=== RENDER SECTION DEBUG ===')
-    console.log('Rendering section:', selectedSection)
-    console.log('Current view:', currentView)
-    console.log('============================')
+
+
+
+
     switch (selectedSection) {
       case 'politicas-programacion':
         return <PoliticasProgramacion />

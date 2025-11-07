@@ -58,7 +58,7 @@ export default function LoginPage() {
       const data = await response.json();
       setSetupComplete(data.setup_complete || false);
     } catch (err) {
-      console.error('Error verificando setup:', err);
+
       // Si falla, asumir que NO está configurado para mostrar la opción de crear admin
       setSetupComplete(false);
     } finally {
@@ -84,7 +84,7 @@ export default function LoginPage() {
         // Redirigir a la página principal
         router.push('/');
       } catch (err) {
-        console.error('Error de autenticación:', err);
+
         
         // Manejar requerimientos de MFA
         if (err.message === 'MFA_SETUP_REQUIRED') {
@@ -165,10 +165,10 @@ export default function LoginPage() {
           },
           body: JSON.stringify({
             email,
-            nombre: name,
+ombre: name,
             password,
             confirm_password: confirmPassword,
-            nombre_empresa: nombreEmpresa || null,
+ombre_empresa: nombreEmpresa || null,
             telefono: telefono || null,
             direccion: direccion || null,
             ciudad: ciudad || null,
@@ -214,7 +214,7 @@ export default function LoginPage() {
           }
         }, 2000);
       } catch (err) {
-        console.error('Error al crear administrador:', err);
+
         setError(err.message || 'Error al crear el administrador');
       } finally {
         setLoading(false);
@@ -234,7 +234,7 @@ export default function LoginPage() {
           setMode('login');
         }, 3000);
       } catch (err) {
-        console.error('Error al solicitar reseteo:', err);
+
         setError(err.message || 'Error al solicitar reseteo de contraseña.');
       } finally {
         setLoading(false);
@@ -267,7 +267,7 @@ export default function LoginPage() {
           router.push('/');
         }, 1500);
       } catch (err) {
-        console.error('Error al establecer nueva contraseña:', err);
+
         
         // Si el error es por falta de usuario pendiente, intentar re-autenticar
         if (err.message.includes('No hay usuario pendiente') || err.message.includes('sesión de cambio de contraseña expiró')) {
@@ -311,7 +311,7 @@ export default function LoginPage() {
           setSuccess('');
         }, 2000);
       } catch (err) {
-        console.error('Error al resetear contraseña:', err);
+
         setError(err.message || 'Error al resetear la contraseña. Verifica el código.');
       } finally {
         setLoading(false);

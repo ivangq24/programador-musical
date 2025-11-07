@@ -22,7 +22,7 @@ export default function MovimientosCategorias() {
       const data = await listCategoriasStats()
       setCategorias(data || [])
     } catch (err) {
-      console.error('Error cargando categorías:', err)
+
       setCategorias([])
     } finally {
       setLoading(false)
@@ -42,7 +42,7 @@ export default function MovimientosCategorias() {
       setSongs(data || [])
       setSelected(new Set())
     } catch (err) {
-      console.error('Error cargando canciones origen:', err)
+
       setSongs([])
       setSelected(new Set())
     } finally {
@@ -61,7 +61,7 @@ export default function MovimientosCategorias() {
       const data = await getElementosCategoria(catId)
       setDestSongs(data || [])
     } catch (err) {
-      console.error('Error cargando canciones destino:', err)
+
       setDestSongs([])
     } finally {
       setLoading(false)
@@ -120,9 +120,9 @@ export default function MovimientosCategorias() {
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(id)) {
-        next.delete(id)
+ext.delete(id)
       } else {
-        next.add(id)
+ext.add(id)
       }
       return next
     })
@@ -212,7 +212,7 @@ export default function MovimientosCategorias() {
       {/* Notification Component */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 ${
-          notification.type === 'success'
+otification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 text-red-800'
         }`}>

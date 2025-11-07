@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import List, Optional
-import logging
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, require_role, get_user_difusoras
@@ -26,7 +25,6 @@ from app.schemas.auth import (
 )
 from app.core.auth import cognito_auth
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -87,13 +85,13 @@ async def update_my_profile(
                     attributes=cognito_attributes
                 )
             except Exception as e:
-                logger.error(f"Error actualizando Cognito: {e}")
                 # Continuar aunque falle Cognito, la BD ya está actualizada
+                pass
     
     db.commit()
     db.refresh(usuario)
     
-    logger.info(f"Perfil actualizado por {usuario.email}")
+
     
     return UserInfo(
         id=usuario.id,
@@ -134,18 +132,17 @@ async def change_my_password(
     try:
         cognito_auth.change_user_password(
             cognito_user_id=usuario.cognito_user_id,
-            new_password=password_request.new_password,
+ew_password=password_request.new_password,
             permanent=True
         )
         
-        logger.info(f"Contraseña cambiada para {usuario.email}")
+
         
         return {"message": "Contraseña cambiada exitosamente"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error cambiando contraseña: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error cambiando contraseña: {str(e)}"
@@ -169,15 +166,16 @@ async def delete_my_account(
     try:
         cognito_auth.send_account_deletion_email(email=email, nombre=nombre)
     except Exception as e:
-        logger.warning(f"Error enviando email de eliminación: {e}")
+        # Continuar aunque falle el envío de email
+        pass
     
     # Eliminar de Cognito
     try:
         cognito_auth.delete_user(usuario.cognito_user_id)
-        logger.info(f"Cuenta eliminada: {email}")
+
     except Exception as e:
-        logger.error(f"Error eliminando usuario de Cognito: {e}")
         # Continuar aunque falle Cognito
+        pass
     
     # Opcional: Eliminar completamente de BD (comentado por seguridad)
     # db.delete(usuario)
@@ -224,7 +222,7 @@ async def get_usuarios(
     for u in usuarios:
         # Filtrar usuarios con email inválido o vacío
         if not u.email or '@' not in u.email:
-            logger.warning(f"Usuario {u.id} tiene email inválido: '{u.email}', omitiendo")
+
             continue
             
         asignaciones = db.query(UsuarioDifusora).filter(
@@ -321,7 +319,7 @@ async def invitar_usuario(
                 # Verificar que la difusora existe
                 difusora = db.query(Difusora).filter(Difusora.id == difusora_id).first()
                 if not difusora:
-                    logger.warning(f"Difusora {difusora_id} no encontrada, omitiendo")
+
                     continue
                 
                 # Verificar que no esté ya asignada
@@ -353,7 +351,7 @@ async def invitar_usuario(
         else:
             message = f"Usuario {usuario_invite.email} invitado exitosamente. Se ha enviado un email con un link de verificación. El usuario debe hacer clic en el link para verificar su email y luego puede iniciar sesión con la contraseña temporal."
         
-        logger.info(f"Usuario {usuario_invite.email} invitado por {usuario.email}. Cognito enviará el código de verificación automáticamente.")
+
         
         return UsuarioInviteResponse(
             usuario=UsuarioConDifusoras(
@@ -369,7 +367,7 @@ async def invitar_usuario(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error invitando usuario: {e}")
+
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -443,11 +441,10 @@ async def update_usuario(
                 old_rol=old_rol,
                 new_rol=new_rol
             )
-            logger.info(f"Rol actualizado en Cognito: {usuario_obj.email} de {old_rol} a {new_rol}")
+
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error actualizando rol en Cognito: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error actualizando rol en Cognito: {str(e)}"
@@ -460,7 +457,7 @@ async def update_usuario(
     db.commit()
     db.refresh(usuario_obj)
     
-    logger.info(f"Usuario {usuario_id} actualizado por {usuario.email}")
+
     
     # Obtener difusoras para la respuesta
     asignaciones = db.query(UsuarioDifusora).filter(
@@ -520,7 +517,7 @@ async def asignar_difusora(
     db.add(nueva_asignacion)
     db.commit()
     
-    logger.info(f"Difusora {difusora_obj.siglas} asignada a usuario {usuario_obj.email}")
+
     
     # Retornar usuario actualizado
     asignaciones = db.query(UsuarioDifusora).filter(
@@ -559,7 +556,7 @@ async def asignar_difusoras_multiple(
         # Verificar que la difusora existe
         difusora_obj = db.query(Difusora).filter(Difusora.id == difusora_id).first()
         if not difusora_obj:
-            logger.warning(f"Difusora {difusora_id} no encontrada, omitiendo")
+
             continue
         
         # Verificar que no esté ya asignada
@@ -576,7 +573,7 @@ async def asignar_difusoras_multiple(
                 difusora_id=difusora_id
             )
             db.add(nueva_asignacion)
-            logger.info(f"Difusora {difusora_obj.siglas} asignada a usuario {usuario_obj.email}")
+
     
     db.commit()
     
@@ -623,7 +620,7 @@ async def remover_difusora(
     db.delete(asignacion)
     db.commit()
     
-    logger.info(f"Difusora {difusora_id} removida de usuario {usuario_id}")
+
     return {"message": "Difusora removida correctamente"}
 
 
@@ -697,7 +694,6 @@ async def verify_email(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error verificando email: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al verificar el email: {str(e)}"
@@ -765,7 +761,7 @@ async def create_first_admin(
         # Establecer contraseña permanente
         cognito_auth.change_user_password(
             cognito_user_id=cognito_result['cognito_user_id'],
-            new_password=admin_data.password,
+ew_password=admin_data.password,
             permanent=True
         )
         
@@ -778,7 +774,8 @@ async def create_first_admin(
                 Username=cognito_result['cognito_user_id']
             )
         except Exception as e:
-            logger.warning(f"Error confirmando usuario en Cognito: {e}")
+            # Continuar aunque falle la asignación de grupo
+            pass
         
         # Crear registro en BD
         usuario = Usuario(
@@ -804,9 +801,10 @@ async def create_first_admin(
                 nombre=admin_data.nombre
             )
         except Exception as e:
-            logger.warning(f"Error enviando email de bienvenida: {e}")
+            # Continuar aunque falle el envío de email
+            pass
         
-        logger.info(f"Primer administrador creado: {admin_data.email}")
+
         
         return {
             "message": "Administrador creado exitosamente",
@@ -817,7 +815,6 @@ async def create_first_admin(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creando primer administrador: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creando administrador: {str(e)}"

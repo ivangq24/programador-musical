@@ -95,12 +95,12 @@ export default function PoliticasProgramacion() {
   const loadReglasPolitica = useCallback(async (politicaId) => {
     try {
       setLoadingReglas(true);
-      console.log('🔄 Cargando reglas para política ID:', politicaId);
+
       const reglasData = await getReglasByPolitica(politicaId);
-      console.log('✅ Reglas cargadas desde API:', reglasData);
+
       setReglasPolitica(reglasData);
     } catch (error) {
-      console.error('❌ Error al cargar reglas:', error);
+
     } finally {
       setLoadingReglas(false);
     }
@@ -109,7 +109,7 @@ export default function PoliticasProgramacion() {
   // Cargar categorías seleccionadas al inicializar el componente - Optimizado
   useEffect(() => {
     // No cargar categorías automáticamente - se cargarán cuando se edite una política específica
-    console.log('ℹ️ Inicializando sin categorías pre-seleccionadas');
+
     setCategoriasSeleccionadas([]);
   }, []);
 
@@ -131,7 +131,7 @@ export default function PoliticasProgramacion() {
 
   // Debug: monitorear cambios en showReglaForm
   useEffect(() => {
-    console.log('🔍 showReglaForm cambió a:', showReglaForm);
+
   }, [showReglaForm]);
 
   // ===== FUNCIONES AUXILIARES =====
@@ -139,15 +139,15 @@ export default function PoliticasProgramacion() {
   // Función para cargar categorías de una política - Memoizada
   const loadCategoriasPolitica = useCallback(async (politicaId) => {
     if (!politicaId) {
-      console.log('ℹ️ No hay política ID - limpiando categorías');
+
       setCategoriasSeleccionadas([]);
       return;
     }
     
     try {
-      console.log('🔄 Cargando categorías para política ID:', politicaId);
+
       const categoriasData = await obtenerCategoriasPolitica(politicaId);
-      console.log('✅ Categorías cargadas desde API:', categoriasData);
+
       
       if (categoriasData?.categorias && Array.isArray(categoriasData.categorias)) {
         // Si las categorías son strings, usarlas directamente; si son objetos, extraer el nombre
@@ -155,24 +155,24 @@ export default function PoliticasProgramacion() {
           typeof c === 'string' ? c : c.nombre || c
         );
         setCategoriasSeleccionadas(categoriasNombres);
-        console.log('✅ Categorías seleccionadas actualizadas:', categoriasNombres);
+
       } else {
-        console.log('ℹ️ No hay categorías guardadas para esta política');
+
         setCategoriasSeleccionadas([]);
       }
     } catch (error) {
-      console.error('❌ Error al cargar categorías:', error);
+
       setCategoriasSeleccionadas([]);
     }
   }, []);
 
   // Función para manejar el guardado de categorías desde OrdenAsignacion - Memoizada
   const handleCategoriasSaved = useCallback((configuracion) => {
-    console.log('Configuración de orden de asignación:', configuracion);
+
     // Actualizar las categorías seleccionadas
     if (configuracion.categorias) {
       const nuevasCategorias = configuracion.categorias.map(c => c.nombre);
-      console.log('Categorías actualizadas:', nuevasCategorias);
+
       // Actualizar el estado de categorías seleccionadas
       setCategoriasSeleccionadas(nuevasCategorias);
     }
@@ -200,15 +200,15 @@ export default function PoliticasProgramacion() {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Cargando políticas desde API...');
+
       const data = await politicasApi.getAll();
-      console.log('✅ Políticas cargadas desde API:', data);
+
       
       // Mapear datos de la API al formato esperado por el componente
       const politicasMapeadas = data.map(politica => ({
         id: politica.id,
         clave: politica.clave,
-        nombre: politica.nombre,
+nombre: politica.nombre,
         descripcion: politica.descripcion || `Política para ${politica.difusora}`,
         habilitada: politica.habilitada,
         tipo: 'General',
@@ -223,7 +223,7 @@ export default function PoliticasProgramacion() {
       
       setPoliticas(politicasMapeadas);
     } catch (err) {
-      console.error('❌ Error loading políticas:', err);
+
       setError(err.message || 'Error al cargar las políticas');
       setPoliticas([]);
     } finally {
@@ -234,14 +234,14 @@ export default function PoliticasProgramacion() {
   // Cargar días modelo por política - Memoizada
   const loadDiasModelo = useCallback(async (politicaId) => {
     try {
-      console.log('🔄 Cargando días modelo para política ID:', politicaId);
+
       const diasModeloData = await diasModeloApi.getByPolitica(politicaId);
-      console.log('✅ Días modelo cargados desde API:', diasModeloData);
-      console.log('🔍 IDs de días modelo disponibles:', diasModeloData.map(d => ({ id: d.id, nombre: d.nombre })));
-      console.log('🔍 Días modelo completos:', diasModeloData);
+
+
+
       setDiasModelo(diasModeloData);
     } catch (err) {
-      console.error('❌ Error loading días modelo:', err);
+
       setDiasModelo([]);
     }
   }, []);
@@ -249,12 +249,12 @@ export default function PoliticasProgramacion() {
   // Cargar relojes por política - Memoizada
   const loadRelojes = useCallback(async (politicaId) => {
     try {
-      console.log('🔄 Cargando relojes para política ID:', politicaId);
+
       const relojesData = await relojesApi.getByPolitica(politicaId);
-      console.log('✅ Relojes cargados:', relojesData);
+
       setRelojes(relojesData);
     } catch (err) {
-      console.error('❌ Error loading relojes:', err);
+
       setRelojes([]);
     }
   }, []);
@@ -266,8 +266,8 @@ export default function PoliticasProgramacion() {
 
   // Funciones para el formulario de reglas - Memoizadas
   const handleNewRegla = useCallback(() => {
-    console.log('🔍 handleNewRegla ejecutándose...');
-    console.log('🔍 showReglaForm antes:', showReglaForm);
+
+
     setReglaFormData({
       tipoRegla: '',
       reglaHabilitada: true,
@@ -279,9 +279,9 @@ export default function PoliticasProgramacion() {
       soloVerificarDia: false,
       separaciones: []
     });
-    console.log('🔍 setShowReglaForm(true) ejecutándose...');
+
     setShowReglaForm(true);
-    console.log('🔍 showReglaForm después:', showReglaForm);
+
   }, []);
 
   const handleReglaFormChange = useCallback((field, value) => {
@@ -316,7 +316,7 @@ export default function PoliticasProgramacion() {
 
   const handleReglaSave = useCallback(async () => {
     try {
-      console.log('💾 Guardando regla:', reglaFormData);
+
       
       // Preparar datos para enviar a la API
       const reglaData = {
@@ -336,7 +336,7 @@ export default function PoliticasProgramacion() {
       
       // Crear la regla
       const nuevaRegla = await createRegla(reglaData);
-      console.log('✅ Regla creada:', nuevaRegla);
+
       
       // Cerrar el modal y limpiar el formulario
       setShowReglaForm(false);
@@ -351,14 +351,14 @@ export default function PoliticasProgramacion() {
       });
       
       // Mostrar notificación de éxito
-      console.log('✅ Regla guardada exitosamente');
+
       
       // Recargar las reglas de la política
       await loadReglasPolitica(selectedPolitica?.id || 1);
       
     } catch (error) {
-      console.error('❌ Error al guardar regla:', error);
-      console.error('❌ Error al guardar la regla. Por favor, inténtalo de nuevo.');
+
+
     }
   }, [reglaFormData, selectedPolitica, loadReglasPolitica]);
 
@@ -536,9 +536,9 @@ export default function PoliticasProgramacion() {
     setExpandedCategories(prev => {
       const newExpanded = new Set(prev);
       if (newExpanded.has(category)) {
-        newExpanded.delete(category);
+ewExpanded.delete(category);
       } else {
-        newExpanded.add(category);
+ewExpanded.add(category);
       }
       return newExpanded;
     });
@@ -596,12 +596,12 @@ export default function PoliticasProgramacion() {
 
   const loadRelojesForPolitica = useCallback(async (politicaId) => {
     try {
-      console.log('🔄 Cargando relojes para política ID:', politicaId);
+
       const relojesData = await relojesApi.getByPolitica(politicaId);
-      console.log('✅ Relojes cargados:', relojesData);
+
       setRelojes(relojesData);
     } catch (err) {
-      console.error('❌ Error loading relojes:', err);
+
       setRelojes([]);
     }
   }, []);
@@ -621,9 +621,9 @@ export default function PoliticasProgramacion() {
 
       // Actualizar en la base de datos
       await relojesApi.update(relojId, { habilitado: nuevoEstado });
-      console.log(`✅ Reloj ${relojId} actualizado: habilitado = ${nuevoEstado}`);
+
     } catch (error) {
-      console.error('❌ Error al actualizar estado del reloj:', error);
+
       
       // Revertir cambio local en caso de error
       setRelojes(prev => prev.map(r => 
@@ -651,9 +651,9 @@ export default function PoliticasProgramacion() {
 
       // Actualizar en la base de datos
       await updateRegla(reglaId, { habilitada: nuevoEstado });
-      console.log(`✅ Regla ${reglaId} actualizada: habilitada = ${nuevoEstado}`);
+
     } catch (error) {
-      console.error('❌ Error al actualizar estado de la regla:', error);
+
       
       // Revertir cambio local en caso de error
       setReglasPolitica(prev => prev.map(r => 
@@ -681,9 +681,9 @@ export default function PoliticasProgramacion() {
 
       // Actualizar en la base de datos
       await diasModeloApi.update(diaModeloId, { habilitado: nuevoEstado });
-      console.log(`✅ Día modelo ${diaModeloId} actualizado: habilitado = ${nuevoEstado}`);
+
     } catch (error) {
-      console.error('❌ Error al actualizar estado del día modelo:', error);
+
       
       // Revertir cambio local en caso de error
       setDiasModelo(prev => prev.map(dm => 
@@ -698,9 +698,9 @@ export default function PoliticasProgramacion() {
   }, [diasModelo, showNotification]);
 
   const handleEdit = useCallback(async (politica) => {
-    console.log('🔍 handleEdit - Política seleccionada:', politica);
-    console.log('🔍 handleEdit - Clave de la política:', politica.clave);
-    console.log('🔍 handleEdit - Nombre de la política:', politica.nombre);
+
+
+
     
     // Resetear categorías seleccionadas para no arrastrar selección entre políticas
     setCategoriasSeleccionadas([]);
@@ -708,10 +708,10 @@ export default function PoliticasProgramacion() {
     try {
       // Obtener los datos completos de la política
       const politicaCompleta = await politicasApi.getById(politica.id);
-      console.log('🔍 handleEdit - Política completa obtenida:', politicaCompleta);
+
       setSelectedPolitica(politicaCompleta);
     } catch (error) {
-      console.error('❌ Error al obtener política completa:', error);
+
       setSelectedPolitica(politica);
     }
     
@@ -741,7 +741,7 @@ export default function PoliticasProgramacion() {
         // Actualizar estado local en lugar de recargar todo
         setPoliticas(prev => prev.filter(p => p.id !== id));
       } catch (err) {
-        console.error('Error deleting política:', err);
+
         showNotification(`Error al eliminar la política: ${err.message}`, 'error');
       } finally {
         setLoading(false);
@@ -756,16 +756,16 @@ export default function PoliticasProgramacion() {
   const handleSave = useCallback(async (politicaData) => {
     try {
       setLoading(true);
-      console.log('🔍 handleSave - Datos a enviar:', politicaData);
-      console.log('🔍 handleSave - Modo:', formMode);
-      console.log('🔍 handleSave - ID de política:', selectedPolitica?.id);
+
+
+
       
       if (formMode === 'edit') {
-        console.log('🔍 handleSave - Actualizando política ID:', selectedPolitica.id);
+
         await politicasApi.update(selectedPolitica.id, politicaData);
         showNotification('Política actualizada correctamente', 'success');
       } else {
-        console.log('🔍 handleSave - Creando nueva política');
+
         await politicasApi.create(politicaData);
         showNotification('Política creada correctamente', 'success');
       }
@@ -783,7 +783,7 @@ export default function PoliticasProgramacion() {
       setSelectedPolitica(null);
       setFormMode('new');
     } catch (err) {
-      console.error('Error saving política:', err);
+
       showNotification(`Error al guardar la política: ${err.message}`, 'error');
     } finally {
       setLoading(false);
@@ -793,10 +793,10 @@ export default function PoliticasProgramacion() {
   // ===== FUNCIONES DE GESTIÓN DE RELOJES =====
   
   const handleNewReloj = useCallback(async () => {
-    console.log('🔵 handleNewReloj - INICIO');
-    console.log('🔵 selectedPolitica:', selectedPolitica);
-    console.log('🔵 showForm:', showForm);
-    console.log('🔵 formMode:', formMode);
+
+
+
+
     
     // Permitir crear reloj si:
     // 1. Hay una política seleccionada, O
@@ -825,15 +825,15 @@ export default function PoliticasProgramacion() {
     
     // Iniciar con reloj vacío - sin eventos automáticos
     setRelojEvents([]);
-    console.log('🔍 Nuevo reloj iniciado vacío - sin eventos automáticos');
+
     
     setShowRelojForm(true); // Mostrar el RelojForm modal
-    console.log('🔵 handleNewReloj - FIN - Modal abierto');
+
   }, [selectedPolitica, showForm, formMode, loadCategoriasPolitica]);
 
   const handleEditReloj = useCallback(async (reloj) => {
-    console.log('🟡 handleEditReloj - INICIO - Reloj recibido:', reloj);
-    console.log('🟡 handleEditReloj - Eventos del reloj:', reloj.eventos);
+
+
     setSelectedReloj(reloj);
     setRelojFormMode('edit');
     
@@ -873,14 +873,14 @@ export default function PoliticasProgramacion() {
     })) : [];
     
     setRelojEvents(eventosMapeados);
-    console.log('🟡 handleEditReloj - Eventos mapeados al estado:', eventosMapeados);
+
     setShowRelojForm(true);
-    console.log('🟡 handleEditReloj - FIN - Modal abierto para edición');
+
   }, [selectedPolitica, loadCategoriasPolitica]);
 
   const handleViewReloj = useCallback((reloj) => {
-    console.log('🔄 handleViewReloj - Reloj recibido:', reloj);
-    console.log('🔄 handleViewReloj - Eventos del reloj:', reloj.eventos);
+
+
     setSelectedReloj(reloj);
     setRelojFormMode('view');
     
@@ -906,7 +906,7 @@ export default function PoliticasProgramacion() {
     })) : [];
     
     setRelojEvents(eventosMapeados);
-    console.log('🔄 handleViewReloj - Eventos mapeados al estado:', eventosMapeados);
+
     setShowRelojForm(true);
   }, []);
 
@@ -929,7 +929,7 @@ export default function PoliticasProgramacion() {
           }
         }
       } catch (err) {
-        console.error('Error deleting reloj:', err);
+
         setNotification({ type: 'error', message: 'Error al eliminar el reloj' });
       } finally {
         setLoading(false);
@@ -938,37 +938,37 @@ export default function PoliticasProgramacion() {
   }, [relojes, selectedPolitica, selectedRelojInTable, showNotification]);
 
   const handleSaveReloj = useCallback(async (relojData, politicaFromForm = null) => {
-    console.log('🔍 handleSaveReloj - INICIO');
-    console.log('🔍 handleSaveReloj - relojData recibido:', relojData);
-    console.log('🔍 handleSaveReloj - relojFormMode:', relojFormMode);
-    console.log('🔍 handleSaveReloj - selectedPolitica:', selectedPolitica);
-    console.log('🔍 handleSaveReloj - politicaFromForm:', politicaFromForm);
+
+
+
+
+
     
     try {
       setLoading(true);
       
       // Usar la política del formulario si está disponible, sino usar selectedPolitica
       const politicaToUse = politicaFromForm || selectedPolitica;
-      console.log('🔍 handleSaveReloj - politicaToUse:', politicaToUse);
+
       
       let relojId;
       
       if (relojFormMode === 'new') {
-        console.log('🔍 handleSaveReloj - Modo: CREAR NUEVO RELOJ');
+
         // Crear nuevo reloj
         if (!politicaToUse || !politicaToUse.id) {
           const errorMsg = 'No se ha seleccionado una política válida. Por favor, guarde la política primero antes de crear el reloj.';
-          console.error('❌', errorMsg);
+
           setNotification({ type: 'error', message: errorMsg });
           return;
         }
         
-        console.log('🔍 handleSaveReloj - Llamando a relojesApi.create...');
-        console.log('🔍 handleSaveReloj - politicaId:', politicaToUse.id);
-        console.log('🔍 handleSaveReloj - relojData:', relojData);
+
+
+
         
         const newReloj = await relojesApi.create(politicaToUse.id, relojData);
-        console.log('✅ handleSaveReloj - Reloj creado exitosamente:', newReloj);
+
         relojId = newReloj.id;
         setNotification({ type: 'success', message: 'Reloj creado exitosamente' });
       } else {
@@ -982,7 +982,7 @@ export default function PoliticasProgramacion() {
           try {
             await eventosRelojApi.delete(evento.id);
           } catch (deleteError) {
-            console.error('Error al eliminar evento existente:', deleteError);
+
           }
         }
         
@@ -1004,7 +1004,7 @@ export default function PoliticasProgramacion() {
               categoria: evento.categoria,
               descripcion: evento.descripcion,
               duracion: evento.duracion,
-              numero_cancion: evento.numeroCancion || evento.numero_cancion || '-',
+numero_cancion: evento.numeroCancion || evento.numero_cancion || '-',
               sin_categorias: evento.sinCategorias || evento.sin_categorias || '-',
               id_media: evento.idMedia || evento.id_media,
               categoria_media: evento.categoriaMedia || evento.categoria_media,
@@ -1014,8 +1014,8 @@ export default function PoliticasProgramacion() {
             
             await eventosRelojApi.create(relojId, eventoData);
           } catch (eventoError) {
-            console.error('❌ Error al guardar evento:', eventoError);
-            console.error('❌ Detalles del error:', eventoError.response?.data);
+
+
             
             const errorMessage = formatErrorMessage(eventoError, 'Error al guardar evento');
             setNotification({ type: 'error', message: `Error al guardar evento: ${errorMessage}` });
@@ -1025,24 +1025,24 @@ export default function PoliticasProgramacion() {
       }
       
       // Recargar relojes de la política actual primero
-      console.log('🔄 Recargando lista de relojes...');
+
       if (selectedPolitica) {
         const relojesData = await relojesApi.getByPolitica(selectedPolitica.id);
         setRelojes(relojesData);
-        console.log('✅ Lista de relojes recargada');
+
       }
       
       // Limpiar estados después de recargar
-      console.log('🔄 Limpiando estados y cerrando formulario...');
+
       setShowRelojForm(false);
       setSelectedReloj(null);
       setRelojFormMode('new');
       setRelojEvents([]);
       setSelectedRelojInTable(null); // Limpiar selección de tabla
-      console.log('✅ Formulario cerrado, estados limpiados');
+
     } catch (err) {
-      console.error('❌ Error saving reloj:', err);
-      console.error('❌ Error details:', err.response?.data);
+
+
       
       const errorMessage = formatErrorMessage(err, 'Error al guardar el reloj');
       setNotification({ type: 'error', message: errorMessage });
@@ -1065,7 +1065,7 @@ export default function PoliticasProgramacion() {
           message: 'Día modelo eliminado correctamente'
         });
       } catch (err) {
-        console.error('Error deleting día modelo:', err);
+
         const errorMessage = err.response?.data?.detail || err.message || 'Error al eliminar el día modelo';
         setNotification({
           type: 'error',
@@ -1108,7 +1108,7 @@ export default function PoliticasProgramacion() {
       setSelectedDiaModelo(null);
       setDiaModeloFormMode('new');
     } catch (err) {
-      console.error('Error saving dia modelo:', err);
+
       
       const errorMessage = formatErrorMessage(err, 'Error al guardar el día modelo');
       setNotification({ type: 'error', message: errorMessage });
@@ -1137,7 +1137,7 @@ export default function PoliticasProgramacion() {
       
       return [hours, minutes, seconds];
     } catch (error) {
-      console.error('Error parsing time:', error);
+
       return [0, 0, 0];
     }
   }, []);
@@ -1193,7 +1193,7 @@ export default function PoliticasProgramacion() {
       
       return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}:${newSeconds.toString().padStart(2, '0')}`;
     } catch (error) {
-      console.error('Error al calcular offset:', error);
+
       return '00:00:00';
     }
   }, [relojEvents, parseTimeSafely]);
@@ -1235,8 +1235,8 @@ export default function PoliticasProgramacion() {
 
   // addEventToReloj debe definirse antes de handlePredefinedEventClick porque lo usa
   const addEventToReloj = useCallback((newEvent) => {
-    console.log('🔄 addEventToReloj - Evento recibido:', newEvent);
-    console.log('🔄 addEventToReloj - Estado actual de relojEvents:', relojEvents);
+
+
     
     setRelojEvents(prev => {
       // Calcular el offset correcto para el nuevo evento
@@ -1278,10 +1278,10 @@ export default function PoliticasProgramacion() {
       };
       
       const newState = [...prev, eventWithCorrectOffsets];
-      console.log('🔄 addEventToReloj - Nuevo estado de relojEvents:', newState);
+
       return newState;
     });
-    console.log('✅ Evento añadido al reloj:', newEvent);
+
   }, [relojEvents]);
 
   const handleEventClick = useCallback((eventType, eventName) => {
@@ -1332,10 +1332,10 @@ export default function PoliticasProgramacion() {
       const corteEncontrado = cortes.find(corte => corte.nombre === eventName);
       if (corteEncontrado) {
         duracion = corteEncontrado.duracion; // Usar la duración real del corte
-        console.log('🔍 Corte encontrado:', corteEncontrado);
-        console.log('🔍 Duración del corte:', duracion);
+
+
       } else {
-        console.warn('⚠️ Corte no encontrado:', eventName);
+
       }
     }
     
@@ -1401,7 +1401,7 @@ export default function PoliticasProgramacion() {
     // Añadir el evento a la tabla (addEventToReloj calculará los offsets automáticamente)
     addEventToReloj(newEvent);
     
-    console.log('Evento añadido al reloj:', newEvent);
+
     
     // Mostrar notificación de éxito
     setNotification({
@@ -1417,15 +1417,15 @@ export default function PoliticasProgramacion() {
       try {
         // Si el evento tiene un ID válido (no es temporal), eliminarlo de la BD
         if (eventId && typeof eventId === 'number') {
-          console.log('🔄 Eliminando evento de la base de datos:', eventId);
+
           await eventosRelojApi.delete(eventId);
-          console.log('✅ Evento eliminado de la base de datos');
+
           
           // Recargar relojes para actualizar la vista de lista
           if (selectedPolitica) {
             const relojesData = await relojesApi.getByPolitica(selectedPolitica.id);
             setRelojes(relojesData);
-            console.log('🔄 Relojes recargados después de eliminar evento');
+
           }
         }
         
@@ -1437,7 +1437,7 @@ export default function PoliticasProgramacion() {
           message: 'Evento eliminado correctamente'
         });
       } catch (error) {
-        console.error('❌ Error al eliminar evento:', error);
+
         setNotification({
           type: 'error',
           message: 'Error al eliminar el evento'
@@ -1526,7 +1526,7 @@ export default function PoliticasProgramacion() {
       {/* Notification Component */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 border-2 ${
-          notification.type === 'success'
+otification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-300 text-red-800'
         }`}>
@@ -2029,7 +2029,7 @@ export default function PoliticasProgramacion() {
                 getEventCategory={getEventCategory}
                 getNumeroCancion={getNumeroCancion}
                 onSave={(eventData) => {
-                  console.log('Guardando evento:', eventData);
+
                   setShowEventForm(false);
                   setSelectedEventType(null);
                   setEventFormData({
@@ -2104,9 +2104,9 @@ export default function PoliticasProgramacion() {
               const response = await fetch(buildApiUrl('/catalogos/general/cortes/?activo=true'));
               const data = await response.json();
               setCortes(data || []);
-              console.log('🔍 RelojForm - Cortes cargados:', data);
+
             } catch (error) {
-              console.error('Error al cargar cortes en RelojForm:', error);
+
               setCortes([]);
             } finally {
               setLoadingCortes(false);
@@ -2130,7 +2130,7 @@ export default function PoliticasProgramacion() {
           try {
             return timeString.split(':').map(Number);
           } catch (error) {
-            console.error('Error al parsear tiempo:', error);
+
             return [0, 0, 0];
           }
         };
@@ -2162,7 +2162,7 @@ export default function PoliticasProgramacion() {
         const tabs = [
           { 
             id: 0, 
-            name: 'Datos generales', 
+ame: 'Datos generales', 
             icon: (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2171,7 +2171,7 @@ export default function PoliticasProgramacion() {
           },
           { 
             id: 1, 
-            name: 'Eventos del reloj', 
+ame: 'Eventos del reloj', 
             icon: (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2189,20 +2189,20 @@ export default function PoliticasProgramacion() {
 
         const validateForm = () => {
           const newErrors = {};
-          if (!formData.clave) newErrors.clave = 'La clave es requerida';
-          if (!formData.nombre) newErrors.nombre = 'El nombre es requerido';
-          if (formData.perteneceGrupo && !formData.grupo) newErrors.grupo = 'El grupo es requerido cuando pertenece a un grupo';
+          if (!formData.clave) nnewErrors.clave = 'La clave es requerida';
+          if (!formData.nombre) nnewErrors.nombre = 'El nombre es requerido';
+          if (formData.perteneceGrupo && !formData.grupo) nnewErrors.grupo = 'El grupo es requerido cuando pertenece a un grupo';
           setErrors(newErrors);
           return Object.keys(newErrors).length === 0;
         };
 
         const handleSubmit = async () => {
-          console.log('🔍 RelojForm - handleSubmit INICIO');
-          console.log('🔍 RelojForm - formData actual:', formData);
-          console.log('🔍 RelojForm - relojEvents:', relojEvents);
+
+
+
           
           if (!validateForm()) {
-            console.log('❌ RelojForm - Validación falló');
+
             return;
           }
           
@@ -2217,15 +2217,15 @@ export default function PoliticasProgramacion() {
               duracion: '00:00:00'
             };
             
-            console.log('📦 DATOS A ENVIAR AL BACKEND:', JSON.stringify(relojDataForBackend, null, 2));
-            console.log('🔍 RelojForm - politica disponible:', politica);
-            console.log('🔍 RelojForm - Llamando a onSave...');
+
+
+
             
             // Llamar a la función onSave del componente padre, pasando también la política
             await onSave(relojDataForBackend, politica);
-            console.log('✅ RelojForm - onSave completado exitosamente');
+
           } catch (error) {
-            console.error('Error en RelojForm handleSubmit:', error);
+
           } finally {
             setIsLoading(false);
           }
@@ -2265,7 +2265,7 @@ export default function PoliticasProgramacion() {
                   <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
                     <input 
                       type="checkbox" 
-                      name="habilitado" 
+ame="habilitado" 
                       checked={formData.habilitado} 
                       onChange={handleChange} 
                       disabled={isReadOnly} 
@@ -2281,7 +2281,7 @@ export default function PoliticasProgramacion() {
                       </label>
                       <input 
                         type="text" 
-                        name="clave" 
+ame="clave" 
                         value={formData.clave || ''} 
                         onChange={handleChange} 
                         disabled={isReadOnly} 
@@ -2303,7 +2303,7 @@ export default function PoliticasProgramacion() {
                       <label className="block text-sm font-bold text-gray-700 mb-2">Número de Regla</label>
                       <input 
                         type="text" 
-                        name="numeroRegla" 
+ame="numeroRegla" 
                         value={formData.numeroRegla || ''} 
                         onChange={handleChange} 
                         disabled={isReadOnly} 
@@ -2316,7 +2316,7 @@ export default function PoliticasProgramacion() {
                       <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm mb-4">
                         <input 
                           type="checkbox" 
-                          name="perteneceGrupo" 
+ame="perteneceGrupo" 
                           checked={formData.perteneceGrupo} 
                           onChange={handleChange} 
                           disabled={isReadOnly} 
@@ -2329,7 +2329,7 @@ export default function PoliticasProgramacion() {
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-2">Grupo</label>
                           <select 
-                            name="grupo" 
+ame="grupo" 
                             value={formData.grupo || ''} 
                             onChange={handleChange} 
                             disabled={isReadOnly} 
@@ -2357,7 +2357,7 @@ export default function PoliticasProgramacion() {
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Descripción</label>
                       <textarea 
-                        name="descripcion" 
+ame="descripcion" 
                         value={formData.descripcion || ''} 
                         onChange={handleChange} 
                         readOnly={isReadOnly} 
@@ -2671,7 +2671,7 @@ export default function PoliticasProgramacion() {
                                 try {
                                   return timeString.split(':').map(Number);
                                 } catch (error) {
-                                  console.error('Error al parsear tiempo:', error);
+
                                   return [0, 0, 0];
                                 }
                               };
@@ -3080,7 +3080,7 @@ export default function PoliticasProgramacion() {
           try {
             return timeString.split(':').map(Number);
           } catch (error) {
-            console.error('Error al parsear tiempo:', error);
+
             return [0, 0, 0];
           }
         };
@@ -3092,15 +3092,15 @@ export default function PoliticasProgramacion() {
 
         const validateForm = () => {
           const newErrors = {};
-          if (!localFormData.consecutivo) newErrors.consecutivo = 'El consecutivo es requerido';
-          if (!localFormData.offset) newErrors.offset = 'El offset es requerido';
-          if (!localFormData.duracion) newErrors.duracion = 'La duración es requerida';
-          if (!localFormData.descripcion) newErrors.descripcion = 'La descripción es requerida';
+          if (!localFormData.consecutivo) nnewErrors.consecutivo = 'El consecutivo es requerido';
+          if (!localFormData.offset) nnewErrors.offset = 'El offset es requerido';
+          if (!localFormData.duracion) nnewErrors.duracion = 'La duración es requerida';
+          if (!localFormData.descripcion) nnewErrors.descripcion = 'La descripción es requerida';
           
           // Validación adicional para Cartucho Fijo
           if (eventType?.type === 'cartucho-fijo') {
-            if (!localFormData.idMedia) newErrors.idMedia = 'El ID Media es requerido';
-            if (!localFormData.categoria) newErrors.categoria = 'La categoría es requerida';
+            if (!localFormData.idMedia) nnewErrors.idMedia = 'El ID Media es requerido';
+            if (!localFormData.categoria) nnewErrors.categoria = 'La categoría es requerida';
           }
           
           
@@ -3117,7 +3117,7 @@ export default function PoliticasProgramacion() {
             // Crear el nuevo evento
             const newEvent = {
               id: relojEvents.length + 1,
-              numero: localFormData.consecutivo,
+numero: localFormData.consecutivo,
               offset: localFormData.offset,
               desdeETM: localFormData.offset,
               desdeCorte: localFormData.offset,
@@ -3126,7 +3126,7 @@ export default function PoliticasProgramacion() {
               categoria: eventType?.type === 'cartucho-fijo' ? localFormData.categoria : getEventCategory(eventType?.type || 'otros'),
               descripcion: localFormData.descripcion,
               duracion: localFormData.duracion,
-              numeroCancion: getNumeroCancion(eventType?.type || 'otros'),
+numeroCancion: getNumeroCancion(eventType?.type || 'otros'),
               sinCategorias: '-',
               // Campos adicionales para Cartucho Fijo
               ...(eventType?.type === 'cartucho-fijo' && {
@@ -3146,15 +3146,15 @@ export default function PoliticasProgramacion() {
             const finalMinutes = Math.floor((finalTotalSeconds % 3600) / 60);
             const finalSeconds = finalTotalSeconds % 60;
             
-            newEvent.offsetFinal = `${finalHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}:${finalSeconds.toString().padStart(2, '0')}`;
+ewEvent.offsetFinal = `${finalHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}:${finalSeconds.toString().padStart(2, '0')}`;
             
             // Añadir el evento a la tabla
             addEventToReloj(newEvent);
             
-            console.log('Evento añadido desde formulario:', newEvent);
+
             onSave(newEvent);
           } catch (error) {
-            console.error('Error al guardar:', error);
+
           } finally {
             setIsLoading(false);
           }
@@ -3208,7 +3208,7 @@ export default function PoliticasProgramacion() {
                     </label>
                     <input 
                       type="text" 
-                      name="consecutivo" 
+ame="consecutivo" 
                       value={localFormData.consecutivo || ''} 
                       onChange={handleChange} 
                       className={inputClass} 
@@ -3228,7 +3228,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="offsetHoras" 
+ame="offsetHoras" 
                             value={localFormData.offset ? parseInt(localFormData.offset.split(':')[0]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = e.target.value;
@@ -3255,7 +3255,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="offsetMinutos" 
+ame="offsetMinutos" 
                             value={localFormData.offset ? parseInt(localFormData.offset.split(':')[1]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.offset ? parseInt(localFormData.offset.split(':')[0]) || 0 : 0;
@@ -3282,7 +3282,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="offsetSegundos" 
+ame="offsetSegundos" 
                             value={localFormData.offset ? parseInt(localFormData.offset.split(':')[2]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.offset ? parseInt(localFormData.offset.split(':')[0]) || 0 : 0;
@@ -3321,7 +3321,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="duracionHoras" 
+ame="duracionHoras" 
                             value={localFormData.duracion ? parseInt(localFormData.duracion.split(':')[0]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = e.target.value;
@@ -3348,7 +3348,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="duracionMinutos" 
+ame="duracionMinutos" 
                             value={localFormData.duracion ? parseInt(localFormData.duracion.split(':')[1]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.duracion ? parseInt(localFormData.duracion.split(':')[0]) || 0 : 0;
@@ -3375,7 +3375,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="duracionSegundos" 
+ame="duracionSegundos" 
                             value={localFormData.duracion ? parseInt(localFormData.duracion.split(':')[2]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.duracion ? parseInt(localFormData.duracion.split(':')[0]) || 0 : 0;
@@ -3409,7 +3409,7 @@ export default function PoliticasProgramacion() {
                       Descripción <span className="text-red-500">*</span>
                     </label>
                     <textarea 
-                      name="descripcion" 
+ame="descripcion" 
                       value={localFormData.descripcion || ''} 
                       onChange={handleChange} 
                       rows="4" 
@@ -3437,7 +3437,7 @@ export default function PoliticasProgramacion() {
                         </label>
                         <input 
                           type="text" 
-                          name="idMedia" 
+ame="idMedia" 
                           value={localFormData.idMedia || ''} 
                           onChange={handleChange} 
                           className={inputClass} 
@@ -3453,7 +3453,7 @@ export default function PoliticasProgramacion() {
                           Categoría <span className="text-red-500">*</span>
                         </label>
                         <select 
-                          name="categoria" 
+ame="categoria" 
                           value={localFormData.categoria || ''} 
                           onChange={handleChange} 
                           className={inputClass} 
@@ -3650,7 +3650,7 @@ export default function PoliticasProgramacion() {
 
   // Debug: monitorear cambios en showReglaForm
   useEffect(() => {
-    console.log('🔍 showReglaForm cambió a:', showReglaForm);
+
   }, [showReglaForm]);
 
   // Funciones locales para manejar días modelo
@@ -3661,7 +3661,7 @@ export default function PoliticasProgramacion() {
 
   // Funciones para el formulario de reglas
   const handleNewReglaLocal = () => {
-    console.log('🔍 handleNewReglaLocal ejecutándose...');
+
     setSelectedRegla(null);
     setReglaFormMode('new');
     setReglaFormData({
@@ -3684,7 +3684,7 @@ export default function PoliticasProgramacion() {
       alert('Por favor, selecciona una regla para editar');
       return;
     }
-    console.log('🔍 handleEditReglaLocal - Regla seleccionada:', selectedRegla);
+
     setReglaFormMode('edit');
     setReglaFormData({
       tipoRegla: selectedRegla.tipo_regla || 'Separación Mínima',
@@ -3709,7 +3709,7 @@ export default function PoliticasProgramacion() {
       alert('Por favor, selecciona una regla para consultar');
       return;
     }
-    console.log('🔍 handleConsultarRegla - Regla seleccionada:', selectedRegla);
+
     setReglaFormMode('view');
     setReglaFormData({
       tipoRegla: selectedRegla.tipo_regla || 'Separación Mínima',
@@ -3741,7 +3741,7 @@ export default function PoliticasProgramacion() {
     
     try {
       await deleteRegla(selectedRegla.id);
-      console.log('✅ Regla eliminada exitosamente');
+
       
       // Recargar las reglas de la política
       await loadReglasPolitica(politica?.id || 1);
@@ -3750,7 +3750,7 @@ export default function PoliticasProgramacion() {
       setSelectedRegla(null);
       
     } catch (error) {
-      console.error('❌ Error al eliminar regla:', error);
+
       alert('Error al eliminar la regla. Por favor, inténtalo de nuevo.');
     }
   };
@@ -3787,7 +3787,7 @@ export default function PoliticasProgramacion() {
 
   const handleReglaSave = async () => {
     try {
-      console.log('💾 Guardando regla:', reglaFormData);
+
       
       // Preparar datos para enviar a la API
       const reglaData = {
@@ -3807,7 +3807,7 @@ export default function PoliticasProgramacion() {
       
       // Crear la regla
       const nuevaRegla = await createRegla(reglaData);
-      console.log('✅ Regla creada:', nuevaRegla);
+
       
       // Cerrar el modal y limpiar el formulario
       setShowReglaForm(false);
@@ -3822,14 +3822,14 @@ export default function PoliticasProgramacion() {
       });
       
       // Mostrar notificación de éxito
-      console.log('✅ Regla guardada exitosamente');
+
       
       // Recargar las reglas de la política
       await loadReglasPolitica(politica?.id || 1);
       
     } catch (error) {
-      console.error('❌ Error al guardar regla:', error);
-      console.error('❌ Error al guardar la regla. Por favor, inténtalo de nuevo.');
+
+
     }
   };
 
@@ -3850,7 +3850,7 @@ export default function PoliticasProgramacion() {
   const [formData, setFormData] = useState({
     clave: politica?.clave || '',
     difusora: politica?.difusora || '',
-    nombre: politica?.nombre || '',
+nombre: politica?.nombre || '',
     descripcion: politica?.descripcion || '',
     habilitada: politica?.habilitada ?? true,
     // Datos adicionales para los otros tabs
@@ -3880,10 +3880,10 @@ export default function PoliticasProgramacion() {
   // Actualizar formData cuando cambie la política
   useEffect(() => {
     if (politica) {
-      console.log('🔍 Política recibida en PoliticaForm:', politica);
-      console.log('🔍 Clave de la política:', politica.clave);
-      console.log('🔍 Nombre de la política:', politica.nombre);
-      console.log('🔍 Descripción de la política:', politica.descripcion);
+
+
+
+
       
       setFormData({
         clave: politica.clave || '',
@@ -3905,52 +3905,9 @@ export default function PoliticasProgramacion() {
         sabado: politica.sabado ? String(politica.sabado) : '',
         domingo: politica.domingo ? String(politica.domingo) : ''
       });
-      
-      console.log('🔍 FormData días modelo asignados:', {
-        lunes: politica.lunes ? String(politica.lunes) : '',
-        martes: politica.martes ? String(politica.martes) : '',
-        miercoles: politica.miercoles ? String(politica.miercoles) : '',
-        jueves: politica.jueves ? String(politica.jueves) : '',
-        viernes: politica.viernes ? String(politica.viernes) : '',
-        sabado: politica.sabado ? String(politica.sabado) : '',
-        domingo: politica.domingo ? String(politica.domingo) : ''
-      });
-      console.log('🔍 Valores específicos para formData:', {
-        lunes: politica.lunes ? String(politica.lunes) : '',
-        miercoles: politica.miercoles ? String(politica.miercoles) : ''
-      });
-      
-      console.log('🔍 FormData actualizado:', {
-        clave: politica.clave || '',
-        difusora: politica.difusora || '',
-        nombre: politica.nombre || '',
-        descripcion: politica.descripcion || ''
-      });
-      console.log('🔍 Días modelo por defecto desde DB:', {
-        lunes: politica.lunes,
-        martes: politica.martes,
-        miercoles: politica.miercoles,
-        jueves: politica.jueves,
-        viernes: politica.viernes,
-        sabado: politica.sabado,
-        domingo: politica.domingo
-      });
-      console.log('🔍 Valores específicos:', {
-        lunes: politica.lunes,
-        miercoles: politica.miercoles
-      });
-      console.log('🔍 Tipos de datos:', {
-        lunes: typeof politica.lunes,
-        martes: typeof politica.martes,
-        miercoles: typeof politica.miercoles,
-        jueves: typeof politica.jueves,
-        viernes: typeof politica.viernes,
-        sabado: typeof politica.sabado,
-        domingo: typeof politica.domingo
-      });
-      console.log('🔍 Difusoras disponibles:', difusoras);
-      console.log('🔍 Valor de difusora de la política:', politica.difusora);
-      console.log('🔍 ¿Existe la difusora en las opciones?', difusoras.some(d => d.value === politica.difusora));
+
+
+
     }
   }, [politica, difusoras]);
 
@@ -3962,10 +3919,28 @@ export default function PoliticasProgramacion() {
   // Cargar difusoras desde la API
   const loadDifusoras = async () => {
     try {
-      console.log('🔍 Cargando difusoras desde API...');
-      const response = await fetch(buildApiUrl('/catalogos/general/difusoras/'));
+      // Usar apiClient que incluye el token de autenticación
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
+      const response = await fetch(buildApiUrl('/catalogos/general/difusoras/'), {
+        headers: headers
+      });
+      
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('No tienes permisos para acceder a las difusoras. Por favor, inicia sesión.');
+        }
+        throw new Error(`Error al cargar difusoras: ${response.status}`);
+      }
+      
       const data = await response.json();
-      console.log('✅ Difusoras cargadas desde API:', data);
+
       
       // Mapear datos de la API al formato esperado por el select
       const difusorasMapeadas = data.map(difusora => ({
@@ -3981,7 +3956,7 @@ export default function PoliticasProgramacion() {
       
       setDifusoras(difusorasConTodas);
     } catch (err) {
-      console.error('❌ Error cargando difusoras:', err);
+
       setDifusoras([]);
     }
   };
@@ -3989,7 +3964,7 @@ export default function PoliticasProgramacion() {
   const tabs = [
     { 
       id: 0, 
-      name: 'Datos generales', 
+ame: 'Datos generales', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -3998,7 +3973,7 @@ export default function PoliticasProgramacion() {
     },
     { 
       id: 1, 
-      name: 'Reglas', 
+ame: 'Reglas', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -4008,7 +3983,7 @@ export default function PoliticasProgramacion() {
     },
     { 
       id: 2, 
-      name: 'Orden de asignación', 
+ame: 'Orden de asignación', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -4017,7 +3992,7 @@ export default function PoliticasProgramacion() {
     },
     { 
       id: 3, 
-      name: 'Relojes', 
+ame: 'Relojes', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -4026,7 +4001,7 @@ export default function PoliticasProgramacion() {
     },
     { 
       id: 4, 
-      name: 'Días modelo', 
+ame: 'Días modelo', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -4039,7 +4014,7 @@ export default function PoliticasProgramacion() {
     const newErrors = {};
     
     if (!formData.clave || formData.clave.trim() === '') {
-      newErrors.clave = 'La clave es obligatoria';
+newErrors.clave = 'La clave es obligatoria';
     } else {
       // Verificar si la clave ya existe en otra política
       const claveExistente = politicas.find(p => 
@@ -4047,16 +4022,16 @@ export default function PoliticasProgramacion() {
         p.id !== politica?.id
       );
       if (claveExistente) {
-        newErrors.clave = `La clave "${formData.clave.trim()}" ya existe en la política "${claveExistente.nombre || claveExistente.difusora}"`;
+        nnewErrors.clave = `La clave "${formData.clave.trim()}" ya existe en la política "${claveExistente.nombre || claveExistente.difusora}"`;
       }
     }
     
     if (!formData.difusora || formData.difusora.trim() === '') {
-      newErrors.difusora = 'La difusora es obligatoria';
+newErrors.difusora = 'La difusora es obligatoria';
     }
     
     if (!formData.nombre || formData.nombre.trim() === '') {
-      newErrors.nombre = 'El nombre es obligatorio';
+      nnewErrors.nombre = 'El nombre es obligatorio';
     }
     
     setErrors(newErrors);
@@ -4077,12 +4052,12 @@ export default function PoliticasProgramacion() {
         try {
           const categoriasNombres = categoriasSeleccionadas.map(c => typeof c === 'string' ? c : c.nombre)
           await guardarCategoriasPolitica(politica.id, categoriasNombres)
-          console.log('✅ Categorías de política guardadas:', categoriasNombres)
+
         } catch (err) {
-          console.error('Error guardando categorías de política:', err)
+
         }
       }
-      console.log('🔍 FormData antes de enviar:', formData);
+
       
       // Convertir cadenas vacías a null para los días modelo
       const formDataToSend = {
@@ -4096,20 +4071,9 @@ export default function PoliticasProgramacion() {
         domingo: formData.domingo === '' ? null : formData.domingo
       };
       
-      console.log('🔍 FormData después de limpiar:', formDataToSend);
-      console.log('🔍 Días modelo en formDataToSend:', {
-        lunes: formDataToSend.lunes,
-        martes: formDataToSend.martes,
-        miercoles: formDataToSend.miercoles,
-        jueves: formDataToSend.jueves,
-        viernes: formDataToSend.viernes,
-        sabado: formDataToSend.sabado,
-        domingo: formDataToSend.domingo
-      });
-      
       await onSave(formDataToSend);
     } catch (err) {
-      console.error('Error in form submission:', err);
+
     } finally {
       setIsLoading(false);
     }
@@ -4148,7 +4112,7 @@ export default function PoliticasProgramacion() {
             <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
               <input
                 type="checkbox"
-                name="habilitada"
+ame="habilitada"
                 checked={formData.habilitada}
                 onChange={handleChange}
                 disabled={isReadOnly}
@@ -4167,7 +4131,7 @@ export default function PoliticasProgramacion() {
                   </label>
                   <input
                     type="text"
-                    name="clave"
+ame="clave"
                     value={formData.clave || ''}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -4190,7 +4154,7 @@ export default function PoliticasProgramacion() {
                     Difusora <span className="text-red-500">*</span>
                   </label>
                   <select
-                    name="difusora"
+ame="difusora"
                     value={formData.difusora || ''}
                     onChange={handleChange}
                     disabled={isReadOnly}
@@ -4241,7 +4205,7 @@ export default function PoliticasProgramacion() {
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-2">Descripción</label>
                   <textarea
-                    name="descripcion"
+ame="descripcion"
                     value={formData.descripcion || ''}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -4264,7 +4228,7 @@ export default function PoliticasProgramacion() {
               <div className="flex space-x-2">
                 <button 
                   onClick={() => {
-                    console.log('🔍 Botón Añadir clickeado');
+
                     handleNewReglaLocal();
                   }}
                   className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -4542,7 +4506,7 @@ export default function PoliticasProgramacion() {
                             key={reloj.id} 
                             className={`${selectedRelojInTable?.id === reloj.id ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm' : ''} hover:bg-gray-50 cursor-pointer transition-all duration-150`}
                             onClick={() => {
-                              console.log('🔄 Reloj seleccionado en tabla:', reloj);
+
                               setSelectedRelojInTable(reloj);
                             }}
                             onDoubleClick={() => handleEditReloj(reloj)}
@@ -4642,7 +4606,7 @@ export default function PoliticasProgramacion() {
                           try {
                             return timeString.split(':').map(Number);
                           } catch (error) {
-                            console.error('Error al parsear tiempo:', error);
+
                             return [0, 0, 0];
                           }
                         };
@@ -5238,7 +5202,7 @@ export default function PoliticasProgramacion() {
               setShowDiaModeloForm(false);
               setEditingDiaModeloIndex(null);
             } catch (error) {
-              console.error('Error al guardar día modelo:', error);
+
             }
           }}
           onCancel={() => {
@@ -5249,10 +5213,10 @@ export default function PoliticasProgramacion() {
       )}
 
       {/* Modal Independiente de Nueva Regla */}
-      {console.log('🔍 Verificando showReglaForm:', showReglaForm)}
+
       {showReglaForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200">
-          {console.log('🔍 Modal independiente de nueva regla renderizándose...')}
+
           <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 w-[95vw] max-w-[1400px] h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100">
             {/* Enhanced Header */}
             <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-6 py-4 relative overflow-hidden border-b border-blue-800/20">
@@ -5539,7 +5503,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
     habilitado: diaModelo?.habilitado ?? true,
     difusora: diaModelo?.difusora || 'RADIO_1', // Valor por defecto
     clave: diaModelo?.clave || '',
-    nombre: diaModelo?.nombre || '',
+nombre: diaModelo?.nombre || '',
     descripcion: diaModelo?.descripcion || '',
     lunes: diaModelo?.lunes ?? false,
     martes: diaModelo?.martes ?? false,
@@ -5604,7 +5568,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
   const tabs = [
     { 
       id: 0, 
-      name: 'Datos generales', 
+ame: 'Datos generales', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -5613,7 +5577,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
     },
     { 
       id: 1, 
-      name: 'Relojes que forman el día modelo', 
+ame: 'Relojes que forman el día modelo', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -5627,13 +5591,13 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.difusora) newErrors.difusora = 'La difusora es requerida';
-    if (!formData.clave) newErrors.clave = 'La clave es requerida';
-    if (!formData.nombre) newErrors.nombre = 'El nombre es requerido';
+    if (!formData.difusora) nnewErrors.difusora = 'La difusora es requerida';
+    if (!formData.clave) nnewErrors.clave = 'La clave es requerida';
+    if (!formData.nombre) nnewErrors.nombre = 'El nombre es requerido';
     
     // Verificar que al menos un reloj esté seleccionado
     if (relojesDiaModelo.length === 0) {
-      newErrors.relojes = 'Debe seleccionar al menos un reloj para el día modelo';
+newErrors.relojes = 'Debe seleccionar al menos un reloj para el día modelo';
     }
     
     // Verificar nombres duplicados dentro de la misma política
@@ -5644,7 +5608,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
       );
       
       if (nombreExistente) {
-        newErrors.nombre = 'Ya existe un día modelo con este nombre en la política';
+newErrors.nombre = 'Ya existe un día modelo con este nombre en la política';
       }
     }
     
@@ -5663,11 +5627,11 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
         relojes: relojesDiaModelo.map(reloj => reloj.id)
       };
       
-      console.log('📦 Datos a guardar día modelo:', dataToSave);
+
       await onSave(dataToSave);
-      console.log('✅ Día modelo guardado exitosamente');
+
     } catch (error) {
-      console.error('❌ Error al guardar día modelo:', error);
+
     } finally {
       setIsLoading(false);
     }
@@ -5690,12 +5654,12 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
       if (nombreExistente) {
         setErrors(prev => ({
           ...prev,
-          nombre: 'Ya existe un día modelo con este nombre en la política'
+nombre: 'Ya existe un día modelo con este nombre en la política'
         }));
       } else {
         setErrors(prev => {
           const newErrors = { ...prev };
-          delete newErrors.nombre;
+          delete nnewErrors.nombre;
           return newErrors;
         });
       }
@@ -5806,7 +5770,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                     <input
                       type="checkbox"
                       id="habilitado"
-                      name="habilitado"
+ame="habilitado"
                       checked={formData.habilitado}
                       onChange={handleChange}
                       disabled={isReadOnly}
@@ -5834,7 +5798,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                 </label>
                 <input
                   type="text"
-                  name="clave"
+ame="clave"
                   value={formData.clave || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}
@@ -5863,7 +5827,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                 </label>
                 <input
                   type="text"
-                  name="nombre"
+ame="nombre"
                   value={formData.nombre || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}
@@ -5890,7 +5854,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                   <span>Descripción</span>
                 </label>
                 <textarea
-                  name="descripcion"
+ame="descripcion"
                   value={formData.descripcion || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}

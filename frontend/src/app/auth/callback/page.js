@@ -37,7 +37,7 @@ function CallbackContent() {
         // Redirigir a la página principal
         router.push('/');
       } catch (err) {
-        console.error('Error en callback:', err);
+
         setError(err.message || 'Error al procesar la autenticación');
         setTimeout(() => {
           router.push('/auth/login');

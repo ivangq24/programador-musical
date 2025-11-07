@@ -46,7 +46,7 @@ export default function AsignarDifusorasModal({ usuario, difusoras = [], onClose
           try {
             await usuariosApi.removerDifusora(usuario.id, id)
           } catch (err) {
-            console.warn('Error removiendo difusora:', err)
+
           }
         }
       }
@@ -62,7 +62,7 @@ export default function AsignarDifusorasModal({ usuario, difusoras = [], onClose
         onSuccess()
       }, 1000)
     } catch (err) {
-      console.error('Error asignando difusoras:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al asignar difusoras')
     } finally {
       setLoading(false)

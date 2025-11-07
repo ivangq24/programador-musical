@@ -34,7 +34,7 @@ export default function MantenimientoCategorias() {
       const data = await listCategoriasStats()
       setCategorias(data || [])
     } catch (err) {
-      console.error('Error cargando categorías:', err)
+
       setCategorias([])
     } finally {
       setLoading(false)
@@ -47,7 +47,7 @@ export default function MantenimientoCategorias() {
       const d = await getDifusoras()
       setDifusoras(d || [])
     } catch (err) {
-      console.error('Error cargando difusoras:', err)
+
       setDifusoras([])
     }
   }, [])
@@ -92,7 +92,7 @@ export default function MantenimientoCategorias() {
     setForm({ 
       difusora: cat.difusora || '', 
       clave: cat.clave || '', 
-      nombre: cat.nombre || '', 
+ombre: cat.nombre || '', 
       descripcion: cat.descripcion || '', 
       activa: !!cat.activa 
     })
@@ -104,7 +104,7 @@ export default function MantenimientoCategorias() {
         const els = await getElementosCategoria(cat.id)
         setElementos(els || [])
       } catch (err) {
-        console.error('Error cargando elementos:', err)
+
         setElementos([])
       }
     })()
@@ -193,7 +193,7 @@ export default function MantenimientoCategorias() {
       {/* Notification Component */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 ${
-          notification.type === 'success'
+otification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 text-red-800'
         }`}>

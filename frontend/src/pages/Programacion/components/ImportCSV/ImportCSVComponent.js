@@ -215,7 +215,7 @@ export default function ImportCSVComponent({ onBack }) {
       }
       
     } catch (err) {
-      console.error('Error importing:', err)
+
       setError('Error al importar datos: ' + (err.response?.data?.detail || err.message))
       setSuccess(false)
     } finally {
@@ -246,7 +246,7 @@ export default function ImportCSVComponent({ onBack }) {
       setSuccess(true)
       setError(null)
     } catch (error) {
-      console.error('Error downloading template:', error)
+
       setError('Error al descargar la plantilla: ' + error.message)
     } finally {
       setLoading(false)

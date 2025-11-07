@@ -7,7 +7,7 @@ import { X, UserPlus, Mail, User, Shield, Building, Loader2, AlertCircle, CheckC
 export default function InvitarUsuarioForm({ onClose, onSuccess, difusoras = [] }) {
   const [formData, setFormData] = useState({
     email: '',
-    nombre: '',
+ombre: '',
     rol: 'operador',
     difusoras_ids: []
   })
@@ -47,7 +47,7 @@ export default function InvitarUsuarioForm({ onClose, onSuccess, difusoras = [] 
       setSuccess(response.message)
       // No llamar onSuccess inmediatamente, esperar a que el usuario copie la contraseña
     } catch (err) {
-      console.error('Error invitando usuario:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al invitar usuario')
     } finally {
       setLoading(false)
@@ -56,7 +56,7 @@ export default function InvitarUsuarioForm({ onClose, onSuccess, difusoras = [] 
   
   const handleCopyPassword = () => {
     if (temporaryPassword) {
-      navigator.clipboard.writeText(temporaryPassword)
+avigator.clipboard.writeText(temporaryPassword)
       alert('Contraseña copiada al portapapeles')
     }
   }
@@ -177,7 +177,7 @@ export default function InvitarUsuarioForm({ onClose, onSuccess, difusoras = [] 
                 </label>
                 <input
                   type="email"
-                  name="email"
+ame="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
@@ -194,7 +194,7 @@ export default function InvitarUsuarioForm({ onClose, onSuccess, difusoras = [] 
                 </label>
                 <input
                   type="text"
-                  name="nombre"
+ame="nombre"
                   value={formData.nombre}
                   onChange={handleChange}
                   required

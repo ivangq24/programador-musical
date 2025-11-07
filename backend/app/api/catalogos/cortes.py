@@ -34,7 +34,7 @@ async def get_cortes(
         cortes = query.offset(skip).limit(limit).all()
         return cortes
     except Exception as e:
-        print(f"Error en get_cortes: {e}")
+
         return []
 
 # Obtener un corte específico
@@ -49,7 +49,7 @@ async def get_corte(corte_id: int, db: Session = Depends(get_db)):
 @router.post("/", response_model=Corte)
 async def create_corte(corte: CorteCreate, db: Session = Depends(get_db)):
     db_corte = CorteModel(
-        nombre=corte.nombre,
+ombre=corte.nombre,
         descripcion=corte.descripcion,
         duracion=corte.duracion,
         tipo=corte.tipo,

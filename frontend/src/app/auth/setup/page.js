@@ -33,7 +33,7 @@ export default function SetupPage() {
       
       setChecking(false);
     } catch (err) {
-      console.error('Error verificando setup:', err);
+
       setChecking(false);
     }
   };
@@ -61,7 +61,7 @@ export default function SetupPage() {
     try {
       const response = await apiClient.post('/auth/create-first-admin', {
         email,
-        nombre: name,
+ombre: name,
         password,
         confirm_password: confirmPassword,
       });
@@ -84,7 +84,7 @@ export default function SetupPage() {
         }
       }, 2000);
     } catch (err) {
-      console.error('Error al crear administrador:', err);
+
       setError(err.message || 'Error al crear el administrador');
     } finally {
       setLoading(false);

@@ -2,14 +2,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from datetime import date, datetime
 from uuid import UUID
-import logging
 import uuid
 
 from app.models.programacion import Programacion as ProgramacionModel
 from app.models.catalogos import Difusora as DifusoraModel
 from app.models.programacion import PoliticaProgramacion as PoliticaProgramacionModel
-
-logger = logging.getLogger(__name__)
 
 class LogfilesService:
     """Servicio para manejar la lógica de negocio de generación de logfiles"""
@@ -100,7 +97,6 @@ class LogfilesService:
             }
             
         except Exception as e:
-            logger.error(f"Error en generar_logfile_dia: {str(e)}")
             raise
     
     def _generar_contenido_logfile(self, programacion, difusora, fecha):

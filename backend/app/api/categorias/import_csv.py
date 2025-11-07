@@ -48,7 +48,7 @@ async def validate_csv(
             # Validar que la categoría existe
             if row.get('categoria'):
                 categoria = db.query(Categoria).filter(
-                    Categoria.nombre == row['categoria']
+                    Categoria.nnombre == row['categoria']
                 ).first()
                 if not categoria:
                     row_errors.append(f"Categoría '{row['categoria']}' no existe")
@@ -119,7 +119,7 @@ async def import_canciones(
                 
                 db.add(nueva_cancion)
                 db.flush()  # Flush to get the ID
-                print(f"Canción agregada a la sesión: {nueva_cancion.titulo} - {nueva_cancion.artista}")
+
                 imported_count += 1
                 
             except Exception as e:
@@ -133,15 +133,15 @@ async def import_canciones(
         # Commit all changes at once
         try:
             db.commit()
-            print(f"Commit exitoso: {imported_count} canciones importadas")
+
             
             # Verify the data was actually saved
             saved_count = db.query(Cancion).count()
-            print(f"Total canciones en DB después del commit: {saved_count}")
+
             
         except Exception as e:
             db.rollback()
-            print(f"Error en commit: {str(e)}")
+
             raise e
         
         return {

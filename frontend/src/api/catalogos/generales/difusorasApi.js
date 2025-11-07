@@ -22,7 +22,7 @@ const apiRequest = async (endpoint, options = {}) => {
     
     return await response.json();
   } catch (error) {
-    console.error('API Error:', error);
+
     throw error;
   }
 };
@@ -110,7 +110,7 @@ export const exportDifusorasToCSV = async (params = {}) => {
     
     return { success: true, message: 'Exportación CSV completada' };
   } catch (error) {
-    console.error('Error exporting CSV:', error);
+
     throw new Error(`Error al exportar CSV: ${error.message}`);
   }
 };

@@ -78,7 +78,7 @@ export const ProgramacionSection = ({ onItemClick }) => {
             <button 
               key={itemIndex} 
               onClick={() => {
-                console.log('Programacion button clicked:', item.id, item.name)
+
                 onItemClick && onItemClick(item.id)
               }}
               className={`group relative bg-white rounded-2xl shadow-xl border-2 border-gray-200 hover:border-gray-300 hover:shadow-2xl transition-all duration-300 text-left overflow-hidden transform hover:scale-[1.02] hover:-translate-y-2`}

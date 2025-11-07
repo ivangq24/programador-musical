@@ -27,7 +27,7 @@ export default function EventosReloj({ onSave, onCancel, categoriasPolitica = []
   const [loadingCortes, setLoadingCortes] = useState(false)
 
   // Debug: Verificar las categorías recibidas
-  console.log('🔍 EventosReloj - categoriasPolitica recibidas:', categoriasPolitica)
+
 
   // Cargar cortes desde la base de datos
   useEffect(() => {
@@ -36,9 +36,9 @@ export default function EventosReloj({ onSave, onCancel, categoriasPolitica = []
       try {
         const response = await getCortes({ activo: true })
         setCortes(response || [])
-        console.log('🔍 EventosReloj - Cortes cargados:', response)
+
       } catch (error) {
-        console.error('Error al cargar cortes:', error)
+
         setCortes([])
       } finally {
         setLoadingCortes(false)
@@ -51,14 +51,14 @@ export default function EventosReloj({ onSave, onCancel, categoriasPolitica = []
   // Usar las categorías de la política en lugar de cargar todas
   const categorias = categoriasPolitica.map((categoria, index) => ({
     id: index + 1,
-    nombre: categoria,
+ombre: categoria,
     activa: true,
     tipo: 'cancion'
   }))
 
-  console.log('🔍 EventosReloj - categorias mapeadas:', categorias)
-  console.log('🔍 EventosReloj - cortes cargados:', cortes)
-  console.log('🔍 EventosReloj - loadingCortes:', loadingCortes)
+
+
+
 
   const agregarEvento = (categoria) => {
     const nuevoEvento = {
@@ -179,7 +179,7 @@ export default function EventosReloj({ onSave, onCancel, categoriasPolitica = []
                     </div>
                   ) : (
                     categorias.map((categoria) => {
-                      console.log('🔍 EventosReloj - Renderizando categoría:', categoria);
+
                       return (
                         <button
                           key={categoria.id}

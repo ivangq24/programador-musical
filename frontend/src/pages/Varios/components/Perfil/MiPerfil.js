@@ -41,7 +41,7 @@ export default function MiPerfil() {
       const data = await usuariosApi.getMyProfile()
       setProfile(data)
     } catch (err) {
-      console.error('Error cargando perfil:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al cargar perfil')
     } finally {
       setLoading(false)

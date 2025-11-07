@@ -38,7 +38,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       const data = await getDifusoras({});
       setDifusoras(data);
     } catch (err) {
-      console.error('Error loading difusoras:', err);
+
       setError(err.message);
       setDifusoras([]);
     } finally {
@@ -52,7 +52,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       const statsData = await getDifusorasStats();
       setStats(statsData);
     } catch (err) {
-      console.error('Error loading stats:', err);
+
       // Fallback: usar calculatedStats que ya está memoizado
       // No necesitamos actualizar stats aquí, calculatedStats se actualiza automáticamente
     }
@@ -150,7 +150,7 @@ export default function Difusoras({ onDifusoraSelect }) {
         // Actualizar estado local en lugar de recargar todo
         setDifusoras(prev => prev.filter(d => d.id !== id));
       } catch (err) {
-        console.error('Error deleting difusora:', err);
+
         showNotification(`Error al eliminar la difusora: ${err.message}`, 'error');
       }
     }
@@ -176,7 +176,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       await exportDifusorasToCSV(params);
       showNotification('Exportación CSV completada', 'success');
     } catch (err) {
-      console.error('Error exporting CSV:', err);
+
       showNotification(`Error al exportar CSV: ${err.message}`, 'error');
     }
   }, [showOnlyActive, searchTerm, showNotification]);
@@ -209,7 +209,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       setSelectedDifusora(null);
       setFormMode('new');
     } catch (err) {
-      console.error('Error saving difusora:', err);
+
       showNotification(`Error al guardar la difusora: ${err.message}`, 'error');
     }
   }, [formMode, selectedDifusora, showNotification]);
@@ -231,7 +231,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       {/* Notification Component - Outside main container to ensure it's always on top */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 ${
-          notification.type === 'success'
+otification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 text-red-800'
         }`}>
@@ -593,7 +593,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
 
   const [formData, setFormData] = useState({
     siglas: difusora?.siglas || '',
-    nombre: difusora?.nombre || '',
+ombre: difusora?.nombre || '',
     slogan: difusora?.slogan || '',
     orden: difusora?.orden?.toString() || '',
     mascaraMedidas: difusora?.mascara_medidas || difusora?.mascaraMedidas || '',
@@ -611,17 +611,17 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
     const newErrors = {};
     
     if (!formData.siglas || formData.siglas.trim() === '') {
-      newErrors.siglas = 'Las siglas son obligatorias';
+ewErrors.siglas = 'Las siglas son obligatorias';
     }
     
     if (!formData.nombre || formData.nombre.trim() === '') {
-      newErrors.nombre = 'El nombre es obligatorio';
+ewErrors.nombre = 'El nombre es obligatorio';
     }
     
     if (!formData.orden || formData.orden.trim() === '') {
-      newErrors.orden = 'El orden es obligatorio';
+ewErrors.orden = 'El orden es obligatorio';
     } else if (isNaN(parseInt(formData.orden))) {
-      newErrors.orden = 'El orden debe ser un número';
+ewErrors.orden = 'El orden debe ser un número';
     }
     
     setErrors(newErrors);
@@ -644,7 +644,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
 
       await onSave(dataToSave);
     } catch (err) {
-      console.error('Error in form submission:', err);
+
     } finally {
       setIsLoading(false);
     }
@@ -716,7 +716,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
             <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
               <input
                 type="checkbox"
-                name="activa"
+ame="activa"
                 checked={formData.activa}
                 onChange={handleChange}
                 disabled={isReadOnly}
@@ -734,7 +734,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
                   </label>
                   <input
                     type="text"
-                    name="siglas"
+ame="siglas"
                     value={formData.siglas}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -756,7 +756,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
                   </label>
                   <input
                     type="text"
-                    name="nombre"
+ame="nombre"
                     value={formData.nombre}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -778,7 +778,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
                   </label>
                   <input
                     type="text"
-                    name="slogan"
+ame="slogan"
                     value={formData.slogan}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -793,7 +793,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
                   </label>
                   <input
                     type="number"
-                    name="orden"
+ame="orden"
                     value={formData.orden}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -816,7 +816,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
                   </label>
                   <input
                     type="text"
-                    name="mascaraMedidas"
+ame="mascaraMedidas"
                     value={formData.mascaraMedidas}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -830,7 +830,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
                     Descripción
                   </label>
                   <textarea
-                    name="descripcion"
+ame="descripcion"
                     value={formData.descripcion}
                     onChange={handleChange}
                     readOnly={isReadOnly}

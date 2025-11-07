@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { buildApiUrl } from '../../../../utils/apiConfig'
 
-// Helper para logging condicional - solo en desarrollo
-const debugLog = (...args) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(...args)
-  }
-}
 import { 
   Calendar, 
   Clock, 
@@ -62,7 +56,7 @@ const ConsultarProgramacionComponent = ({
     cortes_comerciales: '#10b981',
     exact_time_markers: '#6b7280',
     cartuchos_fijos: '#8b5cf6',
-    notas_operador: '#fbbf24',
+otas_operador: '#fbbf24',
     vacios: '#3b82f6',
     twofers: '#06b6d4',
     caracteristica_especifica: '#84cc16',
@@ -88,24 +82,11 @@ const ConsultarProgramacionComponent = ({
     }
   }, [isOpen, difusora, politica, fecha])
 
-  // Debug: Log cuando showSongSelector cambie - Solo en desarrollo
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && showSongSelector) {
-      debugLog('🎵 Modal de selección de canciones está visible')
-    }
-  }, [showSongSelector])
 
   const cargarProgramacion = async () => {
     try {
       setLoading(true)
       setError(null)
-      
-      debugLog('🔍 ConsultarProgramacionComponent - Parámetros recibidos:', {
-        isOpen,
-        difusora,
-        politica,
-        fecha
-      })
       
       // Convertir fecha de YYYY-MM-DD a DD/MM/YYYY
       let fechaFormateada
@@ -119,8 +100,8 @@ const ConsultarProgramacionComponent = ({
         throw new Error('Formato de fecha inválido')
       }
       
-      console.log('🔍 Fecha original:', fecha)
-      console.log('🔍 Fecha formateada:', fechaFormateada)
+
+
       
       const params = new URLSearchParams({
         difusora: difusora,
@@ -129,7 +110,7 @@ const ConsultarProgramacionComponent = ({
       })
       
       const url = buildApiUrl(`/programacion/programacion-detallada?${params}`)
-      console.log('🔍 URL completa:', url)
+
       
       const response = await fetch(url, {
         cache: 'no-store',
@@ -138,23 +119,23 @@ const ConsultarProgramacionComponent = ({
         }
       })
       
-      console.log('🔍 Response status:', response.status)
-      console.log('🔍 Response ok:', response.ok)
+
+
       
       if (response.ok) {
         const data = await response.json()
         setProgramacion(data)
-        debugLog('✅ Programación detallada cargada:', data)
-        debugLog('✅ Total eventos:', data.total_eventos)
-        debugLog('✅ Programación array length:', data.programacion ? data.programacion.length : 'undefined')
+
+
+
       } else {
         const errorData = await response.json()
-        console.error('❌ Error response:', errorData)
+
         throw new Error(`Error al cargar programación: ${errorData.detail || response.statusText}`)
       }
       
     } catch (err) {
-      console.error('Error loading programacion:', err)
+
       setError(err.message)
     } finally {
       setLoading(false)
@@ -186,12 +167,12 @@ const ConsultarProgramacionComponent = ({
   }
 
   const handleEditSong = (evento) => {
-    console.log('🎵 handleEditSong llamado con evento:', evento)
-    console.log('🎵 Tipo de evento:', evento.tipo)
-    console.log('🎵 Categoría del evento:', evento.categoria)
+
+
+
     setEditingEvent(evento)
     setShowSongSelector(true)
-    console.log('🎵 showSongSelector establecido a true')
+
     cargarCancionesDisponibles(evento.categoria)
   }
 
@@ -200,7 +181,7 @@ const ConsultarProgramacionComponent = ({
       setLoadingSongs(true)
       setSongsError(null)
       setAvailableSongs([])
-      console.log('🔍 Cargando canciones para categoría:', categoria)
+
       
       // Primero intentar cargar todas las categorías disponibles
       let todasLasCanciones = []
@@ -216,7 +197,7 @@ const ConsultarProgramacionComponent = ({
         })
         if (categoriasResponse.ok) {
           const categoriasData = await categoriasResponse.json()
-          console.log('✅ Categorías disponibles:', categoriasData)
+
           
           // Guardar categorías para el dropdown
           setCategoriasDisponibles(categoriasData.map(cat => ({ id: cat.id, nombre: cat.nombre })))
@@ -242,17 +223,17 @@ const ConsultarProgramacionComponent = ({
               }
               return []
             } catch (err) {
-              console.error(`Error cargando canciones de categoría ${cat.nombre}:`, err)
+
               return []
             }
           })
           
           const resultados = await Promise.all(promesasCanciones)
           todasLasCanciones = resultados.flat()
-          console.log('✅ Total canciones cargadas de todas las categorías:', todasLasCanciones.length)
+
         }
       } catch (err) {
-        console.warn('⚠️ Error cargando categorías, intentando carga directa:', err)
+
         
         // Fallback: cargar canciones sin filtro de categoría
         try {
@@ -272,7 +253,7 @@ const ConsultarProgramacionComponent = ({
             }))
           }
         } catch (fallbackErr) {
-          console.error('❌ Error en fallback:', fallbackErr)
+
         }
       }
       
@@ -280,13 +261,13 @@ const ConsultarProgramacionComponent = ({
         setAvailableSongs(todasLasCanciones)
         setSearchTerm('') // Limpiar búsqueda inicial
         setSelectedCategory(categoria || '') // Filtrar por categoría inicial si se proporciona
-        console.log('✅ Canciones disponibles:', todasLasCanciones.length)
+
       } else {
         setSongsError('No se encontraron canciones disponibles')
         setAvailableSongs([])
       }
     } catch (err) {
-      console.error('❌ Error loading songs:', err)
+
       setSongsError(`Error de conexión: ${err.message}`)
       setAvailableSongs([])
     } finally {
@@ -296,7 +277,7 @@ const ConsultarProgramacionComponent = ({
 
   const handleSongChange = async (nuevaCancion) => {
     try {
-      console.log('🔍 Cambiando canción:', editingEvent, 'por:', nuevaCancion)
+
       
       // Actualizar en la base de datos
       const url = buildApiUrl(`/programacion/programacion/${editingEvent.id}/cancion?cancion_id=${nuevaCancion.id}`)
@@ -313,7 +294,7 @@ const ConsultarProgramacionComponent = ({
       }
       
       const updatedData = await response.json()
-      console.log('✅ Canción actualizada en la base de datos:', updatedData)
+
       
       // Actualizar el estado local con los datos de la respuesta
       setProgramacion(prev => ({
@@ -348,7 +329,7 @@ const ConsultarProgramacionComponent = ({
         setSuccessMessage('')
       }, 3000)
     } catch (err) {
-      console.error('❌ Error updating song:', err)
+
       setError(err.message)
       // No cerrar el modal si hay error para que el usuario pueda intentar de nuevo
     }

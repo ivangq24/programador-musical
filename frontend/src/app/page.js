@@ -168,7 +168,7 @@ export default function Home() {
                     {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
                   </div>
                   <div className="text-sm">
-                    <div className="font-medium text-gray-700">{user.name || user.email}</div>
+                    <div className="font-medium text-gray-700">{user.name || 'Usuario'}</div>
                     <div className="text-xs text-gray-500 capitalize">{user.rol}</div>
                   </div>
                 </div>

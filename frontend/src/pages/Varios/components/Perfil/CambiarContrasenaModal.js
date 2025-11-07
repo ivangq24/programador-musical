@@ -7,7 +7,7 @@ import { X, Lock, Loader2, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-
 export default function CambiarContrasenaModal({ onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     current_password: '',
-    new_password: '',
+ew_password: '',
     confirm_password: ''
   })
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
@@ -57,7 +57,7 @@ export default function CambiarContrasenaModal({ onClose, onSuccess }) {
         onSuccess()
       }, 1500)
     } catch (err) {
-      console.error('Error cambiando contraseña:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al cambiar contraseña')
     } finally {
       setLoading(false)
@@ -105,7 +105,7 @@ export default function CambiarContrasenaModal({ onClose, onSuccess }) {
                 <div className="relative">
                   <input
                     type={showCurrentPassword ? 'text' : 'password'}
-                    name="current_password"
+ame="current_password"
                     value={formData.current_password}
                     onChange={handleChange}
                     required
@@ -134,7 +134,7 @@ export default function CambiarContrasenaModal({ onClose, onSuccess }) {
                 <div className="relative">
                   <input
                     type={showNewPassword ? 'text' : 'password'}
-                    name="new_password"
+ame="new_password"
                     value={formData.new_password}
                     onChange={handleChange}
                     required
@@ -167,7 +167,7 @@ export default function CambiarContrasenaModal({ onClose, onSuccess }) {
                 <div className="relative">
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
-                    name="confirm_password"
+ame="confirm_password"
                     value={formData.confirm_password}
                     onChange={handleChange}
                     required

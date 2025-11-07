@@ -57,7 +57,7 @@ function VerifyEmailContent() {
           }
         }
       } catch (err) {
-        console.error('Error en verificación:', err);
+
         setStatus('error');
         setMessage('Error al procesar la verificación. Intenta nuevamente.');
       }

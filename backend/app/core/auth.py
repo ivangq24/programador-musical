@@ -11,14 +11,11 @@ from sqlalchemy import and_
 import requests
 import json
 from functools import wraps
-import logging
 
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.auth import Usuario, UsuarioDifusora
 from app.models.catalogos import Difusora
-
-logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
@@ -32,7 +29,7 @@ class CognitoAuth:
         self.region = settings.COGNITO_REGION or "us-east-1"
         
         if not self.user_pool_id or not self.client_id:
-            logger.warning("Cognito no configurado. Autenticación deshabilitada.")
+
             self.enabled = False
             self.cognito_client = None
             self.ses_client = None
@@ -45,21 +42,14 @@ class CognitoAuth:
                 try:
                     self.ses_client = boto3.client('ses', region_name=self.region)
                 except Exception as e:
-                    logger.warning(f"Error inicializando cliente de SES: {e}")
                     self.ses_client = None
                 # Verificar que las credenciales funcionan
                 try:
                     self.cognito_client.describe_user_pool(UserPoolId=self.user_pool_id)
                 except Exception as e:
-                    logger.warning(f"Cognito configurado pero sin credenciales válidas: {e}")
-                    logger.warning("El sistema funcionará en modo desarrollo sin Cognito")
-                    self.enabled = False
                     self.cognito_client = None
                     self.ses_client = None
             except Exception as e:
-                logger.warning(f"Error inicializando cliente de Cognito: {e}")
-                logger.warning("El sistema funcionará en modo desarrollo sin Cognito")
-                self.enabled = False
                 self.cognito_client = None
                 self.ses_client = None
     
@@ -70,7 +60,6 @@ class CognitoAuth:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logger.error(f"Error obteniendo JWKS: {e}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Error de configuración de autenticación"
@@ -80,7 +69,7 @@ class CognitoAuth:
         """Verifica el token JWT de Cognito"""
         if not self.enabled:
             # En desarrollo, si Cognito no está configurado, permitir acceso
-            logger.warning("Cognito deshabilitado - modo desarrollo")
+
             return {
                 "sub": "dev-user",
                 "email": "dev@example.com",
@@ -140,13 +129,11 @@ class CognitoAuth:
             return payload
             
         except JWTError as e:
-            logger.error(f"Error verificando token: {e}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token inválido o expirado"
             )
         except Exception as e:
-            logger.error(f"Error inesperado verificando token: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Error verificando token"
@@ -222,7 +209,7 @@ class CognitoAuth:
             )
             
             cognito_user_id = response['User']['Username']
-            logger.info(f"✅ Usuario creado en Cognito. Cognito enviará el código de verificación automáticamente a {email}")
+
             
             # Asignar al grupo correspondiente según el rol
             group_name = rol.lower()  # admin, manager, operador
@@ -232,10 +219,8 @@ class CognitoAuth:
                     Username=cognito_user_id,
                     GroupName=group_name
                 )
-                logger.info(f"Usuario {email} asignado al grupo {group_name}")
+
             except self.cognito_client.exceptions.ResourceNotFoundException:
-                logger.warning(f"Grupo {group_name} no existe, creándolo...")
-                # El grupo debería existir, pero si no, lo creamos
                 try:
                     self.cognito_client.create_group(
                         GroupName=group_name,
@@ -248,8 +233,7 @@ class CognitoAuth:
                         GroupName=group_name
                     )
                 except Exception as e:
-                    logger.error(f"Error creando grupo {group_name}: {e}")
-            
+                     pass
             return {
                 'cognito_user_id': cognito_user_id,
                 'temporary_password': temporary_password,
@@ -257,7 +241,6 @@ class CognitoAuth:
             }
             
         except self.cognito_client.exceptions.UsernameExistsException:
-            # El usuario ya existe en Cognito
             # Verificar su estado y reenviar código de verificación si no está verificado
             try:
                 user_info = self.cognito_client.admin_get_user(
@@ -308,7 +291,7 @@ class CognitoAuth:
                             Permanent=False  # Temporal, el usuario debe cambiarla
                         )
                         
-                        logger.info(f"✅ Nueva contraseña temporal establecida para {email} (usuario existente no verificado)")
+
                         
                         return {
                             'cognito_user_id': email,
@@ -318,7 +301,6 @@ class CognitoAuth:
                             'email_verified': False
                         }
                     except Exception as e:
-                        logger.error(f"Error estableciendo contraseña temporal para usuario existente: {e}")
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail=f"El usuario ya existe en Cognito pero no se pudo establecer una contraseña temporal: {str(e)}. El usuario debe usar 'Reenviar código' desde la página de login."
@@ -330,21 +312,16 @@ class CognitoAuth:
                         detail="El usuario ya existe en Cognito y está verificado. El usuario puede iniciar sesión directamente."
                     )
             except HTTPException:
-                raise
-            except Exception as e:
-                logger.error(f"Error verificando usuario existente en Cognito: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="El usuario ya existe en Cognito. Si no has verificado tu email, intenta iniciar sesión y solicita un nuevo código de verificación."
                 )
         except self.cognito_client.exceptions.InvalidParameterException as e:
-            logger.error(f"Error en parámetros de Cognito: {e}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Error en parámetros: {str(e)}"
             )
         except Exception as e:
-            logger.error(f"Error creando usuario en Cognito: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error creando usuario: {str(e)}"
@@ -372,7 +349,7 @@ class CognitoAuth:
                     GroupName=old_group
                 )
             except Exception as e:
-                logger.warning(f"Error removiendo de grupo {old_group}: {e}")
+                pass
             
             # Agregar al nuevo grupo
             try:
@@ -381,9 +358,8 @@ class CognitoAuth:
                     Username=cognito_user_id,
                     GroupName=new_group
                 )
-                logger.info(f"Usuario {cognito_user_id} movido de {old_group} a {new_group}")
+
             except self.cognito_client.exceptions.ResourceNotFoundException:
-                # Crear grupo si no existe
                 try:
                     self.cognito_client.create_group(
                         GroupName=new_group,
@@ -396,11 +372,9 @@ class CognitoAuth:
                         GroupName=new_group
                     )
                 except Exception as e:
-                    logger.error(f"Error creando grupo {new_group}: {e}")
                     raise
                     
         except Exception as e:
-            logger.error(f"Error actualizando rol en Cognito: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error actualizando rol: {str(e)}"
@@ -413,8 +387,8 @@ class CognitoAuth:
             dict con 'sent' (bool), 'message' (str), 'reason' (str opcional)
         """
         if not self.ses_client:
-            logger.warning(f"⚠️  SES no disponible. Email de invitación no enviado a {email}")
-            logger.info(f"   Contraseña temporal: {temporary_password}")
+
+
             return {
                 'sent': False,
                 'message': 'SES no está configurado',
@@ -433,11 +407,10 @@ class CognitoAuth:
             
             if remitente_status != 'Success':
                 if remitente_status == 'Pending':
-                    logger.warning(f"⚠️  Email remitente {from_email} está pendiente de verificación. Revisa el correo y haz clic en el link de verificación.")
+                    pass
                 else:
-                    logger.warning(f"⚠️  Email remitente {from_email} no verificado en SES (estado: {remitente_status}). Email no enviado.")
-                logger.info(f"   Para verificar: aws ses verify-email-identity --email-address {from_email} --region {self.region}")
-                logger.info(f"   Contraseña temporal para {nombre}: {temporary_password}")
+                    pass
+
                 return {
                     'sent': False,
                     'message': f'Email remitente {from_email} no verificado en SES (estado: {remitente_status})',
@@ -455,9 +428,9 @@ class CognitoAuth:
                 destino_status = destino_attrs.get('VerificationAttributes', {}).get(email, {}).get('VerificationStatus', 'NotFound')
                 
                 if destino_status != 'Success':
-                    logger.warning(f"⚠️  Email destino {email} no verificado en SES (modo sandbox, estado: {destino_status}). Email no enviado.")
-                    logger.info(f"   Para verificar: aws ses verify-email-identity --email-address {email} --region {self.region}")
-                    logger.info(f"   Contraseña temporal: {temporary_password}")
+
+
+
                     return {
                         'sent': False,
                         'message': f'Email destino {email} no verificado en SES (modo sandbox, estado: {destino_status})',
@@ -468,6 +441,7 @@ class CognitoAuth:
             
             # Contenido del email
             subject = "Bienvenido a Programador Musical"
+            frontend_url = settings.FRONTEND_URL
             body_html = f"""
             <!DOCTYPE html>
             <html>
@@ -501,7 +475,7 @@ class CognitoAuth:
                         <p><strong>⚠️ Importante:</strong> Debes cambiar esta contraseña en tu primer inicio de sesión.</p>
                         
                         <p style="text-align: center;">
-                            <a href="http://localhost:3000/auth/login" class="button">Iniciar Sesión</a>
+                            <a href="{frontend_url}/auth/login" class="button">Iniciar Sesión</a>
                         </p>
                         
                         <p>Si tienes alguna pregunta, contacta al administrador del sistema.</p>
@@ -528,7 +502,7 @@ Contraseña temporal: {temporary_password}
 
 ⚠️ IMPORTANTE: Debes cambiar esta contraseña en tu primer inicio de sesión.
 
-Accede en: http://localhost:3000/auth/login
+Accede en: {frontend_url}/auth/login
 
 Si tienes alguna pregunta, contacta al administrador del sistema.
 
@@ -548,7 +522,7 @@ Si tienes alguna pregunta, contacta al administrador del sistema.
                 }
             )
             
-            logger.info(f"✅ Email de invitación enviado a {email} (MessageId: {response['MessageId']})")
+
             return {
                 'sent': True,
                 'message': f'Email de invitación enviado exitosamente a {email}',
@@ -556,8 +530,6 @@ Si tienes alguna pregunta, contacta al administrador del sistema.
             }
             
         except self.ses_client.exceptions.MessageRejected as e:
-            logger.error(f"❌ Email rechazado por SES: {e}")
-            logger.warning(f"   Verifica que el email remitente esté verificado en SES")
             return {
                 'sent': False,
                 'message': 'Email rechazado por SES',
@@ -565,8 +537,6 @@ Si tienes alguna pregunta, contacta al administrador del sistema.
                 'error': str(e)
             }
         except Exception as e:
-            logger.error(f"❌ Error enviando email de invitación: {e}")
-            logger.info(f"   Contraseña temporal: {temporary_password}")
             return {
                 'sent': False,
                 'message': f'Error enviando email: {str(e)}',
@@ -579,7 +549,7 @@ Si tienes alguna pregunta, contacta al administrador del sistema.
         Envía email de confirmación cuando se elimina una cuenta
         """
         if not self.ses_client:
-            logger.warning(f"⚠️  SES no disponible. Email de eliminación no enviado a {email}")
+
             return
         
         try:
@@ -589,12 +559,12 @@ Si tienes alguna pregunta, contacta al administrador del sistema.
             verified_list = verified_emails.get('VerifiedEmailAddresses', [])
             
             if from_email not in verified_list:
-                logger.warning(f"⚠️  Email remitente {from_email} no verificado en SES. Email no enviado.")
+
                 return
             
             # En modo sandbox, el email destino también debe estar verificado
             if email not in verified_list:
-                logger.warning(f"⚠️  Email destino {email} no verificado en SES (modo sandbox). Email no enviado.")
+
                 return
             
             subject = "Tu cuenta ha sido eliminada - Programador Musical"
@@ -669,11 +639,10 @@ Si no solicitaste esta eliminación, contacta inmediatamente al administrador de
                 }
             )
             
-            logger.info(f"✅ Email de eliminación enviado a {email} (MessageId: {response['MessageId']})")
+
             
         except Exception as e:
-            logger.error(f"❌ Error enviando email de eliminación: {e}")
-    
+             pass
     def update_user_attributes(self, cognito_user_id: str, attributes: dict):
         """
         Actualiza atributos del usuario en Cognito
@@ -700,10 +669,9 @@ Si no solicitaste esta eliminación, contacta inmediatamente al administrador de
                 UserAttributes=user_attributes
             )
             
-            logger.info(f"Atributos actualizados para usuario {cognito_user_id}: {list(attributes.keys())}")
+
             
         except Exception as e:
-            logger.error(f"Error actualizando atributos en Cognito: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error actualizando atributos: {str(e)}"
@@ -727,10 +695,9 @@ Si no solicitaste esta eliminación, contacta inmediatamente al administrador de
                 Permanent=permanent
             )
             
-            logger.info(f"Contraseña cambiada para usuario {cognito_user_id}")
+
             
         except Exception as e:
-            logger.error(f"Error cambiando contraseña en Cognito: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error cambiando contraseña: {str(e)}"
@@ -752,10 +719,9 @@ Si no solicitaste esta eliminación, contacta inmediatamente al administrador de
                 Username=cognito_user_id
             )
             
-            logger.info(f"Usuario {cognito_user_id} eliminado de Cognito")
+
             
         except Exception as e:
-            logger.error(f"Error eliminando usuario de Cognito: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error eliminando usuario: {str(e)}"
@@ -808,14 +774,14 @@ async def get_current_user(
             usuario = Usuario(
                 cognito_user_id=cognito_user_id,
                 email=email,
-                nombre=nombre,
+ombre=nombre,
                 rol=rol,
                 activo=True
             )
             db.add(usuario)
             db.commit()
             db.refresh(usuario)
-            logger.info(f"Usuario creado automáticamente: {email} ({rol})")
+
         
         if not usuario.activo:
             raise HTTPException(
@@ -826,9 +792,6 @@ async def get_current_user(
         return usuario
         
     except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error obteniendo usuario actual: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error de autenticación"

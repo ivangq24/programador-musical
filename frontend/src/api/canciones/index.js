@@ -6,7 +6,7 @@ export const getCanciones = async (params = {}) => {
     const response = await apiClient.get('/categorias/canciones', { params })
     return response.data
   } catch (error) {
-    console.error('Error fetching canciones:', error)
+
     throw error
   }
 }
@@ -17,7 +17,7 @@ export const getCancion = async (cancionId) => {
     const response = await apiClient.get(`/categorias/canciones/${cancionId}`)
     return response.data
   } catch (error) {
-    console.error('Error fetching cancion:', error)
+
     throw error
   }
 }
@@ -28,7 +28,7 @@ export const createCancion = async (cancionData) => {
     const response = await apiClient.post('/categorias/canciones', cancionData)
     return response.data
   } catch (error) {
-    console.error('Error creating cancion:', error)
+
     throw error
   }
 }
@@ -39,7 +39,7 @@ export const updateCancion = async (cancionId, cancionData) => {
     const response = await apiClient.put(`/categorias/canciones/${cancionId}`, cancionData)
     return response.data
   } catch (error) {
-    console.error('Error updating cancion:', error)
+
     throw error
   }
 }
@@ -50,7 +50,7 @@ export const deleteCancion = async (cancionId) => {
     const response = await apiClient.delete(`/categorias/canciones/${cancionId}`)
     return response.data
   } catch (error) {
-    console.error('Error deleting cancion:', error)
+
     throw error
   }
 }
@@ -61,7 +61,7 @@ export const getCancionesStats = async () => {
     const response = await apiClient.get('/categorias/stats')
     return response.data
   } catch (error) {
-    console.error('Error fetching canciones stats:', error)
+
     throw error
   }
 }
@@ -72,7 +72,7 @@ export const getCategoriasCanciones = async () => {
     const response = await apiClient.get('/categorias/categorias/items')
     return response.data
   } catch (error) {
-    console.error('Error fetching categorias:', error)
+
     throw error
   }
 }
@@ -83,7 +83,7 @@ export const guardarCategoriasPolitica = async (politicaId, categorias) => {
     const response = await apiClient.post(`/categorias/canciones/politica/${politicaId}/categorias`, categorias)
     return response.data
   } catch (error) {
-    console.error('Error guardando categorías de política:', error)
+
     throw error
   }
 }
@@ -94,7 +94,7 @@ export const obtenerCategoriasPolitica = async (politicaId) => {
     const response = await apiClient.get(`/categorias/canciones/politica/${politicaId}/categorias`)
     return response.data
   } catch (error) {
-    console.error('Error obteniendo categorías de política:', error)
+
     throw error
   }
 }

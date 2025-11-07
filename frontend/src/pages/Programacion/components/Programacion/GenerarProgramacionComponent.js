@@ -40,13 +40,6 @@ import {
   Radio
 } from 'lucide-react'
 
-// Helper para logging condicional - solo en desarrollo
-const debugLog = (...args) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log(...args)
-  }
-}
-
 export default function GenerarProgramacionComponent() {
   const [difusora, setDifusora] = useState('')
   const [politica, setPolitica] = useState('')
@@ -210,7 +203,7 @@ export default function GenerarProgramacionComponent() {
         })
       }
     } catch (err) {
-      console.error('Error loading difusoras:', err)
+
       setError(`Error al cargar difusoras: ${err.message}`)
       showNotification(`Error al cargar difusoras: ${err.message}`, 'error')
       
@@ -227,23 +220,34 @@ export default function GenerarProgramacionComponent() {
       setLoadingPoliticas(true)
       setError(null)
       
+      // Usar apiClient que incluye el token de autenticación
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
       const url = buildApiUrl('/programacion/politicas/')
       const response = await fetch(url, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
+        headers: headers
       })
-      const data = await response.json()
       
-      if (response.ok) {
-        setPoliticas(data)
-        debugLog('✅ Políticas cargadas desde API:', data)
-      } else {
-        throw new Error(data.detail || 'Error al cargar políticas')
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('No tienes permisos para acceder a las políticas. Por favor, inicia sesión.');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error al cargar políticas: ${response.status}`);
       }
+      
+      const data = await response.json()
+      setPoliticas(data)
     } catch (err) {
-      console.error('Error loading politicas:', err)
+
       setError(`Error al cargar políticas: ${err.message}`)
       showNotification(`Error al cargar políticas: ${err.message}`, 'error')
       
@@ -270,50 +274,52 @@ export default function GenerarProgramacionComponent() {
       }
       
       // Consultar días modelo de la política seleccionada
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
       const url = buildApiUrl(`/programacion/politicas/${politica}/dias-modelo`)
       const response = await fetch(url, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
+        headers: headers
       })
       
-      if (response.ok) {
-        const diasModelo = await response.json()
-        if (diasModelo && diasModelo.length > 0) {
-          setDiasModelo(diasModelo)
-          // Seleccionar por defecto el primero si no hay uno global elegido aún
-          // Usar callback para evitar dependencia circular
-          setSelectedDiaModelo(prev => {
-            if (!prev || prev === '') {
-              return String(diasModelo[0].id)
-            }
-            return prev
-          })
-          debugLog('✅ Días modelo cargados desde DB para política:', politica, diasModelo)
-        } else {
-          // Si no hay días modelo en la DB, usar datos por defecto
-          const defaultDiasModelo = [
-            { id: 1, clave: 'DIA_LABORAL', nombre: 'Día Laboral', descripcion: 'Día modelo para días laborales' },
-            { id: 2, clave: 'FIN_SEMANA', nombre: 'Fin de Semana', descripcion: 'Día modelo para fines de semana' },
-            { id: 3, clave: 'DIA_GENERAL', nombre: 'Día General', descripcion: 'Día modelo general' }
-          ]
-          setDiasModelo(defaultDiasModelo)
-          debugLog('✅ Días modelo cargados (fallback - no hay datos en DB):', defaultDiasModelo)
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('No tienes permisos para acceder a los días modelo. Por favor, inicia sesión.');
         }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error al cargar días modelo: ${response.status}`);
+      }
+      
+      const diasModelo = await response.json()
+      if (diasModelo && diasModelo.length > 0) {
+        setDiasModelo(diasModelo)
+        // Seleccionar por defecto el primero si no hay uno global elegido aún
+        // Usar callback para evitar dependencia circular
+        setSelectedDiaModelo(prev => {
+          if (!prev || prev === '') {
+            return String(diasModelo[0].id)
+          }
+          return prev
+        })
       } else {
-        // Fallback a datos por defecto si hay error en la API
+        // Si no hay días modelo en la DB, usar datos por defecto
         const defaultDiasModelo = [
           { id: 1, clave: 'DIA_LABORAL', nombre: 'Día Laboral', descripcion: 'Día modelo para días laborales' },
           { id: 2, clave: 'FIN_SEMANA', nombre: 'Fin de Semana', descripcion: 'Día modelo para fines de semana' },
           { id: 3, clave: 'DIA_GENERAL', nombre: 'Día General', descripcion: 'Día modelo general' }
         ]
         setDiasModelo(defaultDiasModelo)
-        debugLog('✅ Días modelo cargados (fallback - error API):', defaultDiasModelo)
       }
       
     } catch (err) {
-      console.error('Error loading días modelo:', err)
+
       // Fallback a datos por defecto en caso de error
       const defaultDiasModelo = [
         { id: 1, clave: 'DIA_LABORAL', nombre: 'Día Laboral', descripcion: 'Día modelo para días laborales' },
@@ -321,7 +327,7 @@ export default function GenerarProgramacionComponent() {
         { id: 3, clave: 'DIA_GENERAL', nombre: 'Día General', descripcion: 'Día modelo general' }
       ]
       setDiasModelo(defaultDiasModelo)
-      debugLog('✅ Días modelo cargados (fallback - error):', defaultDiasModelo)
+
     }
   }, [politica]) // Removida dependencia de selectedDiaModelo para evitar ciclo infinito
 
@@ -364,7 +370,7 @@ export default function GenerarProgramacionComponent() {
         throw new Error('Debe seleccionar una difusora')
       }
       
-      debugLog('Cargando días...', { difusora, politica, fechaInicio, fechaFin })
+
       
       // Convertir fechas de YYYY-MM-DD a DD/MM/YYYY para el backend
       const convertirFecha = (fechaYYYYMMDD) => {
@@ -381,35 +387,50 @@ export default function GenerarProgramacionComponent() {
         _t: Date.now() // Timestamp para evitar caché
       })
       
+      // Agregar token de autenticación
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
       const url = buildApiUrl(`/programacion/dias-simple?${params}`)
       const response = await fetch(url, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
+        headers: headers
       })
-      const data = await response.json()
       
-      debugLog('🔍 Respuesta completa del backend:', data)
+      if (!response.ok) {
+        if (response.status === 403) {
+          throw new Error('No tienes permisos para acceder a los días. Por favor, inicia sesión.');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error al cargar días: ${response.status}`);
+      }
+      
+      const data = await response.json()
       
       if (response.ok) {
         // Convertir datos de la API al formato esperado por el componente
         const diasConvertidos = data.dias.map((dia, index) => {
-          debugLog('🔍 Día modelo recibido del backend:', dia.dia_modelo);
-          debugLog('🔍 Status del día:', dia.status);
+
+
           
           // Usar el día modelo que viene del backend si ya existe programación
           // Si no hay programación, usar el día modelo por defecto de la política
           let diaModeloAsignado = ''
           if (dia.status === 'Con Programación' && dia.dia_modelo) {
             diaModeloAsignado = dia.dia_modelo
-            debugLog('✅ Asignando día modelo del backend (con programación):', diaModeloAsignado);
+
           } else if (dia.status !== 'Con Programación' && dia.dia_modelo) {
             // Usar el día modelo por defecto de la política
             diaModeloAsignado = dia.dia_modelo
-            debugLog('✅ Asignando día modelo por defecto de la política:', diaModeloAsignado);
+
           } else {
-            debugLog('⚠️ No hay día modelo disponible - Status:', dia.status, 'Día modelo:', dia.dia_modelo);
+
           }
           // Si no hay programación, NO asignar automáticamente
           // El usuario debe seleccionar explícitamente el día modelo
@@ -446,16 +467,16 @@ export default function GenerarProgramacionComponent() {
         if (showNotificationParam) {
           showNotification(`Días cargados correctamente: ${diasConvertidos.length} días`, 'success')
         }
-        debugLog('✅ Días cargados desde API:', diasConvertidos)
-        debugLog('📊 Días con programación:', diasConvertidos.filter(d => d.status === 'Con Programación').length)
-        debugLog('🔍 Día modelo en el estado:', diasConvertidos[0]?.diaModelo);
-        debugLog('🔍 Estado completo del primer día:', diasConvertidos[0]);
+
+
+
+
       } else {
         throw new Error(data.detail || 'Error al cargar días')
       }
       
     } catch (err) {
-      console.error('Error loading days:', err)
+
       setError(err.message)
       if (showNotificationParam) {
         showNotification(`Error al cargar días: ${err.message}`, 'error')
@@ -500,7 +521,7 @@ export default function GenerarProgramacionComponent() {
       const currentPoliticaExists = filteredPoliticas.some(p => p.id === parseInt(politica))
       
       if (!currentPoliticaExists) {
-        debugLog('🔄 Difusora cambió, limpiando política seleccionada')
+
         setPolitica('')
       }
     }
@@ -515,7 +536,7 @@ export default function GenerarProgramacionComponent() {
   //       if (!dia.diaModelo) {
   //         const diaModeloPorDefecto = getDiaModeloPorDefecto(dia.dia)
   //         if (diaModeloPorDefecto) {
-  //           console.log(`🔄 Actualizando día modelo por defecto para ${dia.dia}: ${diaModeloPorDefecto}`)
+
   //           return { ...dia, diaModelo: diaModeloPorDefecto }
   //         }
   //       }
@@ -534,14 +555,6 @@ export default function GenerarProgramacionComponent() {
   // }, [diasModelo])
 
   // Debug: Log cuando cambie programacionData - Solo en desarrollo
-  // Removido para reducir overhead de memoria
-  // useEffect(() => {
-  //   if (process.env.NODE_ENV === 'development' && programacionData.length > 0) {
-  //     debugLog('🔄 programacionData actualizado:', programacionData[0]?.diaModelo);
-  //     debugLog('🔄 Estado completo del primer día:', programacionData[0]);
-  //   }
-  // }, [programacionData])
-  
   // Limpiar datos cuando el componente se desmonta
   useEffect(() => {
     return () => {
@@ -617,35 +630,69 @@ export default function GenerarProgramacionComponent() {
         return { fecha: dia.fecha, dia_modelo: diaModeloNombre }
       })
       
+      // Agregar token de autenticación
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
       const url = buildApiUrl(`/programacion/generar-programacion-completa?${params}`)
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify({
           dias_modelo: diasModeloSeleccionados
         })
       })
       
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`)
+        if (response.status === 403) {
+          throw new Error('No tienes permisos para generar programación. Por favor, inicia sesión.');
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Error al generar programación: ${response.status}`);
       }
       
       const result = await response.json()
       
-      showNotification(`Programación generada: ${result.dias_generados} días`, 'success')
+      if (result.dias_generados === 0) {
+        // Si no se generó ningún día, mostrar detalles de los errores
+        const errores = result.dias_procesados?.filter(d => !d.generado) || []
+        if (errores.length > 0) {
+          const erroresResumen = {}
+          errores.forEach(dia => {
+            const status = dia.status || 'Desconocido'
+            if (!erroresResumen[status]) {
+              erroresResumen[status] = []
+            }
+            erroresResumen[status].push(dia.fecha)
+          })
+          
+          let mensaje = 'No se generó programación para ningún día.\n\n'
+          Object.keys(erroresResumen).forEach(status => {
+            mensaje += `${status}: ${erroresResumen[status].join(', ')}\n`
+          })
+          
+          showNotification(mensaje, 'error')
+        } else {
+          showNotification('No se generó programación para ningún día. Verifica que los días seleccionados tengan día modelo asignado.', 'error')
+        }
+      } else {
+        showNotification(`Programación generada: ${result.dias_generados} días`, 'success')
+      }
       
       // Recargar la lista de días para mostrar los cambios
-      debugLog('🔄 Recargando días después de generación...')
       await handleCargarDias(false)
-      debugLog('✅ Días recargados después de generación')
+
       
       // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
       // await cargarEstadisticasProgramacion()
       
     } catch (err) {
-      console.error('Error al generar programación:', err)
+
       showNotification(`Error al generar programación: ${err.message}`, 'error')
     } finally {
       setLoading(false)
@@ -675,27 +722,27 @@ export default function GenerarProgramacionComponent() {
       const filasSeleccionadas = programacionData.filter(row => row.selected)
       
       // Preparar los días modelo seleccionados para enviar al backend
-      debugLog('🔍 DEBUG: selectedDiaModelo from modal:', selectedDiaModelo)
-      debugLog('🔍 DEBUG: diasModelo array:', diasModelo)
-      debugLog('🔍 DEBUG: filasSeleccionadas:', filasSeleccionadas)
+
+
+
       
       const diasModeloSeleccionados = filasSeleccionadas.map(dia => {
         // Si se seleccionó un día modelo diferente en el modal, usar ese
         // Si no, usar el día modelo actual de la fila
         let diaModeloNombre = dia.diaModelo
         
-        debugLog('🔍 DEBUG: Processing day:', dia.fecha, 'current diaModelo:', dia.diaModelo)
+
         
         if (selectedDiaModelo && selectedDiaModelo !== '') {
-          debugLog('🔍 DEBUG: selectedDiaModelo is not empty, looking for ID:', selectedDiaModelo)
+
           const diaModeloSeleccionado = diasModelo.find(dm => dm.id.toString() === selectedDiaModelo)
-          debugLog('🔍 DEBUG: diaModeloSeleccionado found:', diaModeloSeleccionado)
+
           if (diaModeloSeleccionado) {
             diaModeloNombre = diaModeloSeleccionado.nombre
-            debugLog('🔍 DEBUG: Using selected day model name:', diaModeloNombre)
+
           }
         } else {
-          debugLog('🔍 DEBUG: No selectedDiaModelo, using current:', diaModeloNombre)
+
         }
         
         return {
@@ -704,15 +751,22 @@ export default function GenerarProgramacionComponent() {
         }
       })
       
-      debugLog('🔍 DEBUG: Días modelo seleccionados para enviar:', diasModeloSeleccionados)
-      debugLog('🔍 DEBUG: selectedDiaModelo:', selectedDiaModelo)
+
+
+      
+      // Agregar token de autenticación
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
       
       const url = buildApiUrl(`/programacion/generar-programacion-completa?${params}`)
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify({
           dias_modelo: diasModeloSeleccionados
         })
@@ -727,15 +781,15 @@ export default function GenerarProgramacionComponent() {
       showNotification(`Programación regenerada: ${result.dias_generados} días`, 'success')
       
       // Recargar la lista de días para mostrar los cambios
-      debugLog('🔄 Recargando días después de regeneración...')
+
       await handleCargarDias(false)
-      debugLog('✅ Días recargados después de regeneración')
+
       
       // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
       // await cargarEstadisticasProgramacion()
       
     } catch (err) {
-      console.error('Error al regenerar programación:', err)
+
       showNotification(`Error al regenerar programación: ${err.message}`, 'error')
     } finally {
       setLoading(false)
@@ -775,13 +829,13 @@ export default function GenerarProgramacionComponent() {
       return
     }
 
-    debugLog('Editando programación para:', filaSeleccionada.fecha)
+
     
     // Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para la consulta
     const [dia, mes, año] = filaSeleccionada.fecha.split('/')
     const fechaParaEdicion = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
     
-    debugLog('🔍 Fecha para edición:', fechaParaEdicion)
+
     setFechaConsultar(fechaParaEdicion)
     setShowConsultarModal(true)
   }, [programacionData, showNotification])
@@ -800,8 +854,8 @@ export default function GenerarProgramacionComponent() {
     }
     
     const filaSeleccionada = filasSeleccionadas[0]
-    debugLog('🔍 Fila seleccionada:', filaSeleccionada)
-    debugLog('🔍 Fecha de la fila:', filaSeleccionada.fecha)
+
+
     
     // Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para el componente de consulta
     let fechaParaConsulta
@@ -812,7 +866,7 @@ export default function GenerarProgramacionComponent() {
       fechaParaConsulta = filaSeleccionada.fecha
     }
     
-    debugLog('🔍 Fecha para consulta:', fechaParaConsulta)
+
     setFechaConsultar(fechaParaConsulta)
     setShowConsultarModal(true)
   }, [programacionData, showNotification])
@@ -840,12 +894,19 @@ export default function GenerarProgramacionComponent() {
         const [dia, mes, año] = fila.fecha.split('/')
         const fechaFormateada = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
         
+        // Agregar token de autenticación
+        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+        
         const url = buildApiUrl('/programacion/eliminar-programacion')
         const response = await fetch(url, {
           method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: headers,
           body: JSON.stringify({
             difusora: difusora,
             politica_id: politica,
@@ -854,7 +915,11 @@ export default function GenerarProgramacionComponent() {
         })
 
         if (!response.ok) {
-          throw new Error(`Error al eliminar programación para ${fila.fecha}`)
+          if (response.status === 403) {
+            throw new Error('No tienes permisos para eliminar programación. Por favor, inicia sesión.');
+          }
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail || `Error al eliminar programación para ${fila.fecha}: ${response.status}`);
         }
       }
 
@@ -866,7 +931,7 @@ export default function GenerarProgramacionComponent() {
       // await cargarEstadisticasProgramacion()
       
     } catch (err) {
-      console.error('Error eliminando programación:', err)
+
       showNotification(`Error al eliminar programación: ${err.message}`, 'error')
     } finally {
       setLoading(false)
@@ -894,7 +959,7 @@ export default function GenerarProgramacionComponent() {
       return
     }
 
-    debugLog('Imprimiendo carta de tiempo para:', filaSeleccionada.fecha)
+
     
     // Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para la consulta
     const [dia, mes, año] = filaSeleccionada.fecha.split('/')
@@ -932,7 +997,7 @@ export default function GenerarProgramacionComponent() {
       showNotification(`LogFile generado: ${filasSeleccionadas.length} día(s)`, 'success')
       
     } catch (err) {
-      console.error('Error generando LogFile:', err)
+
       showNotification(`Error al generar LogFile: ${err.message}`, 'error')
     } finally {
       setLoading(false)
@@ -1434,7 +1499,7 @@ export default function GenerarProgramacionComponent() {
                         showNotification('Debe seleccionar primero la difusora y la política', 'error')
                         return
                       }
-                      debugLog('Date picker toggled:', !showDatePicker)
+
                       setShowDatePicker(!showDatePicker)
                     }}
                     disabled={!isDatePickerEnabled}
@@ -1533,7 +1598,7 @@ export default function GenerarProgramacionComponent() {
                         <button
                           type="button"
                           onClick={() => {
-                            debugLog('Date picker closed')
+
                             setShowDatePicker(false)
                           }}
                           className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-semibold shadow-lg shadow-green-500/20"

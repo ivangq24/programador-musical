@@ -28,7 +28,7 @@ export default function EliminarCuentaModal({ onClose, onSuccess }) {
       await usuariosApi.deleteMyAccount()
       onSuccess()
     } catch (err) {
-      console.error('Error eliminando cuenta:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al eliminar cuenta')
     } finally {
       setLoading(false)

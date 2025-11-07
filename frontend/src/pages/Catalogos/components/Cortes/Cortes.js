@@ -45,7 +45,7 @@ export default function Cortes() {
   
   // Estados del formulario
   const [formData, setFormData] = useState({
-    nombre: '',
+ombre: '',
     descripcion: '',
     duracion: '',
     tipo: 'comercial', // 'comercial' o 'vacio'
@@ -65,7 +65,7 @@ export default function Cortes() {
       setCortes(response || [])
     } catch (err) {
       setError('Error al cargar los cortes')
-      console.error('Error:', err)
+
       setCortes([])
     } finally {
       setLoading(false)
@@ -184,7 +184,7 @@ export default function Cortes() {
     setShowForm(false)
     setSelectedCorte(null)
     setFormData({
-      nombre: '',
+ombre: '',
       descripcion: '',
       duracion: '',
       tipo: 'comercial',
@@ -220,7 +220,7 @@ export default function Cortes() {
       handleCloseForm()
     } catch (err) {
       showNotification(`Error al guardar el corte: ${err.message}`, 'error')
-      console.error('Error saving corte:', err)
+
     } finally {
       setLoading(false)
     }
@@ -229,7 +229,7 @@ export default function Cortes() {
   const handleEdit = useCallback((corte) => {
     setSelectedCorte(corte)
     setFormData({
-      nombre: corte.nombre || '',
+ombre: corte.nombre || '',
       descripcion: corte.descripcion || '',
       duracion: corte.duracion || '',
       tipo: corte.tipo || 'comercial',
@@ -243,7 +243,7 @@ export default function Cortes() {
   const handleView = useCallback((corte) => {
     setSelectedCorte(corte)
     setFormData({
-      nombre: corte.nombre || '',
+ombre: corte.nombre || '',
       descripcion: corte.descripcion || '',
       duracion: corte.duracion || '',
       tipo: corte.tipo || 'comercial',
@@ -267,7 +267,7 @@ export default function Cortes() {
         setCortes(prev => prev.filter(c => c.id !== corte.id))
       } catch (err) {
         showNotification(`Error al eliminar el corte: ${err.message}`, 'error')
-        console.error('Error deleting corte:', err)
+
       } finally {
         setLoading(false)
       }
@@ -277,7 +277,7 @@ export default function Cortes() {
   const handleNew = useCallback(() => {
     setSelectedCorte(null)
     setFormData({
-      nombre: '',
+ombre: '',
       descripcion: '',
       duracion: '',
       tipo: 'comercial',
@@ -339,7 +339,7 @@ export default function Cortes() {
       {/* Notification Component - Outside main container to ensure it's always on top */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 ${
-          notification.type === 'success'
+otification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 text-red-800'
         }`}>
@@ -726,7 +726,7 @@ export default function Cortes() {
                   <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
                     <input
                       type="checkbox"
-                      name="activo"
+ame="activo"
                       checked={formData.activo}
                       onChange={handleInputChange}
                       disabled={formMode === 'view'}
@@ -745,7 +745,7 @@ export default function Cortes() {
                         </label>
                         <input
                           type="text"
-                          name="nombre"
+ame="nombre"
                           value={formData.nombre}
                           onChange={handleInputChange}
                           disabled={formMode === 'view'}
@@ -766,7 +766,7 @@ export default function Cortes() {
                           Descripción
                         </label>
                         <textarea
-                          name="descripcion"
+ame="descripcion"
                           value={formData.descripcion || ''}
                           onChange={handleInputChange}
                           disabled={formMode === 'view'}
@@ -783,7 +783,7 @@ export default function Cortes() {
                         </label>
                         <input
                           type="text"
-                          name="duracion"
+ame="duracion"
                           value={formData.duracion}
                           onChange={handleInputChange}
                           disabled={formMode === 'view'}
@@ -804,7 +804,7 @@ export default function Cortes() {
                           Tipo <span className="text-red-500">*</span>
                         </label>
                         <select
-                          name="tipo"
+ame="tipo"
                           value={formData.tipo}
                           onChange={handleInputChange}
                           disabled={formMode === 'view'}
@@ -821,7 +821,7 @@ export default function Cortes() {
                           Observaciones
                         </label>
                         <textarea
-                          name="observaciones"
+ame="observaciones"
                           value={formData.observaciones || ''}
                           onChange={handleInputChange}
                           disabled={formMode === 'view'}

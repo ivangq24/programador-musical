@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     SES_FROM_EMAIL: str = Field(default="noreply@programador-musical.com", description="Email remitente para SES (debe estar verificado)")
     SES_PRODUCTION_MODE: bool = Field(default=False, description="Si está en True, no requiere verificar cada email destino (modo producción)")
     
+    # Frontend URL (para links en emails)
+    FRONTEND_URL: str = Field(default="http://localhost:3000", description="URL del frontend para links en emails")
+    
     @computed_field
     @property
     def database_url(self) -> str:

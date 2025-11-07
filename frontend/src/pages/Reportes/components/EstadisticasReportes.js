@@ -390,10 +390,10 @@ const EstadisticasReportes = () => {
       setDifusoras(difusorasData)
       setPoliticas(politicasData)
     } catch (error) {
-      console.error('Error al cargar estadísticas:', error)
+
       // Mejorar manejo de errores - mostrar notificación en lugar de alert
       const errorMessage = error?.response?.data?.detail || error?.message || 'Error desconocido al cargar las estadísticas'
-      console.error('Detalles del error:', errorMessage)
+
       // Por ahora mantenemos alert, pero se puede mejorar con un sistema de notificaciones
       alert(`Error al cargar las estadísticas: ${errorMessage}. Por favor, intenta de nuevo.`)
     } finally {

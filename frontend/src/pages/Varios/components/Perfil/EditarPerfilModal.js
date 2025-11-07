@@ -6,7 +6,7 @@ import { X, User, Mail, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function EditarPerfilModal({ profile, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
-    nombre: profile?.nombre || '',
+ombre: profile?.nombre || '',
     email: profile?.email || ''
   })
   const [loading, setLoading] = useState(false)
@@ -34,7 +34,7 @@ export default function EditarPerfilModal({ profile, onClose, onSuccess }) {
         onSuccess()
       }, 1000)
     } catch (err) {
-      console.error('Error actualizando perfil:', err)
+
       setError(err.response?.data?.detail || err.message || 'Error al actualizar perfil')
     } finally {
       setLoading(false)
@@ -82,7 +82,7 @@ export default function EditarPerfilModal({ profile, onClose, onSuccess }) {
                 </label>
                 <input
                   type="text"
-                  name="nombre"
+ame="nombre"
                   value={formData.nombre}
                   onChange={handleChange}
                   required
@@ -99,7 +99,7 @@ export default function EditarPerfilModal({ profile, onClose, onSuccess }) {
                 </label>
                 <input
                   type="email"
-                  name="email"
+ame="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
