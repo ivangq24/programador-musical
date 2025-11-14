@@ -22,6 +22,12 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "use_route53" {
+  description = "Whether to use Route 53 for DNS management (false for external DNS like GoDaddy)"
+  type        = bool
+  default     = false
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string
@@ -104,4 +110,30 @@ variable "restrict_to_ip" {
   description = "Whether to restrict access to specific IP addresses only"
   type        = bool
   default     = true
+}
+
+variable "google_client_id" {
+  description = "Google OAuth Client ID"
+  type        = string
+  default     = ""
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth Client Secret"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "apple_client_id" {
+  description = "Apple OAuth Client ID (Service ID)"
+  type        = string
+  default     = ""
+}
+
+variable "apple_client_secret" {
+  description = "Apple OAuth Client Secret (Key ID)"
+  type        = string
+  sensitive   = true
+  default     = ""
 }

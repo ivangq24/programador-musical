@@ -3,10 +3,10 @@
 import React from 'react'
 
 export default function HelloWorld({ onBack }) {
-  console.log('=== HELLO WORLD COMPONENT ===')
-  console.log('HelloWorld component rendered')
-  console.log('onBack function:', onBack)
-  console.log('============================')
+
+
+
+
   
   return (
     <div className="h-screen w-full bg-green-500 flex items-center justify-center">

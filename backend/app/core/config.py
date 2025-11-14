@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = Field(default="development")
     
+    # AWS Cognito Configuration
+    COGNITO_USER_POOL_ID: Optional[str] = Field(default=None)
+    COGNITO_CLIENT_ID: Optional[str] = Field(default=None)
+    COGNITO_REGION: str = Field(default="us-east-1")
+    
+    # AWS SES Configuration (para envío de emails)
+    SES_FROM_EMAIL: str = Field(default="noreply@programador-musical.com", description="Email remitente para SES (debe estar verificado)")
+    SES_PRODUCTION_MODE: bool = Field(default=False, description="Si está en True, no requiere verificar cada email destino (modo producción)")
+    
+    # Frontend URL (para links en emails)
+    FRONTEND_URL: str = Field(default="http://localhost:3000", description="URL del frontend para links en emails")
+    
     @computed_field
     @property
     def database_url(self) -> str:

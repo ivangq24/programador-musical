@@ -61,8 +61,8 @@ resource "aws_ecs_task_definition" "app" {
   family                   = "${local.name_prefix}-app"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"   # Reduced for 20 users
-  memory                   = "1024"  # Reduced for 20 users
+  cpu                      = "1024"  # Increased for Next.js build
+  memory                   = "2048"  # Increased to avoid OOM errors
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn           = aws_iam_role.ecs_task.arn
   
@@ -133,6 +133,18 @@ resource "aws_ecs_task_definition" "app" {
         {
           name  = "NEXT_PUBLIC_API_URL"
           value = var.domain_name != "" ? "https://${var.domain_name}/api" : "http://localhost/api"
+        },
+        {
+          name  = "NEXT_PUBLIC_COGNITO_USER_POOL_ID"
+          value = aws_cognito_user_pool.main.id
+        },
+        {
+          name  = "NEXT_PUBLIC_COGNITO_CLIENT_ID"
+          value = aws_cognito_user_pool_client.web.id
+        },
+        {
+          name  = "NEXT_PUBLIC_COGNITO_REGION"
+          value = var.aws_region
         }
       ]
 
@@ -197,6 +209,18 @@ resource "aws_ecs_task_definition" "app" {
         {
           name      = "DATABASE_URL"
           valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:database_url::"
+        },
+        {
+          name      = "COGNITO_USER_POOL_ID"
+          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:cognito_user_pool_id::"
+        },
+        {
+          name      = "COGNITO_CLIENT_ID"
+          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:cognito_client_id::"
+        },
+        {
+          name      = "COGNITO_REGION"
+          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:cognito_region::"
         }
       ]
 

@@ -6,7 +6,7 @@ export const validateCSV = async (csvData) => {
     const response = await apiClient.post('/categorias/validate-csv', csvData)
     return response.data
   } catch (error) {
-    console.error('Error validating CSV:', error)
+
     throw error
   }
 }
@@ -17,7 +17,7 @@ export const importCanciones = async (csvData) => {
     const response = await apiClient.post('/categorias/import-canciones', csvData)
     return response.data
   } catch (error) {
-    console.error('Error importing canciones:', error)
+
     throw error
   }
 }
@@ -28,7 +28,7 @@ export const getCSVTemplate = async () => {
     const response = await apiClient.get('/categorias/template')
     return response.data
   } catch (error) {
-    console.error('Error getting CSV template:', error)
+
     throw error
   }
 }
@@ -39,7 +39,7 @@ export const getValidationRules = async () => {
     const response = await apiClient.get('/categorias/validation-rules')
     return response.data
   } catch (error) {
-    console.error('Error getting validation rules:', error)
+
     throw error
   }
 }
@@ -63,7 +63,7 @@ export const downloadCSVTemplate = async () => {
     
     return { success: true, filename }
   } catch (error) {
-    console.error('Error downloading CSV template:', error)
+
     throw error
   }
 }

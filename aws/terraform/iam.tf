@@ -104,6 +104,63 @@ resource "aws_iam_role_policy" "ecs_task" {
   })
 }
 
+# Policy for ECS task role to access Cognito
+resource "aws_iam_role_policy" "ecs_task_cognito" {
+  name = "${local.name_prefix}-ecs-task-cognito"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminConfirmSignUp",
+          "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminUpdateUserAttributes",
+          "cognito-idp:AdminDeleteUser",
+          "cognito-idp:ListUsers",
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:AdminAddUserToGroup",
+          "cognito-idp:AdminRemoveUserFromGroup",
+          "cognito-idp:AdminListGroupsForUser",
+          "cognito-idp:AdminInitiateAuth",
+          "cognito-idp:AdminRespondToAuthChallenge",
+          "cognito-idp:ForgotPassword",
+          "cognito-idp:ConfirmForgotPassword"
+        ]
+        Resource = [
+          aws_cognito_user_pool.main.arn,
+          "${aws_cognito_user_pool.main.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+# Policy for ECS task role to access SES (for sending emails)
+resource "aws_iam_role_policy" "ecs_task_ses" {
+  name = "${local.name_prefix}-ecs-task-ses"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail",
+          "ses:GetIdentityVerificationAttributes"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "ecs_task" {
   role       = aws_iam_role.ecs_task.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"

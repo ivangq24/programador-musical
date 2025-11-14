@@ -54,7 +54,8 @@ resource "aws_lb_listener" "app_https" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
-  certificate_arn   = aws_acm_certificate_validation.main[0].certificate_arn
+  # Use certificate directly without waiting for validation when using external DNS
+  certificate_arn   = var.use_route53 ? aws_acm_certificate_validation.main[0].certificate_arn : aws_acm_certificate.main[0].arn
 
   default_action {
     type             = "forward"
@@ -83,17 +84,9 @@ resource "aws_acm_certificate" "main" {
   tags = local.common_tags
 }
 
-# Certificate validation (when domain is provided)
-resource "aws_acm_certificate_validation" "main" {
-  count = var.domain_name != "" ? 1 : 0
-
-  certificate_arn         = aws_acm_certificate.main[0].arn
-  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
-}
-
-# Route53 records for certificate validation (when domain is provided)
+# Route53 records for certificate validation (only when using Route 53)
 resource "aws_route53_record" "cert_validation" {
-  for_each = var.domain_name != "" ? {
+  for_each = var.domain_name != "" && var.use_route53 ? {
     for dvo in aws_acm_certificate.main[0].domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
       record = dvo.resource_record_value
@@ -109,15 +102,23 @@ resource "aws_route53_record" "cert_validation" {
   zone_id         = data.aws_route53_zone.main[0].zone_id
 }
 
-# Route53 hosted zone (when domain is provided)
+# Certificate validation (only when using Route 53)
+resource "aws_acm_certificate_validation" "main" {
+  count = var.domain_name != "" && var.use_route53 ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.main[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+# Route53 hosted zone (only when using Route 53 for DNS)
 data "aws_route53_zone" "main" {
-  count = var.domain_name != "" ? 1 : 0
+  count = var.domain_name != "" && var.use_route53 ? 1 : 0
   name  = var.domain_name
 }
 
-# Route53 A record (when domain is provided)
+# Route53 A record (only when using Route 53 for DNS)
 resource "aws_route53_record" "main" {
-  count = var.domain_name != "" ? 1 : 0
+  count = var.domain_name != "" && var.use_route53 ? 1 : 0
 
   zone_id = data.aws_route53_zone.main[0].zone_id
   name    = var.domain_name

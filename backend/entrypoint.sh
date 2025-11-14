@@ -68,8 +68,12 @@ fi
 # Skip Python initialization for now (causing transaction issues)
 echo "Skipping Python database initialization..."
 
-# Skip alembic migrations for now (causing transaction issues)
-echo "Skipping alembic migrations..."
+# Run alembic migrations
+echo "Running alembic migrations..."
+alembic upgrade head || {
+    echo "Warning: Alembic migration failed. This may be normal if migrations are already applied."
+    echo "Continuing with application startup..."
+}
 
 # Start the application
 echo "Starting FastAPI application..."

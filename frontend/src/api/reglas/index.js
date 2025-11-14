@@ -6,7 +6,7 @@ export const getReglasByPolitica = async (politicaId) => {
     const response = await client.get(`/programacion/politicas/${politicaId}/reglas`)
     return response.data
   } catch (error) {
-    console.error('Error al obtener reglas:', error)
+
     throw error
   }
 }
@@ -17,7 +17,7 @@ export const getRegla = async (reglaId) => {
     const response = await client.get(`/programacion/reglas/${reglaId}`)
     return response.data
   } catch (error) {
-    console.error('Error al obtener regla:', error)
+
     throw error
   }
 }
@@ -28,7 +28,7 @@ export const createRegla = async (reglaData) => {
     const response = await client.post('/programacion/reglas', reglaData)
     return response.data
   } catch (error) {
-    console.error('Error al crear regla:', error)
+
     throw error
   }
 }
@@ -39,7 +39,7 @@ export const updateRegla = async (reglaId, reglaData) => {
     const response = await client.put(`/programacion/reglas/${reglaId}`, reglaData)
     return response.data
   } catch (error) {
-    console.error('Error al actualizar regla:', error)
+
     throw error
   }
 }
@@ -50,7 +50,7 @@ export const deleteRegla = async (reglaId) => {
     const response = await client.delete(`/programacion/reglas/${reglaId}`)
     return response.data
   } catch (error) {
-    console.error('Error al eliminar regla:', error)
+
     throw error
   }
 }
@@ -61,7 +61,7 @@ export const getSeparacion = async (separacionId) => {
     const response = await client.get(`/programacion/separaciones/${separacionId}`)
     return response.data
   } catch (error) {
-    console.error('Error al obtener separación:', error)
+
     throw error
   }
 }
@@ -72,7 +72,7 @@ export const updateSeparacion = async (separacionId, separacionData) => {
     const response = await client.put(`/programacion/separaciones/${separacionId}`, separacionData)
     return response.data
   } catch (error) {
-    console.error('Error al actualizar separación:', error)
+
     throw error
   }
 }
@@ -83,7 +83,7 @@ export const deleteSeparacion = async (separacionId) => {
     const response = await client.delete(`/programacion/separaciones/${separacionId}`)
     return response.data
   } catch (error) {
-    console.error('Error al eliminar separación:', error)
+
     throw error
   }
 }
