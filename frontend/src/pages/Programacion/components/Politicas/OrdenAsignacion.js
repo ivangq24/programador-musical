@@ -27,9 +27,9 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
   const loadCategorias = async () => {
     setLoading(true)
     try {
-      console.log('🔍 Cargando categorías desde la API...')
+
       const response = await getCategoriasCanciones()
-      console.log('📊 Respuesta completa de la API:', response)
+
       
       // Manejar diferentes formatos de respuesta: array directo, objeto con items, o objeto con categorias
       let categoriasArray = []
@@ -41,7 +41,7 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
         categoriasArray = response.categorias
       }
       
-      console.log('📊 Categorías procesadas:', categoriasArray)
+
       
       // Si las categorías son objetos con nombre, usarlas directamente; si son strings, mapearlas
       const categorias = categoriasArray.map((item, index) => {
@@ -58,14 +58,14 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
             activa: item.activa !== undefined ? item.activa : true
           }
         }
-      })
+      }).filter(c => c && c.nombre && c.nombre.trim() !== '') // Filtrar categorías inválidas
       
       setCategoriasDisponibles(categorias)
       
       // Cargar categorías ya seleccionadas para esta política
-      console.log('🔍 Cargando categorías guardadas para política ID:', politicaId)
+
       const categoriasGuardadas = await obtenerCategoriasPolitica(politicaId)
-      console.log('📊 Categorías guardadas:', categoriasGuardadas)
+
       
       // Solo cargar desde la DB si no hay categorías seleccionadas en el estado del padre
       if (categoriasSeleccionadas.length === 0) {
@@ -75,16 +75,16 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
             .filter(Boolean)
           
           setCategoriasSeleccionadas(categoriasSeleccionadasFormateadas)
-          console.log('✅ Categorías seleccionadas cargadas desde la DB:', categoriasSeleccionadasFormateadas)
+
         } else {
-          console.log('ℹ️ No hay categorías guardadas para esta política - limpiando estado')
+
           setCategoriasSeleccionadas([])
         }
       } else {
-        console.log('ℹ️ Ya hay categorías seleccionadas en el estado del padre - manteniendo estado actual')
+
       }
     } catch (error) {
-      console.error('Error loading categorías:', error)
+
       setCategoriasDisponibles([])
     } finally {
       setLoading(false)
@@ -127,21 +127,21 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
     try {
       const categoriasNombres = categoriasSeleccionadas.map(c => typeof c === 'string' ? c : c.nombre)
       await guardarCategoriasPolitica(politicaId, categoriasNombres)
-      console.log('Categorías guardadas exitosamente:', categoriasNombres)
+
       
       if (onSave) {
         const configuracion = {
           esquema: 'horas-categorias',
           categorias: categoriasSeleccionadas.map(c => ({ 
             id: typeof c === 'string' ? null : c.id, 
-            nombre: typeof c === 'string' ? c : c.nombre 
+            nombre: typeof c === 'string' ? c : (c.nombre || '')
           }))
         }
         onSave(configuracion)
       }
       return true
     } catch (error) {
-      console.error('Error guardando categorías:', error)
+
       alert('Error al guardar las categorías. Inténtalo de nuevo.')
       return false
     }
@@ -149,6 +149,7 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
 
   // Filtrar categorías basado en el término de búsqueda
   const categoriasFiltradas = categoriasDisponibles.filter(categoria =>
+    categoria && categoria.nombre && typeof categoria.nombre === 'string' &&
     categoria.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -281,7 +282,7 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
                             <div className="flex-shrink-0 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
                               <Check className="w-3 h-3 text-white" />
                             </div>
-                            <span className="font-semibold text-sm truncate">{categoria.nombre}</span>
+                            <span className="font-semibold text-sm truncate">{categoria?.nombre || 'Sin nombre'}</span>
                           </div>
                           <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 ml-2" />
                         </div>
@@ -310,7 +311,7 @@ export default function OrdenAsignacion({ onSave, onCancel, politicaId = 1, cate
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3 flex-1 min-w-0">
                             <div className="flex-shrink-0 w-4 h-4 rounded-full bg-gray-300 border-2 border-gray-400"></div>
-                            <span className="font-medium text-sm truncate">{categoria.nombre}</span>
+                            <span className="font-medium text-sm truncate">{categoria?.nombre || 'Sin nombre'}</span>
                           </div>
                           <Circle className="w-5 h-5 text-gray-400 flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>

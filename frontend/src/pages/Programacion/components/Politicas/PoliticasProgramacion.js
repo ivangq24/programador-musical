@@ -5,13 +5,14 @@ import {
   relojesApi, 
   eventosRelojApi 
 } from '../../../../api/programacion/politicasApi';
+import { buildApiUrl } from '../../../../utils/apiConfig';
 import {
   getReglasByPolitica,
   createRegla,
   updateRegla,
   deleteRegla
 } from '../../../../api/reglas';
-import { guardarCategoriasPolitica } from '../../../../api/canciones';
+import { guardarCategoriasPolitica, obtenerCategoriasPolitica } from '../../../../api/canciones';
 import OrdenAsignacion from './OrdenAsignacion'
 import EventosReloj from './EventosReloj';
 
@@ -94,12 +95,12 @@ export default function PoliticasProgramacion() {
   const loadReglasPolitica = useCallback(async (politicaId) => {
     try {
       setLoadingReglas(true);
-      console.log('🔄 Cargando reglas para política ID:', politicaId);
+
       const reglasData = await getReglasByPolitica(politicaId);
-      console.log('✅ Reglas cargadas desde API:', reglasData);
+
       setReglasPolitica(reglasData);
     } catch (error) {
-      console.error('❌ Error al cargar reglas:', error);
+
     } finally {
       setLoadingReglas(false);
     }
@@ -108,7 +109,7 @@ export default function PoliticasProgramacion() {
   // Cargar categorías seleccionadas al inicializar el componente - Optimizado
   useEffect(() => {
     // No cargar categorías automáticamente - se cargarán cuando se edite una política específica
-    console.log('ℹ️ Inicializando sin categorías pre-seleccionadas');
+
     setCategoriasSeleccionadas([]);
   }, []);
 
@@ -130,18 +131,48 @@ export default function PoliticasProgramacion() {
 
   // Debug: monitorear cambios en showReglaForm
   useEffect(() => {
-    console.log('🔍 showReglaForm cambió a:', showReglaForm);
+
   }, [showReglaForm]);
 
   // ===== FUNCIONES AUXILIARES =====
   
+  // Función para cargar categorías de una política - Memoizada
+  const loadCategoriasPolitica = useCallback(async (politicaId) => {
+    if (!politicaId) {
+
+      setCategoriasSeleccionadas([]);
+      return;
+    }
+    
+    try {
+
+      const categoriasData = await obtenerCategoriasPolitica(politicaId);
+
+      
+      if (categoriasData?.categorias && Array.isArray(categoriasData.categorias)) {
+        // Si las categorías son strings, usarlas directamente; si son objetos, extraer el nombre
+        const categoriasNombres = categoriasData.categorias.map(c => 
+          typeof c === 'string' ? c : c.nombre || c
+        );
+        setCategoriasSeleccionadas(categoriasNombres);
+
+      } else {
+
+        setCategoriasSeleccionadas([]);
+      }
+    } catch (error) {
+
+      setCategoriasSeleccionadas([]);
+    }
+  }, []);
+
   // Función para manejar el guardado de categorías desde OrdenAsignacion - Memoizada
   const handleCategoriasSaved = useCallback((configuracion) => {
-    console.log('Configuración de orden de asignación:', configuracion);
+
     // Actualizar las categorías seleccionadas
     if (configuracion.categorias) {
       const nuevasCategorias = configuracion.categorias.map(c => c.nombre);
-      console.log('Categorías actualizadas:', nuevasCategorias);
+
       // Actualizar el estado de categorías seleccionadas
       setCategoriasSeleccionadas(nuevasCategorias);
     }
@@ -169,9 +200,12 @@ export default function PoliticasProgramacion() {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 Cargando políticas desde API...');
       const data = await politicasApi.getAll();
-      console.log('✅ Políticas cargadas desde API:', data);
+      
+      if (!data || !Array.isArray(data)) {
+        setPoliticas([]);
+        return;
+      }
       
       // Mapear datos de la API al formato esperado por el componente
       const politicasMapeadas = data.map(politica => ({
@@ -192,8 +226,8 @@ export default function PoliticasProgramacion() {
       
       setPoliticas(politicasMapeadas);
     } catch (err) {
-      console.error('❌ Error loading políticas:', err);
-      setError(err.message || 'Error al cargar las políticas');
+      const errorMessage = err.response?.data?.detail || err.message || 'Error al cargar las políticas';
+      setError(errorMessage);
       setPoliticas([]);
     } finally {
       setLoading(false);
@@ -203,14 +237,14 @@ export default function PoliticasProgramacion() {
   // Cargar días modelo por política - Memoizada
   const loadDiasModelo = useCallback(async (politicaId) => {
     try {
-      console.log('🔄 Cargando días modelo para política ID:', politicaId);
+
       const diasModeloData = await diasModeloApi.getByPolitica(politicaId);
-      console.log('✅ Días modelo cargados desde API:', diasModeloData);
-      console.log('🔍 IDs de días modelo disponibles:', diasModeloData.map(d => ({ id: d.id, nombre: d.nombre })));
-      console.log('🔍 Días modelo completos:', diasModeloData);
+
+
+
       setDiasModelo(diasModeloData);
     } catch (err) {
-      console.error('❌ Error loading días modelo:', err);
+
       setDiasModelo([]);
     }
   }, []);
@@ -218,12 +252,12 @@ export default function PoliticasProgramacion() {
   // Cargar relojes por política - Memoizada
   const loadRelojes = useCallback(async (politicaId) => {
     try {
-      console.log('🔄 Cargando relojes para política ID:', politicaId);
+
       const relojesData = await relojesApi.getByPolitica(politicaId);
-      console.log('✅ Relojes cargados:', relojesData);
+
       setRelojes(relojesData);
     } catch (err) {
-      console.error('❌ Error loading relojes:', err);
+
       setRelojes([]);
     }
   }, []);
@@ -235,8 +269,8 @@ export default function PoliticasProgramacion() {
 
   // Funciones para el formulario de reglas - Memoizadas
   const handleNewRegla = useCallback(() => {
-    console.log('🔍 handleNewRegla ejecutándose...');
-    console.log('🔍 showReglaForm antes:', showReglaForm);
+
+
     setReglaFormData({
       tipoRegla: '',
       reglaHabilitada: true,
@@ -248,9 +282,9 @@ export default function PoliticasProgramacion() {
       soloVerificarDia: false,
       separaciones: []
     });
-    console.log('🔍 setShowReglaForm(true) ejecutándose...');
+
     setShowReglaForm(true);
-    console.log('🔍 showReglaForm después:', showReglaForm);
+
   }, []);
 
   const handleReglaFormChange = useCallback((field, value) => {
@@ -285,7 +319,7 @@ export default function PoliticasProgramacion() {
 
   const handleReglaSave = useCallback(async () => {
     try {
-      console.log('💾 Guardando regla:', reglaFormData);
+
       
       // Preparar datos para enviar a la API
       const reglaData = {
@@ -305,7 +339,7 @@ export default function PoliticasProgramacion() {
       
       // Crear la regla
       const nuevaRegla = await createRegla(reglaData);
-      console.log('✅ Regla creada:', nuevaRegla);
+
       
       // Cerrar el modal y limpiar el formulario
       setShowReglaForm(false);
@@ -320,14 +354,14 @@ export default function PoliticasProgramacion() {
       });
       
       // Mostrar notificación de éxito
-      console.log('✅ Regla guardada exitosamente');
+
       
       // Recargar las reglas de la política
       await loadReglasPolitica(selectedPolitica?.id || 1);
       
     } catch (error) {
-      console.error('❌ Error al guardar regla:', error);
-      console.error('❌ Error al guardar la regla. Por favor, inténtalo de nuevo.');
+
+
     }
   }, [reglaFormData, selectedPolitica, loadReglasPolitica]);
 
@@ -391,8 +425,8 @@ export default function PoliticasProgramacion() {
   // Función para obtener los eventos del reloj seleccionado en la tabla - Memoizada
   const getSelectedRelojEvents = useCallback(() => {
     // Si estamos en el formulario de reloj (creando o editando), usar relojEvents
-    if (showRelojForm && relojEvents.length > 0) {
-      return relojEvents;
+    if (showRelojForm) {
+      return relojEvents || [];
     }
 
     // Si hay un reloj seleccionado en la tabla, buscar sus eventos
@@ -525,7 +559,7 @@ export default function PoliticasProgramacion() {
   }, []);
 
   // Función para obtener estadísticas ordenadas - Memoizada
-  const getSortedCategoryStats = useMemo(() => {
+  const getSortedCategoryStats = useCallback(() => {
     const stats = getCategoryStats();
     const entries = Object.entries(stats);
     
@@ -565,12 +599,12 @@ export default function PoliticasProgramacion() {
 
   const loadRelojesForPolitica = useCallback(async (politicaId) => {
     try {
-      console.log('🔄 Cargando relojes para política ID:', politicaId);
+
       const relojesData = await relojesApi.getByPolitica(politicaId);
-      console.log('✅ Relojes cargados:', relojesData);
+
       setRelojes(relojesData);
     } catch (err) {
-      console.error('❌ Error loading relojes:', err);
+
       setRelojes([]);
     }
   }, []);
@@ -590,9 +624,9 @@ export default function PoliticasProgramacion() {
 
       // Actualizar en la base de datos
       await relojesApi.update(relojId, { habilitado: nuevoEstado });
-      console.log(`✅ Reloj ${relojId} actualizado: habilitado = ${nuevoEstado}`);
+
     } catch (error) {
-      console.error('❌ Error al actualizar estado del reloj:', error);
+
       
       // Revertir cambio local en caso de error
       setRelojes(prev => prev.map(r => 
@@ -620,9 +654,9 @@ export default function PoliticasProgramacion() {
 
       // Actualizar en la base de datos
       await updateRegla(reglaId, { habilitada: nuevoEstado });
-      console.log(`✅ Regla ${reglaId} actualizada: habilitada = ${nuevoEstado}`);
+
     } catch (error) {
-      console.error('❌ Error al actualizar estado de la regla:', error);
+
       
       // Revertir cambio local en caso de error
       setReglasPolitica(prev => prev.map(r => 
@@ -650,9 +684,9 @@ export default function PoliticasProgramacion() {
 
       // Actualizar en la base de datos
       await diasModeloApi.update(diaModeloId, { habilitado: nuevoEstado });
-      console.log(`✅ Día modelo ${diaModeloId} actualizado: habilitado = ${nuevoEstado}`);
+
     } catch (error) {
-      console.error('❌ Error al actualizar estado del día modelo:', error);
+
       
       // Revertir cambio local en caso de error
       setDiasModelo(prev => prev.map(dm => 
@@ -667,9 +701,9 @@ export default function PoliticasProgramacion() {
   }, [diasModelo, showNotification]);
 
   const handleEdit = useCallback(async (politica) => {
-    console.log('🔍 handleEdit - Política seleccionada:', politica);
-    console.log('🔍 handleEdit - Clave de la política:', politica.clave);
-    console.log('🔍 handleEdit - Nombre de la política:', politica.nombre);
+
+
+
     
     // Resetear categorías seleccionadas para no arrastrar selección entre políticas
     setCategoriasSeleccionadas([]);
@@ -677,10 +711,10 @@ export default function PoliticasProgramacion() {
     try {
       // Obtener los datos completos de la política
       const politicaCompleta = await politicasApi.getById(politica.id);
-      console.log('🔍 handleEdit - Política completa obtenida:', politicaCompleta);
+
       setSelectedPolitica(politicaCompleta);
     } catch (error) {
-      console.error('❌ Error al obtener política completa:', error);
+
       setSelectedPolitica(politica);
     }
     
@@ -710,7 +744,7 @@ export default function PoliticasProgramacion() {
         // Actualizar estado local en lugar de recargar todo
         setPoliticas(prev => prev.filter(p => p.id !== id));
       } catch (err) {
-        console.error('Error deleting política:', err);
+
         showNotification(`Error al eliminar la política: ${err.message}`, 'error');
       } finally {
         setLoading(false);
@@ -725,16 +759,16 @@ export default function PoliticasProgramacion() {
   const handleSave = useCallback(async (politicaData) => {
     try {
       setLoading(true);
-      console.log('🔍 handleSave - Datos a enviar:', politicaData);
-      console.log('🔍 handleSave - Modo:', formMode);
-      console.log('🔍 handleSave - ID de política:', selectedPolitica?.id);
+
+
+
       
       if (formMode === 'edit') {
-        console.log('🔍 handleSave - Actualizando política ID:', selectedPolitica.id);
+
         await politicasApi.update(selectedPolitica.id, politicaData);
         showNotification('Política actualizada correctamente', 'success');
       } else {
-        console.log('🔍 handleSave - Creando nueva política');
+
         await politicasApi.create(politicaData);
         showNotification('Política creada correctamente', 'success');
       }
@@ -752,7 +786,7 @@ export default function PoliticasProgramacion() {
       setSelectedPolitica(null);
       setFormMode('new');
     } catch (err) {
-      console.error('Error saving política:', err);
+
       showNotification(`Error al guardar la política: ${err.message}`, 'error');
     } finally {
       setLoading(false);
@@ -762,10 +796,10 @@ export default function PoliticasProgramacion() {
   // ===== FUNCIONES DE GESTIÓN DE RELOJES =====
   
   const handleNewReloj = useCallback(async () => {
-    console.log('🔵 handleNewReloj - INICIO');
-    console.log('🔵 selectedPolitica:', selectedPolitica);
-    console.log('🔵 showForm:', showForm);
-    console.log('🔵 formMode:', formMode);
+
+
+
+
     
     // Permitir crear reloj si:
     // 1. Hay una política seleccionada, O
@@ -778,22 +812,47 @@ export default function PoliticasProgramacion() {
       return;
     }
     
+    // Determinar qué política usar
+    const politicaToUse = selectedPolitica;
+    const politicaId = politicaToUse?.id;
+    
+    // Cargar categorías de la política
+    if (politicaId) {
+      await loadCategoriasPolitica(politicaId);
+    } else {
+      setCategoriasSeleccionadas([]);
+    }
+    
     setSelectedReloj(null);
     setRelojFormMode('new');
     
     // Iniciar con reloj vacío - sin eventos automáticos
     setRelojEvents([]);
-    console.log('🔍 Nuevo reloj iniciado vacío - sin eventos automáticos');
+
     
     setShowRelojForm(true); // Mostrar el RelojForm modal
-    console.log('🔵 handleNewReloj - FIN - Modal abierto');
-  }, [selectedPolitica, showForm, formMode]);
 
-  const handleEditReloj = useCallback((reloj) => {
-    console.log('🟡 handleEditReloj - INICIO - Reloj recibido:', reloj);
-    console.log('🟡 handleEditReloj - Eventos del reloj:', reloj.eventos);
+  }, [selectedPolitica, showForm, formMode, loadCategoriasPolitica]);
+
+  const handleEditReloj = useCallback(async (reloj) => {
+
+
     setSelectedReloj(reloj);
     setRelojFormMode('edit');
+    
+    // Cargar categorías de la política asociada al reloj
+    const politicaId = reloj.politica_id || reloj.politica?.id;
+    if (politicaId) {
+      await loadCategoriasPolitica(politicaId);
+    } else {
+      // Si no hay política en el reloj, usar la política seleccionada
+      const politicaIdFromSelected = selectedPolitica?.id;
+      if (politicaIdFromSelected) {
+        await loadCategoriasPolitica(politicaIdFromSelected);
+      } else {
+        setCategoriasSeleccionadas([]);
+      }
+    }
     
     // Mapear eventos del backend al formato del frontend
     const eventosMapeados = reloj.eventos ? reloj.eventos.map(evento => ({
@@ -817,14 +876,14 @@ export default function PoliticasProgramacion() {
     })) : [];
     
     setRelojEvents(eventosMapeados);
-    console.log('🟡 handleEditReloj - Eventos mapeados al estado:', eventosMapeados);
+
     setShowRelojForm(true);
-    console.log('🟡 handleEditReloj - FIN - Modal abierto para edición');
-  }, []);
+
+  }, [selectedPolitica, loadCategoriasPolitica]);
 
   const handleViewReloj = useCallback((reloj) => {
-    console.log('🔄 handleViewReloj - Reloj recibido:', reloj);
-    console.log('🔄 handleViewReloj - Eventos del reloj:', reloj.eventos);
+
+
     setSelectedReloj(reloj);
     setRelojFormMode('view');
     
@@ -850,7 +909,7 @@ export default function PoliticasProgramacion() {
     })) : [];
     
     setRelojEvents(eventosMapeados);
-    console.log('🔄 handleViewReloj - Eventos mapeados al estado:', eventosMapeados);
+
     setShowRelojForm(true);
   }, []);
 
@@ -873,7 +932,7 @@ export default function PoliticasProgramacion() {
           }
         }
       } catch (err) {
-        console.error('Error deleting reloj:', err);
+
         setNotification({ type: 'error', message: 'Error al eliminar el reloj' });
       } finally {
         setLoading(false);
@@ -882,37 +941,37 @@ export default function PoliticasProgramacion() {
   }, [relojes, selectedPolitica, selectedRelojInTable, showNotification]);
 
   const handleSaveReloj = useCallback(async (relojData, politicaFromForm = null) => {
-    console.log('🔍 handleSaveReloj - INICIO');
-    console.log('🔍 handleSaveReloj - relojData recibido:', relojData);
-    console.log('🔍 handleSaveReloj - relojFormMode:', relojFormMode);
-    console.log('🔍 handleSaveReloj - selectedPolitica:', selectedPolitica);
-    console.log('🔍 handleSaveReloj - politicaFromForm:', politicaFromForm);
+
+
+
+
+
     
     try {
       setLoading(true);
       
       // Usar la política del formulario si está disponible, sino usar selectedPolitica
       const politicaToUse = politicaFromForm || selectedPolitica;
-      console.log('🔍 handleSaveReloj - politicaToUse:', politicaToUse);
+
       
       let relojId;
       
       if (relojFormMode === 'new') {
-        console.log('🔍 handleSaveReloj - Modo: CREAR NUEVO RELOJ');
+
         // Crear nuevo reloj
         if (!politicaToUse || !politicaToUse.id) {
           const errorMsg = 'No se ha seleccionado una política válida. Por favor, guarde la política primero antes de crear el reloj.';
-          console.error('❌', errorMsg);
+
           setNotification({ type: 'error', message: errorMsg });
           return;
         }
         
-        console.log('🔍 handleSaveReloj - Llamando a relojesApi.create...');
-        console.log('🔍 handleSaveReloj - politicaId:', politicaToUse.id);
-        console.log('🔍 handleSaveReloj - relojData:', relojData);
+
+
+
         
         const newReloj = await relojesApi.create(politicaToUse.id, relojData);
-        console.log('✅ handleSaveReloj - Reloj creado exitosamente:', newReloj);
+
         relojId = newReloj.id;
         setNotification({ type: 'success', message: 'Reloj creado exitosamente' });
       } else {
@@ -926,7 +985,7 @@ export default function PoliticasProgramacion() {
           try {
             await eventosRelojApi.delete(evento.id);
           } catch (deleteError) {
-            console.error('Error al eliminar evento existente:', deleteError);
+
           }
         }
         
@@ -948,7 +1007,7 @@ export default function PoliticasProgramacion() {
               categoria: evento.categoria,
               descripcion: evento.descripcion,
               duracion: evento.duracion,
-              numero_cancion: evento.numeroCancion || evento.numero_cancion || '-',
+numero_cancion: evento.numeroCancion || evento.numero_cancion || '-',
               sin_categorias: evento.sinCategorias || evento.sin_categorias || '-',
               id_media: evento.idMedia || evento.id_media,
               categoria_media: evento.categoriaMedia || evento.categoria_media,
@@ -958,8 +1017,8 @@ export default function PoliticasProgramacion() {
             
             await eventosRelojApi.create(relojId, eventoData);
           } catch (eventoError) {
-            console.error('❌ Error al guardar evento:', eventoError);
-            console.error('❌ Detalles del error:', eventoError.response?.data);
+
+
             
             const errorMessage = formatErrorMessage(eventoError, 'Error al guardar evento');
             setNotification({ type: 'error', message: `Error al guardar evento: ${errorMessage}` });
@@ -969,24 +1028,24 @@ export default function PoliticasProgramacion() {
       }
       
       // Recargar relojes de la política actual primero
-      console.log('🔄 Recargando lista de relojes...');
+
       if (selectedPolitica) {
         const relojesData = await relojesApi.getByPolitica(selectedPolitica.id);
         setRelojes(relojesData);
-        console.log('✅ Lista de relojes recargada');
+
       }
       
       // Limpiar estados después de recargar
-      console.log('🔄 Limpiando estados y cerrando formulario...');
+
       setShowRelojForm(false);
       setSelectedReloj(null);
       setRelojFormMode('new');
       setRelojEvents([]);
       setSelectedRelojInTable(null); // Limpiar selección de tabla
-      console.log('✅ Formulario cerrado, estados limpiados');
+
     } catch (err) {
-      console.error('❌ Error saving reloj:', err);
-      console.error('❌ Error details:', err.response?.data);
+
+
       
       const errorMessage = formatErrorMessage(err, 'Error al guardar el reloj');
       setNotification({ type: 'error', message: errorMessage });
@@ -1009,7 +1068,7 @@ export default function PoliticasProgramacion() {
           message: 'Día modelo eliminado correctamente'
         });
       } catch (err) {
-        console.error('Error deleting día modelo:', err);
+
         const errorMessage = err.response?.data?.detail || err.message || 'Error al eliminar el día modelo';
         setNotification({
           type: 'error',
@@ -1052,7 +1111,7 @@ export default function PoliticasProgramacion() {
       setSelectedDiaModelo(null);
       setDiaModeloFormMode('new');
     } catch (err) {
-      console.error('Error saving dia modelo:', err);
+
       
       const errorMessage = formatErrorMessage(err, 'Error al guardar el día modelo');
       setNotification({ type: 'error', message: errorMessage });
@@ -1081,7 +1140,7 @@ export default function PoliticasProgramacion() {
       
       return [hours, minutes, seconds];
     } catch (error) {
-      console.error('Error parsing time:', error);
+
       return [0, 0, 0];
     }
   }, []);
@@ -1137,7 +1196,7 @@ export default function PoliticasProgramacion() {
       
       return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}:${newSeconds.toString().padStart(2, '0')}`;
     } catch (error) {
-      console.error('Error al calcular offset:', error);
+
       return '00:00:00';
     }
   }, [relojEvents, parseTimeSafely]);
@@ -1179,8 +1238,8 @@ export default function PoliticasProgramacion() {
 
   // addEventToReloj debe definirse antes de handlePredefinedEventClick porque lo usa
   const addEventToReloj = useCallback((newEvent) => {
-    console.log('🔄 addEventToReloj - Evento recibido:', newEvent);
-    console.log('🔄 addEventToReloj - Estado actual de relojEvents:', relojEvents);
+
+
     
     setRelojEvents(prev => {
       // Calcular el offset correcto para el nuevo evento
@@ -1222,11 +1281,11 @@ export default function PoliticasProgramacion() {
       };
       
       const newState = [...prev, eventWithCorrectOffsets];
-      console.log('🔄 addEventToReloj - Nuevo estado de relojEvents:', newState);
+
       return newState;
     });
-    console.log('✅ Evento añadido al reloj:', newEvent);
-  }, [relojEvents]);
+
+  }, []); // No necesita relojEvents en dependencias porque usa la forma funcional de setState
 
   const handleEventClick = useCallback((eventType, eventName) => {
     setSelectedEventType({ type: eventType, name: eventName });
@@ -1276,10 +1335,10 @@ export default function PoliticasProgramacion() {
       const corteEncontrado = cortes.find(corte => corte.nombre === eventName);
       if (corteEncontrado) {
         duracion = corteEncontrado.duracion; // Usar la duración real del corte
-        console.log('🔍 Corte encontrado:', corteEncontrado);
-        console.log('🔍 Duración del corte:', duracion);
+
+
       } else {
-        console.warn('⚠️ Corte no encontrado:', eventName);
+
       }
     }
     
@@ -1322,7 +1381,7 @@ export default function PoliticasProgramacion() {
     
     // Añadir directamente al reloj
     const newEvent = {
-      id: relojEvents.length + 1,
+      id: Date.now(), // Usar timestamp para evitar conflictos de ID
       numero: generateConsecutivo(),
       tipo: getEventTypeNumber(eventType),
       categoria: categoria,
@@ -1345,7 +1404,7 @@ export default function PoliticasProgramacion() {
     // Añadir el evento a la tabla (addEventToReloj calculará los offsets automáticamente)
     addEventToReloj(newEvent);
     
-    console.log('Evento añadido al reloj:', newEvent);
+
     
     // Mostrar notificación de éxito
     setNotification({
@@ -1361,15 +1420,15 @@ export default function PoliticasProgramacion() {
       try {
         // Si el evento tiene un ID válido (no es temporal), eliminarlo de la BD
         if (eventId && typeof eventId === 'number') {
-          console.log('🔄 Eliminando evento de la base de datos:', eventId);
+
           await eventosRelojApi.delete(eventId);
-          console.log('✅ Evento eliminado de la base de datos');
+
           
           // Recargar relojes para actualizar la vista de lista
           if (selectedPolitica) {
             const relojesData = await relojesApi.getByPolitica(selectedPolitica.id);
             setRelojes(relojesData);
-            console.log('🔄 Relojes recargados después de eliminar evento');
+
           }
         }
         
@@ -1381,7 +1440,7 @@ export default function PoliticasProgramacion() {
           message: 'Evento eliminado correctamente'
         });
       } catch (error) {
-        console.error('❌ Error al eliminar evento:', error);
+
         setNotification({
           type: 'error',
           message: 'Error al eliminar el evento'
@@ -1973,7 +2032,7 @@ export default function PoliticasProgramacion() {
                 getEventCategory={getEventCategory}
                 getNumeroCancion={getNumeroCancion}
                 onSave={(eventData) => {
-                  console.log('Guardando evento:', eventData);
+
                   setShowEventForm(false);
                   setSelectedEventType(null);
                   setEventFormData({
@@ -2045,12 +2104,40 @@ export default function PoliticasProgramacion() {
           const loadCortes = async () => {
             setLoadingCortes(true);
             try {
-              const response = await fetch('http://localhost:8000/api/v1/catalogos/general/cortes/?activo=true');
+              // Obtener token de autenticación
+              const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+              const headers = {
+                'Content-Type': 'application/json',
+              };
+              if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+              }
+              
+              const response = await fetch(buildApiUrl('/catalogos/general/cortes/?activo=true'), {
+                headers: headers
+              });
+              
+              if (!response.ok) {
+                if (response.status === 403) {
+                  throw new Error('No tienes permisos para acceder a los cortes. Por favor, inicia sesión.');
+                }
+                if (response.status === 401) {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('idToken');
+                    localStorage.removeItem('refreshToken');
+                    window.location.href = '/auth/login';
+                  }
+                  throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+                }
+                throw new Error(`Error al cargar cortes: ${response.status}`);
+              }
+              
               const data = await response.json();
               setCortes(data || []);
-              console.log('🔍 RelojForm - Cortes cargados:', data);
+
             } catch (error) {
-              console.error('Error al cargar cortes en RelojForm:', error);
+              console.error('Error al cargar cortes:', error);
               setCortes([]);
             } finally {
               setLoadingCortes(false);
@@ -2074,15 +2161,13 @@ export default function PoliticasProgramacion() {
           try {
             return timeString.split(':').map(Number);
           } catch (error) {
-            console.error('Error al parsear tiempo:', error);
+
             return [0, 0, 0];
           }
         };
 
         const [formData, setFormData] = useState({
           habilitado: reloj?.habilitado ?? true,
-          perteneceGrupo: reloj?.pertenece_grupo ?? false,
-          grupo: reloj?.grupo || '',
           clave: reloj?.clave || '',
           numeroRegla: reloj?.numero_regla || '',
           nombre: reloj?.nombre || '',
@@ -2096,12 +2181,6 @@ export default function PoliticasProgramacion() {
         
 
 
-        // Mock data
-        const grupos = [
-          { value: 'GRUPO_A', label: 'Grupo A' },
-          { value: 'GRUPO_B', label: 'Grupo B' },
-          { value: 'GRUPO_C', label: 'Grupo C' }
-        ];
 
         const tabs = [
           { 
@@ -2135,18 +2214,17 @@ export default function PoliticasProgramacion() {
           const newErrors = {};
           if (!formData.clave) newErrors.clave = 'La clave es requerida';
           if (!formData.nombre) newErrors.nombre = 'El nombre es requerido';
-          if (formData.perteneceGrupo && !formData.grupo) newErrors.grupo = 'El grupo es requerido cuando pertenece a un grupo';
           setErrors(newErrors);
           return Object.keys(newErrors).length === 0;
         };
 
         const handleSubmit = async () => {
-          console.log('🔍 RelojForm - handleSubmit INICIO');
-          console.log('🔍 RelojForm - formData actual:', formData);
-          console.log('🔍 RelojForm - relojEvents:', relojEvents);
+
+
+
           
           if (!validateForm()) {
-            console.log('❌ RelojForm - Validación falló');
+
             return;
           }
           
@@ -2156,20 +2234,20 @@ export default function PoliticasProgramacion() {
             const relojDataForBackend = {
               habilitado: formData.habilitado ?? true,
               clave: formData.clave || '',
-              nombre: formData.nombre || '',
+                  nombre: formData.nombre || '',
               numero_eventos: relojEvents.length || 0,
               duracion: '00:00:00'
             };
             
-            console.log('📦 DATOS A ENVIAR AL BACKEND:', JSON.stringify(relojDataForBackend, null, 2));
-            console.log('🔍 RelojForm - politica disponible:', politica);
-            console.log('🔍 RelojForm - Llamando a onSave...');
+
+
+
             
             // Llamar a la función onSave del componente padre, pasando también la política
             await onSave(relojDataForBackend, politica);
-            console.log('✅ RelojForm - onSave completado exitosamente');
+
           } catch (error) {
-            console.error('Error en RelojForm handleSubmit:', error);
+
           } finally {
             setIsLoading(false);
           }
@@ -2209,7 +2287,7 @@ export default function PoliticasProgramacion() {
                   <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
                     <input 
                       type="checkbox" 
-                      name="habilitado" 
+ame="habilitado" 
                       checked={formData.habilitado} 
                       onChange={handleChange} 
                       disabled={isReadOnly} 
@@ -2254,48 +2332,6 @@ export default function PoliticasProgramacion() {
                         className={inputClass} 
                         placeholder="Número de regla"
                       />
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm mb-4">
-                        <input 
-                          type="checkbox" 
-                          name="perteneceGrupo" 
-                          checked={formData.perteneceGrupo} 
-                          onChange={handleChange} 
-                          disabled={isReadOnly} 
-                          className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded transition-all cursor-pointer disabled:cursor-not-allowed" 
-                        />
-                        <label className="text-base font-semibold text-gray-700 cursor-pointer">Pertenece al grupo de relojes</label>
-                      </div>
-                      
-                      {formData.perteneceGrupo && (
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-2">Grupo</label>
-                          <select 
-                            name="grupo" 
-                            value={formData.grupo || ''} 
-                            onChange={handleChange} 
-                            disabled={isReadOnly} 
-                            className={selectClass}
-                          >
-                            <option value="">Seleccionar grupo</option>
-                            {grupos.map((grupo) => (
-                              <option key={grupo.value} value={grupo.value}>
-                                {grupo.label}
-                              </option>
-                            ))}
-                          </select>
-                          {errors.grupo && (
-                            <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>{errors.grupo}</span>
-                            </p>
-                          )}
-                        </div>
-                      )}
                     </div>
                     
                     <div className="md:col-span-2">
@@ -2535,16 +2571,31 @@ export default function PoliticasProgramacion() {
                           <tbody className="bg-white divide-y divide-gray-200">
                             {(() => {
                               const events = getSelectedRelojEvents();
+                              if (!events || events.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan="9" className="px-3 py-8 text-center text-gray-500">
+                                      <div className="flex flex-col items-center justify-center space-y-2">
+                                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        <p className="text-sm font-medium">No hay eventos en el reloj</p>
+                                        <p className="text-xs text-gray-400">Agrega eventos desde el panel izquierdo</p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              }
                               return events.map((event, index) => (
                               <tr
-                                key={event.id}
+                                key={event.id || index}
                                 className={`hover:bg-gray-50`}
                                 style={{ borderLeft: `4px solid ${colorForCategory(event.categoria)}` }}
                               >
                                 <td className="px-3 py-2 text-sm font-medium text-gray-900">{event.numero}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.offset}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.offset || '00:00:00'}</td>
                                 
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.offsetFinal}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.offsetFinal || '00:00:00'}</td>
                                 <td className="px-3 py-2 text-sm text-gray-600">
                                   <span className="inline-flex items-center gap-2">
                                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorForCategory(event.categoria) }}></span>
@@ -2552,9 +2603,9 @@ export default function PoliticasProgramacion() {
                                   </span>
                                 </td>
                                 <td className="px-3 py-2 text-sm text-gray-600">{event.descripcion}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.duracion}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.numeroCancion}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.sinCategorias}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{typeof event.duracion === 'string' ? event.duracion : (typeof event.duracion === 'number' ? `${Math.floor(event.duracion / 60)}:${String(event.duracion % 60).padStart(2, '0')}` : event.duracion)}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.numeroCancion || '-'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.sinCategorias || '-'}</td>
                                 <td className="px-3 py-2 text-sm text-gray-600">
                                   <button
                                     onClick={() => deleteEventFromReloj(event.id)}
@@ -2615,7 +2666,7 @@ export default function PoliticasProgramacion() {
                                 try {
                                   return timeString.split(':').map(Number);
                                 } catch (error) {
-                                  console.error('Error al parsear tiempo:', error);
+
                                   return [0, 0, 0];
                                 }
                               };
@@ -2737,14 +2788,14 @@ export default function PoliticasProgramacion() {
                             
                             // Mapa de colores para cada categoría
                             const colorMap = {
-                              'Canciones': { color: 'bg-blue-500', nombre: 'Canciones' },
-                              'Corte Comercial': { color: 'bg-red-500', nombre: 'Corte Comercial' },
-                              'Nota Operador': { color: 'bg-yellow-500', nombre: 'Nota Operador' },
-                              'ETM': { color: 'bg-green-500', nombre: 'ETM' },
-                              'Cartucho Fijo': { color: 'bg-purple-500', nombre: 'Cartucho Fijo' },
-                              'Comando': { color: 'bg-indigo-500', nombre: 'Comando' },
-                              'Twofer': { color: 'bg-pink-500', nombre: 'Twofer' },
-                              'Característica Específica': { color: 'bg-lime-500', nombre: 'Característica Específica' }
+                              'Canciones': { color: 'bg-blue-500',     nombre: 'Canciones' },
+                              'Corte Comercial': { color: 'bg-red-500',     nombre: 'Corte Comercial' },
+                              'Nota Operador': { color: 'bg-yellow-500',     nombre: 'Nota Operador' },
+                              'ETM': { color: 'bg-green-500',     nombre: 'ETM' },
+                              'Cartucho Fijo': { color: 'bg-purple-500',     nombre: 'Cartucho Fijo' },
+                              'Comando': { color: 'bg-indigo-500',     nombre: 'Comando' },
+                              'Twofer': { color: 'bg-pink-500',     nombre: 'Twofer' },
+                              'Característica Específica': { color: 'bg-lime-500',     nombre: 'Característica Específica' }
                             };
                             
                             // Filtrar solo las categorías presentes
@@ -3024,7 +3075,7 @@ export default function PoliticasProgramacion() {
           try {
             return timeString.split(':').map(Number);
           } catch (error) {
-            console.error('Error al parsear tiempo:', error);
+
             return [0, 0, 0];
           }
         };
@@ -3061,7 +3112,7 @@ export default function PoliticasProgramacion() {
             // Crear el nuevo evento
             const newEvent = {
               id: relojEvents.length + 1,
-              numero: localFormData.consecutivo,
+numero: localFormData.consecutivo,
               offset: localFormData.offset,
               desdeETM: localFormData.offset,
               desdeCorte: localFormData.offset,
@@ -3070,7 +3121,7 @@ export default function PoliticasProgramacion() {
               categoria: eventType?.type === 'cartucho-fijo' ? localFormData.categoria : getEventCategory(eventType?.type || 'otros'),
               descripcion: localFormData.descripcion,
               duracion: localFormData.duracion,
-              numeroCancion: getNumeroCancion(eventType?.type || 'otros'),
+numeroCancion: getNumeroCancion(eventType?.type || 'otros'),
               sinCategorias: '-',
               // Campos adicionales para Cartucho Fijo
               ...(eventType?.type === 'cartucho-fijo' && {
@@ -3090,15 +3141,15 @@ export default function PoliticasProgramacion() {
             const finalMinutes = Math.floor((finalTotalSeconds % 3600) / 60);
             const finalSeconds = finalTotalSeconds % 60;
             
-            newEvent.offsetFinal = `${finalHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}:${finalSeconds.toString().padStart(2, '0')}`;
+ewEvent.offsetFinal = `${finalHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}:${finalSeconds.toString().padStart(2, '0')}`;
             
             // Añadir el evento a la tabla
             addEventToReloj(newEvent);
             
-            console.log('Evento añadido desde formulario:', newEvent);
+
             onSave(newEvent);
           } catch (error) {
-            console.error('Error al guardar:', error);
+
           } finally {
             setIsLoading(false);
           }
@@ -3152,7 +3203,7 @@ export default function PoliticasProgramacion() {
                     </label>
                     <input 
                       type="text" 
-                      name="consecutivo" 
+ame="consecutivo" 
                       value={localFormData.consecutivo || ''} 
                       onChange={handleChange} 
                       className={inputClass} 
@@ -3172,7 +3223,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="offsetHoras" 
+ame="offsetHoras" 
                             value={localFormData.offset ? parseInt(localFormData.offset.split(':')[0]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = e.target.value;
@@ -3199,7 +3250,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="offsetMinutos" 
+ame="offsetMinutos" 
                             value={localFormData.offset ? parseInt(localFormData.offset.split(':')[1]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.offset ? parseInt(localFormData.offset.split(':')[0]) || 0 : 0;
@@ -3226,7 +3277,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="offsetSegundos" 
+ame="offsetSegundos" 
                             value={localFormData.offset ? parseInt(localFormData.offset.split(':')[2]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.offset ? parseInt(localFormData.offset.split(':')[0]) || 0 : 0;
@@ -3265,7 +3316,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="duracionHoras" 
+ame="duracionHoras" 
                             value={localFormData.duracion ? parseInt(localFormData.duracion.split(':')[0]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = e.target.value;
@@ -3292,7 +3343,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="duracionMinutos" 
+ame="duracionMinutos" 
                             value={localFormData.duracion ? parseInt(localFormData.duracion.split(':')[1]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.duracion ? parseInt(localFormData.duracion.split(':')[0]) || 0 : 0;
@@ -3319,7 +3370,7 @@ export default function PoliticasProgramacion() {
                         <div className="flex flex-col items-center">
                           <input 
                             type="number" 
-                            name="duracionSegundos" 
+ame="duracionSegundos" 
                             value={localFormData.duracion ? parseInt(localFormData.duracion.split(':')[2]) || 0 : 0} 
                             onChange={(e) => {
                               const horas = localFormData.duracion ? parseInt(localFormData.duracion.split(':')[0]) || 0 : 0;
@@ -3353,7 +3404,7 @@ export default function PoliticasProgramacion() {
                       Descripción <span className="text-red-500">*</span>
                     </label>
                     <textarea 
-                      name="descripcion" 
+ame="descripcion" 
                       value={localFormData.descripcion || ''} 
                       onChange={handleChange} 
                       rows="4" 
@@ -3381,7 +3432,7 @@ export default function PoliticasProgramacion() {
                         </label>
                         <input 
                           type="text" 
-                          name="idMedia" 
+ame="idMedia" 
                           value={localFormData.idMedia || ''} 
                           onChange={handleChange} 
                           className={inputClass} 
@@ -3397,7 +3448,7 @@ export default function PoliticasProgramacion() {
                           Categoría <span className="text-red-500">*</span>
                         </label>
                         <select 
-                          name="categoria" 
+ame="categoria" 
                           value={localFormData.categoria || ''} 
                           onChange={handleChange} 
                           className={inputClass} 
@@ -3594,7 +3645,7 @@ export default function PoliticasProgramacion() {
 
   // Debug: monitorear cambios en showReglaForm
   useEffect(() => {
-    console.log('🔍 showReglaForm cambió a:', showReglaForm);
+
   }, [showReglaForm]);
 
   // Funciones locales para manejar días modelo
@@ -3605,7 +3656,7 @@ export default function PoliticasProgramacion() {
 
   // Funciones para el formulario de reglas
   const handleNewReglaLocal = () => {
-    console.log('🔍 handleNewReglaLocal ejecutándose...');
+
     setSelectedRegla(null);
     setReglaFormMode('new');
     setReglaFormData({
@@ -3628,7 +3679,7 @@ export default function PoliticasProgramacion() {
       alert('Por favor, selecciona una regla para editar');
       return;
     }
-    console.log('🔍 handleEditReglaLocal - Regla seleccionada:', selectedRegla);
+
     setReglaFormMode('edit');
     setReglaFormData({
       tipoRegla: selectedRegla.tipo_regla || 'Separación Mínima',
@@ -3653,7 +3704,7 @@ export default function PoliticasProgramacion() {
       alert('Por favor, selecciona una regla para consultar');
       return;
     }
-    console.log('🔍 handleConsultarRegla - Regla seleccionada:', selectedRegla);
+
     setReglaFormMode('view');
     setReglaFormData({
       tipoRegla: selectedRegla.tipo_regla || 'Separación Mínima',
@@ -3685,7 +3736,7 @@ export default function PoliticasProgramacion() {
     
     try {
       await deleteRegla(selectedRegla.id);
-      console.log('✅ Regla eliminada exitosamente');
+
       
       // Recargar las reglas de la política
       await loadReglasPolitica(politica?.id || 1);
@@ -3694,7 +3745,7 @@ export default function PoliticasProgramacion() {
       setSelectedRegla(null);
       
     } catch (error) {
-      console.error('❌ Error al eliminar regla:', error);
+
       alert('Error al eliminar la regla. Por favor, inténtalo de nuevo.');
     }
   };
@@ -3731,7 +3782,7 @@ export default function PoliticasProgramacion() {
 
   const handleReglaSave = async () => {
     try {
-      console.log('💾 Guardando regla:', reglaFormData);
+
       
       // Preparar datos para enviar a la API
       const reglaData = {
@@ -3751,7 +3802,7 @@ export default function PoliticasProgramacion() {
       
       // Crear la regla
       const nuevaRegla = await createRegla(reglaData);
-      console.log('✅ Regla creada:', nuevaRegla);
+
       
       // Cerrar el modal y limpiar el formulario
       setShowReglaForm(false);
@@ -3766,14 +3817,14 @@ export default function PoliticasProgramacion() {
       });
       
       // Mostrar notificación de éxito
-      console.log('✅ Regla guardada exitosamente');
+
       
       // Recargar las reglas de la política
       await loadReglasPolitica(politica?.id || 1);
       
     } catch (error) {
-      console.error('❌ Error al guardar regla:', error);
-      console.error('❌ Error al guardar la regla. Por favor, inténtalo de nuevo.');
+
+
     }
   };
 
@@ -3824,15 +3875,15 @@ export default function PoliticasProgramacion() {
   // Actualizar formData cuando cambie la política
   useEffect(() => {
     if (politica) {
-      console.log('🔍 Política recibida en PoliticaForm:', politica);
-      console.log('🔍 Clave de la política:', politica.clave);
-      console.log('🔍 Nombre de la política:', politica.nombre);
-      console.log('🔍 Descripción de la política:', politica.descripcion);
+
+
+
+
       
       setFormData({
         clave: politica.clave || '',
         difusora: politica.difusora || '',
-        nombre: politica.nombre || '',
+            nombre: politica.nombre || '',
         descripcion: politica.descripcion || '',
         habilitada: politica.habilitada ?? true,
         setsReglas: politica.setsReglas || [],
@@ -3849,52 +3900,9 @@ export default function PoliticasProgramacion() {
         sabado: politica.sabado ? String(politica.sabado) : '',
         domingo: politica.domingo ? String(politica.domingo) : ''
       });
-      
-      console.log('🔍 FormData días modelo asignados:', {
-        lunes: politica.lunes ? String(politica.lunes) : '',
-        martes: politica.martes ? String(politica.martes) : '',
-        miercoles: politica.miercoles ? String(politica.miercoles) : '',
-        jueves: politica.jueves ? String(politica.jueves) : '',
-        viernes: politica.viernes ? String(politica.viernes) : '',
-        sabado: politica.sabado ? String(politica.sabado) : '',
-        domingo: politica.domingo ? String(politica.domingo) : ''
-      });
-      console.log('🔍 Valores específicos para formData:', {
-        lunes: politica.lunes ? String(politica.lunes) : '',
-        miercoles: politica.miercoles ? String(politica.miercoles) : ''
-      });
-      
-      console.log('🔍 FormData actualizado:', {
-        clave: politica.clave || '',
-        difusora: politica.difusora || '',
-        nombre: politica.nombre || '',
-        descripcion: politica.descripcion || ''
-      });
-      console.log('🔍 Días modelo por defecto desde DB:', {
-        lunes: politica.lunes,
-        martes: politica.martes,
-        miercoles: politica.miercoles,
-        jueves: politica.jueves,
-        viernes: politica.viernes,
-        sabado: politica.sabado,
-        domingo: politica.domingo
-      });
-      console.log('🔍 Valores específicos:', {
-        lunes: politica.lunes,
-        miercoles: politica.miercoles
-      });
-      console.log('🔍 Tipos de datos:', {
-        lunes: typeof politica.lunes,
-        martes: typeof politica.martes,
-        miercoles: typeof politica.miercoles,
-        jueves: typeof politica.jueves,
-        viernes: typeof politica.viernes,
-        sabado: typeof politica.sabado,
-        domingo: typeof politica.domingo
-      });
-      console.log('🔍 Difusoras disponibles:', difusoras);
-      console.log('🔍 Valor de difusora de la política:', politica.difusora);
-      console.log('🔍 ¿Existe la difusora en las opciones?', difusoras.some(d => d.value === politica.difusora));
+
+
+
     }
   }, [politica, difusoras]);
 
@@ -3906,26 +3914,38 @@ export default function PoliticasProgramacion() {
   // Cargar difusoras desde la API
   const loadDifusoras = async () => {
     try {
-      console.log('🔍 Cargando difusoras desde API...');
-      const response = await fetch('http://localhost:8000/api/v1/catalogos/general/difusoras/');
-      const data = await response.json();
-      console.log('✅ Difusoras cargadas desde API:', data);
+      // Usar la misma API que la página de gestión de difusoras
+      const { getDifusoras } = await import('../../../../api/catalogos/generales/difusorasApi');
       
+      // Cargar todas las difusoras activas
+      const data = await getDifusoras({ activa: true });
+      
+      if (!data || !Array.isArray(data)) {
+        console.warn('No se recibieron difusoras o el formato es incorrecto:', data);
+        setDifusoras([]);
+        return;
+      }
+
       // Mapear datos de la API al formato esperado por el select
       const difusorasMapeadas = data.map(difusora => ({
         value: difusora.siglas,
         label: `${difusora.siglas} - ${difusora.nombre}`
       }));
       
-      // Agregar opción especial para "Todas las difusoras"
-      const difusorasConTodas = [
+      // Agregar opción especial para "Todas las difusoras" solo si hay difusoras
+      const difusorasConTodas = difusorasMapeadas.length > 0 ? [
         { value: 'TODAS', label: 'Todas las difusoras' },
         ...difusorasMapeadas
-      ];
+      ] : [];
       
       setDifusoras(difusorasConTodas);
+      
+      // Log para debugging
+      if (difusorasConTodas.length === 0) {
+        console.warn('No se encontraron difusoras para el usuario actual');
+      }
     } catch (err) {
-      console.error('❌ Error cargando difusoras:', err);
+      console.error('Error al cargar difusoras:', err);
       setDifusoras([]);
     }
   };
@@ -4021,12 +4041,12 @@ export default function PoliticasProgramacion() {
         try {
           const categoriasNombres = categoriasSeleccionadas.map(c => typeof c === 'string' ? c : c.nombre)
           await guardarCategoriasPolitica(politica.id, categoriasNombres)
-          console.log('✅ Categorías de política guardadas:', categoriasNombres)
+
         } catch (err) {
-          console.error('Error guardando categorías de política:', err)
+
         }
       }
-      console.log('🔍 FormData antes de enviar:', formData);
+
       
       // Convertir cadenas vacías a null para los días modelo
       const formDataToSend = {
@@ -4040,20 +4060,9 @@ export default function PoliticasProgramacion() {
         domingo: formData.domingo === '' ? null : formData.domingo
       };
       
-      console.log('🔍 FormData después de limpiar:', formDataToSend);
-      console.log('🔍 Días modelo en formDataToSend:', {
-        lunes: formDataToSend.lunes,
-        martes: formDataToSend.martes,
-        miercoles: formDataToSend.miercoles,
-        jueves: formDataToSend.jueves,
-        viernes: formDataToSend.viernes,
-        sabado: formDataToSend.sabado,
-        domingo: formDataToSend.domingo
-      });
-      
       await onSave(formDataToSend);
     } catch (err) {
-      console.error('Error in form submission:', err);
+
     } finally {
       setIsLoading(false);
     }
@@ -4141,7 +4150,11 @@ export default function PoliticasProgramacion() {
                     className={selectClass}
                     required={!isReadOnly}
                   >
-                    <option value="">Seleccionar difusora</option>
+                    <option value="">
+                      {difusoras.length === 0 
+                        ? 'No hay difusoras disponibles. Contacta al administrador para que te asigne difusoras.' 
+                        : 'Seleccionar difusora'}
+                    </option>
                     {difusoras.map((difusora) => (
                       <option key={difusora.value} value={difusora.value}>
                         {difusora.label}
@@ -4208,7 +4221,7 @@ export default function PoliticasProgramacion() {
               <div className="flex space-x-2">
                 <button 
                   onClick={() => {
-                    console.log('🔍 Botón Añadir clickeado');
+
                     handleNewReglaLocal();
                   }}
                   className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -4486,7 +4499,7 @@ export default function PoliticasProgramacion() {
                             key={reloj.id} 
                             className={`${selectedRelojInTable?.id === reloj.id ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 shadow-sm' : ''} hover:bg-gray-50 cursor-pointer transition-all duration-150`}
                             onClick={() => {
-                              console.log('🔄 Reloj seleccionado en tabla:', reloj);
+
                               setSelectedRelojInTable(reloj);
                             }}
                             onDoubleClick={() => handleEditReloj(reloj)}
@@ -4586,7 +4599,7 @@ export default function PoliticasProgramacion() {
                           try {
                             return timeString.split(':').map(Number);
                           } catch (error) {
-                            console.error('Error al parsear tiempo:', error);
+
                             return [0, 0, 0];
                           }
                         };
@@ -4719,14 +4732,14 @@ export default function PoliticasProgramacion() {
                           
                           // Mapa de colores para cada categoría
                           const colorMap = {
-                            'Canciones': { color: 'bg-blue-500', border: 'border-blue-500', nombre: 'Canciones' },
-                            'Corte Comercial': { color: 'bg-red-500', border: 'border-red-500', nombre: 'Corte Comercial' },
-                            'Nota Operador': { color: 'bg-yellow-500', border: 'border-yellow-500', nombre: 'Nota Operador' },
-                            'ETM': { color: 'bg-green-500', border: 'border-green-500', nombre: 'ETM' },
-                            'Cartucho Fijo': { color: 'bg-purple-500', border: 'border-purple-500', nombre: 'Cartucho Fijo' },
-                            'Comando': { color: 'bg-indigo-500', border: 'border-indigo-500', nombre: 'Comando' },
-                            'Twofer': { color: 'bg-pink-500', border: 'border-pink-500', nombre: 'Twofer' },
-                            'Característica Específica': { color: 'bg-lime-500', border: 'border-lime-500', nombre: 'Característica Específica' }
+                            'Canciones': { color: 'bg-blue-500', border: 'border-blue-500',     nombre: 'Canciones' },
+                            'Corte Comercial': { color: 'bg-red-500', border: 'border-red-500',     nombre: 'Corte Comercial' },
+                            'Nota Operador': { color: 'bg-yellow-500', border: 'border-yellow-500',     nombre: 'Nota Operador' },
+                            'ETM': { color: 'bg-green-500', border: 'border-green-500',     nombre: 'ETM' },
+                            'Cartucho Fijo': { color: 'bg-purple-500', border: 'border-purple-500',     nombre: 'Cartucho Fijo' },
+                            'Comando': { color: 'bg-indigo-500', border: 'border-indigo-500',     nombre: 'Comando' },
+                            'Twofer': { color: 'bg-pink-500', border: 'border-pink-500',     nombre: 'Twofer' },
+                            'Característica Específica': { color: 'bg-lime-500', border: 'border-lime-500',     nombre: 'Característica Específica' }
                           };
                           
                           // Filtrar solo las categorías presentes
@@ -5182,7 +5195,7 @@ export default function PoliticasProgramacion() {
               setShowDiaModeloForm(false);
               setEditingDiaModeloIndex(null);
             } catch (error) {
-              console.error('Error al guardar día modelo:', error);
+
             }
           }}
           onCancel={() => {
@@ -5193,10 +5206,10 @@ export default function PoliticasProgramacion() {
       )}
 
       {/* Modal Independiente de Nueva Regla */}
-      {console.log('🔍 Verificando showReglaForm:', showReglaForm)}
+
       {showReglaForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-200">
-          {console.log('🔍 Modal independiente de nueva regla renderizándose...')}
+
           <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 w-[95vw] max-w-[1400px] h-[92vh] overflow-hidden flex flex-col transform transition-all duration-300 scale-100">
             {/* Enhanced Header */}
             <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 px-6 py-4 relative overflow-hidden border-b border-blue-800/20">
@@ -5481,7 +5494,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
 
   const [formData, setFormData] = useState({
     habilitado: diaModelo?.habilitado ?? true,
-    difusora: diaModelo?.difusora || 'RADIO_1', // Valor por defecto
+    difusora: diaModelo?.difusora || '', // Sin valor por defecto
     clave: diaModelo?.clave || '',
     nombre: diaModelo?.nombre || '',
     descripcion: diaModelo?.descripcion || '',
@@ -5520,7 +5533,6 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
     return (
       reloj.nombre?.toLowerCase().includes(searchTerm) ||
       reloj.clave?.toLowerCase().includes(searchTerm) ||
-      reloj.grupo?.toLowerCase().includes(searchTerm) ||
       reloj.numeroRegla?.toLowerCase().includes(searchTerm)
     );
   });
@@ -5607,11 +5619,11 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
         relojes: relojesDiaModelo.map(reloj => reloj.id)
       };
       
-      console.log('📦 Datos a guardar día modelo:', dataToSave);
+
       await onSave(dataToSave);
-      console.log('✅ Día modelo guardado exitosamente');
+
     } catch (error) {
-      console.error('❌ Error al guardar día modelo:', error);
+
     } finally {
       setIsLoading(false);
     }
@@ -5750,7 +5762,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                     <input
                       type="checkbox"
                       id="habilitado"
-                      name="habilitado"
+ame="habilitado"
                       checked={formData.habilitado}
                       onChange={handleChange}
                       disabled={isReadOnly}
@@ -5778,7 +5790,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                 </label>
                 <input
                   type="text"
-                  name="clave"
+ame="clave"
                   value={formData.clave || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}
@@ -5807,7 +5819,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                 </label>
                 <input
                   type="text"
-                  name="nombre"
+ame="nombre"
                   value={formData.nombre || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}
@@ -5834,7 +5846,7 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
                   <span>Descripción</span>
                 </label>
                 <textarea
-                  name="descripcion"
+ame="descripcion"
                   value={formData.descripcion || ''}
                   onChange={handleChange}
                   readOnly={isReadOnly}

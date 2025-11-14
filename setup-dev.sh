@@ -142,7 +142,7 @@ cleanup() {
     print_message "Limpiando contenedores y volúmenes existentes..."
     
     # Detener y eliminar contenedores
-    $DOCKER_COMPOSE_CMD down --remove-orphans 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml down --remove-orphans 2>/dev/null || true
     
     # Eliminar volúmenes huérfanos
     docker volume prune -f 2>/dev/null || true
@@ -156,11 +156,11 @@ start_services() {
     
     # Construir imágenes
     print_message "Construyendo imágenes de Docker..."
-    $DOCKER_COMPOSE_CMD build
+    $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml build
     
     # Ejecutar servicios en modo detached
     print_message "Iniciando servicios..."
-    $DOCKER_COMPOSE_CMD up -d
+    $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml up -d
     
     print_success "Servicios iniciados en modo detached"
 }
@@ -176,7 +176,7 @@ check_services() {
     # Verificar estado de los contenedores
     echo ""
     print_message "Estado de los contenedores:"
-    $DOCKER_COMPOSE_CMD ps
+    $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml ps
     
     echo ""
     print_message "Verificando conectividad..."
@@ -203,7 +203,7 @@ check_services() {
     fi
     
     # Verificar base de datos
-    if $DOCKER_COMPOSE_CMD exec -T db pg_isready -U postgres > /dev/null 2>&1; then
+    if $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml exec -T db pg_isready -U postgres > /dev/null 2>&1; then
         print_success "✅ Base de datos PostgreSQL está funcionando"
     else
         print_warning "⚠️  Base de datos no responde aún, puede estar iniciando..."
@@ -224,10 +224,10 @@ show_info() {
     echo "   • Base de datos:  localhost:5433"
     echo ""
     echo "📚 Comandos útiles:"
-    echo "   • Ver logs:       $DOCKER_COMPOSE_CMD logs -f"
-    echo "   • Parar servicios: $DOCKER_COMPOSE_CMD down"
-    echo "   • Reiniciar:      $DOCKER_COMPOSE_CMD restart"
-    echo "   • Estado:         $DOCKER_COMPOSE_CMD ps"
+    echo "   • Ver logs:       $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml logs -f"
+    echo "   • Parar servicios: $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml down"
+    echo "   • Reiniciar:      $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml restart"
+    echo "   • Estado:         $DOCKER_COMPOSE_CMD -f docker-compose.dev.yml ps"
     echo ""
     echo "🔧 Para desarrollo:"
     echo "   • Los cambios en el código se reflejan automáticamente"

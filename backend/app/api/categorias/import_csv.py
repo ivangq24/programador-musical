@@ -6,6 +6,8 @@ import csv
 from datetime import datetime
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
+from app.models.auth import Usuario
 from app.models.catalogos import Difusora
 from app.models.categorias import Categoria, Cancion
 
@@ -14,10 +16,11 @@ router = APIRouter()
 @router.post("/validate-csv")
 async def validate_csv(
     csv_data: List[Dict[str, Any]],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
 ):
     """
-    Valida los datos del CSV antes de la importación
+    Valida los datos del CSV antes de la importación (solo difusoras de la organización del usuario)
     """
     try:
         validation_results = {
@@ -37,21 +40,31 @@ async def validate_csv(
                 if not row.get(field) or str(row.get(field)).strip() == '':
                     row_errors.append(f"Campo requerido '{field}' está vacío")
             
-            # Validar que la difusora existe
+            # Validar que la difusora existe y pertenece a la organización del usuario
             if row.get('difusora'):
                 difusora = db.query(Difusora).filter(
-                    Difusora.siglas == row['difusora']
+                    Difusora.siglas == row['difusora'],
+                    Difusora.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
                 ).first()
                 if not difusora:
-                    row_errors.append(f"Difusora '{row['difusora']}' no existe")
+                    row_errors.append(f"Difusora '{row['difusora']}' no existe o no pertenece a tu organización")
             
-            # Validar que la categoría existe
+            # Validar que la categoría existe y pertenece a una difusora de la organización del usuario
             if row.get('categoria'):
-                categoria = db.query(Categoria).filter(
-                    Categoria.nombre == row['categoria']
-                ).first()
-                if not categoria:
-                    row_errors.append(f"Categoría '{row['categoria']}' no existe")
+                # Primero verificar que la difusora existe y pertenece a la organización
+                difusora_siglas = row.get('difusora')
+                if difusora_siglas:
+                    difusora = db.query(Difusora).filter(
+                        Difusora.siglas == difusora_siglas,
+                        Difusora.organizacion_id == usuario.organizacion_id
+                    ).first()
+                    if difusora:
+                        categoria = db.query(Categoria).filter(
+                            Categoria.nombre == row['categoria'],
+                            Categoria.difusora == difusora_siglas  # La categoría debe pertenecer a la difusora
+                        ).first()
+                        if not categoria:
+                            row_errors.append(f"Categoría '{row['categoria']}' no existe para la difusora '{difusora_siglas}'")
             
             if row_errors:
                 validation_results["invalid_rows"] += 1
@@ -70,10 +83,11 @@ async def validate_csv(
 @router.post("/import-canciones")
 async def import_canciones(
     csv_data: List[Dict[str, Any]],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
 ):
     """
-    Importa las canciones desde el CSV
+    Importa las canciones desde el CSV (solo difusoras de la organización del usuario)
     """
     try:
         imported_count = 0
@@ -92,18 +106,28 @@ async def import_canciones(
                     skipped_count += 1
                     continue
                 
-                # Obtener la difusora
+                # Obtener la difusora (solo de la organización del usuario)
                 difusora = None
                 if row.get('difusora'):
                     difusora = db.query(Difusora).filter(
-                        Difusora.siglas == row['difusora']
+                        Difusora.siglas == row['difusora'],
+                        Difusora.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
                     ).first()
+                    
+                    if not difusora:
+                        errors.append({
+                            "row": i + 1,
+                            "error": f"Difusora '{row['difusora']}' no existe o no pertenece a tu organización"
+                        })
+                        skipped_count += 1
+                        continue
                 
-                # Obtener la categoría
+                # Obtener la categoría (debe pertenecer a la difusora de la organización)
                 categoria = None
-                if row.get('categoria'):
+                if row.get('categoria') and difusora:
                     categoria = db.query(Categoria).filter(
-                        Categoria.nombre == row['categoria']
+                        Categoria.nombre == row['categoria'],
+                        Categoria.difusora == difusora.siglas  # La categoría debe pertenecer a la difusora
                     ).first()
                 
                 # Crear nueva canción
@@ -119,7 +143,7 @@ async def import_canciones(
                 
                 db.add(nueva_cancion)
                 db.flush()  # Flush to get the ID
-                print(f"Canción agregada a la sesión: {nueva_cancion.titulo} - {nueva_cancion.artista}")
+
                 imported_count += 1
                 
             except Exception as e:
@@ -133,15 +157,15 @@ async def import_canciones(
         # Commit all changes at once
         try:
             db.commit()
-            print(f"Commit exitoso: {imported_count} canciones importadas")
+
             
             # Verify the data was actually saved
             saved_count = db.query(Cancion).count()
-            print(f"Total canciones en DB después del commit: {saved_count}")
+
             
         except Exception as e:
             db.rollback()
-            print(f"Error en commit: {str(e)}")
+
             raise e
         
         return {

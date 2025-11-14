@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.core.database import get_db
+from app.core.auth import get_current_user, get_user_difusoras
+from app.models.auth import Usuario
 from app.schemas.programacion import GenerarProgramacionRequest
 from app.models.programacion import (
     Programacion as ProgramacionModel,
@@ -15,10 +17,8 @@ from app.models.programacion import (
 from app.models.categorias import Cancion as CancionModel, Categoria as CategoriaModel
 from datetime import datetime, time, timedelta
 import random
-import logging
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 def convertir_duracion_a_segundos(duracion_str: str) -> int:
     """Convertir duración HH:MM:SS a segundos"""
@@ -38,30 +38,64 @@ async def generar_programacion_completa(
     politica_id: int = Query(..., description="ID de la política"),
     fecha_inicio: str = Query(..., description="Fecha de inicio (DD/MM/YYYY)"),
     fecha_fin: str = Query(..., description="Fecha de fin (DD/MM/YYYY)"),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras),
     db: Session = Depends(get_db)
 ):
     """Generar programación completa basada en 24 relojes con corte automático"""
     try:
+        # Validar que request.dias_modelo no esté vacío
+        if not request.dias_modelo or len(request.dias_modelo) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No se proporcionaron días modelo para generar la programación"
+            )
+        
+        # Verificar que el usuario tenga acceso a la difusora (todos los usuarios, incluyendo admins)
+        # Cada admin solo puede generar programación para sus propias difusoras asignadas
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para generar programación para la difusora {difusora}"
+            )
+        
         # Convertir fechas
-        fecha_inicio_dt = datetime.strptime(fecha_inicio, "%d/%m/%Y")
-        fecha_fin_dt = datetime.strptime(fecha_fin, "%d/%m/%Y")
+        try:
+            fecha_inicio_dt = datetime.strptime(fecha_inicio, "%d/%m/%Y")
+            fecha_fin_dt = datetime.strptime(fecha_fin, "%d/%m/%Y")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Formato de fecha inválido. Esperado DD/MM/YYYY. Error: {str(e)}"
+            )
         
         dias_generados = 0
         dias_procesados = []
         
         # Crear un diccionario de días modelo seleccionados por fecha
         dias_modelo_por_fecha = {}
-        print(f"🔍 DEBUG: Días modelo recibidos del frontend: {request.dias_modelo}")
-        logger.info(f"Días modelo recibidos del frontend: {request.dias_modelo}")
+
         for dia_seleccionado in request.dias_modelo:
-            print(f"🔍 DEBUG: Procesando día {dia_seleccionado.fecha} con modelo '{dia_seleccionado.dia_modelo}'")
-            logger.info(f"Procesando día {dia_seleccionado.fecha} con modelo '{dia_seleccionado.dia_modelo}'")
             # Registrar el día modelo seleccionado por fecha para usarlo en el bucle principal
             try:
-                dias_modelo_por_fecha[dia_seleccionado.fecha] = dia_seleccionado.dia_modelo
+                fecha_key = dia_seleccionado.fecha if isinstance(dia_seleccionado.fecha, str) else str(dia_seleccionado.fecha)
+                # Normalizar el formato de fecha a DD/MM/YYYY si viene en otro formato
+                if '/' in fecha_key:
+                    # Ya está en formato DD/MM/YYYY
+                    dias_modelo_por_fecha[fecha_key] = dia_seleccionado.dia_modelo
+                elif '-' in fecha_key:
+                    # Convertir de YYYY-MM-DD a DD/MM/YYYY
+                    try:
+                        fecha_dt = datetime.strptime(fecha_key, "%Y-%m-%d")
+                        fecha_key = fecha_dt.strftime("%d/%m/%Y")
+                        dias_modelo_por_fecha[fecha_key] = dia_seleccionado.dia_modelo
+                    except:
+                        dias_modelo_por_fecha[fecha_key] = dia_seleccionado.dia_modelo
+                else:
+                    dias_modelo_por_fecha[fecha_key] = dia_seleccionado.dia_modelo
             except Exception:
+                # Si hay algún problema, intentar con string
                 dias_modelo_por_fecha[str(dia_seleccionado.fecha)] = dia_seleccionado.dia_modelo
-            dias_modelo_por_fecha[dia_seleccionado.fecha] = dia_seleccionado.dia_modelo
         
         # Obtener día modelo para esta política
         fecha_actual = fecha_inicio_dt
@@ -77,20 +111,19 @@ async def generar_programacion_completa(
             
             # Buscar día modelo seleccionado por el usuario
             dia_modelo_nombre = dias_modelo_por_fecha.get(fecha_str)
-            if not dia_modelo_nombre:
-                logger.warning(f"No hay día modelo seleccionado para {fecha_str}")
+            if not dia_modelo_nombre or (isinstance(dia_modelo_nombre, str) and dia_modelo_nombre.strip() == ''):
                 dias_procesados.append({
                     "fecha": fecha_str,
                     "dia_semana": fecha_actual.strftime("%A"),
-                    "status": "Sin Configuración",
+                    "status": "Sin Día Modelo Seleccionado",
                     "generado": False
                 })
                 fecha_actual += timedelta(days=1)
                 continue
             
             # Buscar el día modelo por nombre (búsqueda flexible por difusora)
-            print(f"🔍 DEBUG: Buscando día modelo '{dia_modelo_nombre}' para política {politica_id}, difusora {difusora}")
-            logger.info(f"Buscando día modelo '{dia_modelo_nombre}' para política {politica_id}, difusora {difusora}")
+
+
             
             # Primero intentar buscar con difusora específica
             dia_modelo = db.query(DiaModeloModel).filter(
@@ -102,8 +135,8 @@ async def generar_programacion_completa(
             
             # Si no se encuentra, buscar sin restricción de difusora (permite "TODAS" o cualquier otra)
             if not dia_modelo:
-                print(f"⚠️ DEBUG: No encontrado con difusora específica '{difusora}', buscando sin restricción de difusora...")
-                logger.info(f"No encontrado con difusora específica '{difusora}', buscando sin restricción de difusora...")
+
+
                 dia_modelo = db.query(DiaModeloModel).filter(
                     DiaModeloModel.politica_id == politica_id,
                     DiaModeloModel.habilitado == True,
@@ -112,26 +145,18 @@ async def generar_programacion_completa(
             
             # Si aún no se encuentra, buscar solo por política y nombre (última opción)
             if not dia_modelo:
-                print(f"⚠️ DEBUG: No encontrado con filtros anteriores, buscando solo por política y nombre...")
-                logger.info(f"No encontrado con filtros anteriores, buscando solo por política y nombre...")
+
+
                 dia_modelo = db.query(DiaModeloModel).filter(
                     DiaModeloModel.politica_id == politica_id,
                     DiaModeloModel.nombre == dia_modelo_nombre
                 ).first()
             
-            if dia_modelo:
-                print(f"✅ DEBUG: Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}', difusora='{dia_modelo.difusora}'")
-                logger.info(f"Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}', difusora='{dia_modelo.difusora}'")
-            else:
-                print(f"❌ DEBUG: No se encontró día modelo con nombre '{dia_modelo_nombre}' para política {politica_id}")
-                logger.warning(f"No se encontró día modelo con nombre '{dia_modelo_nombre}' para política {politica_id}")
-            
             if not dia_modelo:
-                logger.warning(f"No se encontró el día modelo '{dia_modelo_nombre}' para {fecha_str}")
                 dias_procesados.append({
                     "fecha": fecha_str,
                     "dia_semana": fecha_actual.strftime("%A"),
-                    "status": "Sin Configuración",
+                    "status": f"Día Modelo '{dia_modelo_nombre}' no encontrado",
                     "generado": False
                 })
                 fecha_actual += timedelta(days=1)
@@ -145,11 +170,6 @@ async def generar_programacion_completa(
                 RelojDiaModeloModel.dia_modelo_id == dia_modelo.id,
                 RelojModel.habilitado == True
             ).order_by(RelojDiaModeloModel.orden).all()
-            
-            logger.info(f"📋 Día modelo '{dia_modelo.nombre}' (ID: {dia_modelo.id}) tiene {len(relojes_dia)} relojes asociados")
-            print(f"📋 Día modelo '{dia_modelo.nombre}' (ID: {dia_modelo.id}) tiene {len(relojes_dia)} relojes asociados")
-            for r in relojes_dia:
-                print(f"  - Reloj {r.clave} (ID: {r.id}, habilitado: {r.habilitado})")
             
             if not relojes_dia:
                 dias_procesados.append({
@@ -169,7 +189,7 @@ async def generar_programacion_completa(
             ).all()
             
             if programacion_existente:
-                logger.info(f"Eliminando {len(programacion_existente)} eventos existentes para {fecha_actual.strftime('%d/%m/%Y')}")
+
                 for evento in programacion_existente:
                     db.delete(evento)
                 db.flush()  # Aplicar eliminaciones antes de generar nueva programación
@@ -180,8 +200,6 @@ async def generar_programacion_completa(
                     fecha_actual, difusora, politica_id, relojes_dia, dia_modelo.id, db
                 )
                 
-                logger.info(f"Generados {len(eventos_generados)} eventos para {fecha_actual.strftime('%d/%m/%Y')}")
-                
                 dias_generados += 1
                 dias_procesados.append({
                     "fecha": fecha_actual.strftime("%d/%m/%Y"),
@@ -191,27 +209,59 @@ async def generar_programacion_completa(
                     "num_eventos": len(eventos_generados)
                 })
                 
-            except Exception as e:
-                logger.error(f"Error al generar programación para {fecha_actual}: {str(e)}")
+            except ValueError as ve:
+                # Errores de validación (política no encontrada, sin canciones, etc.)
                 dias_procesados.append({
                     "fecha": fecha_actual.strftime("%d/%m/%Y"),
                     "dia_semana": fecha_actual.strftime("%A"),
-                    "status": "Error",
+                    "status": f"Error de validación: {str(ve)}",
                     "generado": False
                 })
+            except Exception as e:
+                # Otros errores
+                dias_procesados.append({
+                    "fecha": fecha_actual.strftime("%d/%m/%Y"),
+                    "dia_semana": fecha_actual.strftime("%A"),
+                    "status": f"Error: {str(e)}",
+                    "generado": False
+                })
+                # Si es un error crítico, re-lanzarlo
+                if "no encontrada" in str(e).lower() or "no hay" in str(e).lower():
+                    raise
             
             fecha_actual += timedelta(days=1)
         
         # Hacer commit de todos los cambios después de generar toda la programación
         try:
             db.commit()
-            logger.info(f"✅ Programación generada y guardada en la base de datos: {dias_generados} días")
-            print(f"✅ DEBUG: Programación generada y guardada en la base de datos: {dias_generados} días")
+
+
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Error al hacer commit de la programación: {str(e)}")
-            print(f"❌ DEBUG: Error al hacer commit de la programación: {str(e)}")
+
+
             raise HTTPException(status_code=500, detail=f"Error al guardar la programación: {str(e)}")
+        
+        # Si no se generó ningún día, proporcionar información detallada
+        if dias_generados == 0:
+            errores_resumen = {}
+            for dia in dias_procesados:
+                status = dia.get("status", "Desconocido")
+                if status not in errores_resumen:
+                    errores_resumen[status] = 0
+                errores_resumen[status] += 1
+            
+            mensaje_error = "No se generó programación para ningún día. "
+            if errores_resumen:
+                detalles = ", ".join([f"{count} día(s) con '{status}'" for status, count in errores_resumen.items()])
+                mensaje_error += f"Detalles: {detalles}."
+            else:
+                mensaje_error += "No se encontraron días modelo seleccionados para las fechas especificadas."
+            
+            raise HTTPException(
+                status_code=400,
+                detail=mensaje_error
+            )
         
         return {
             "message": "Programación generada correctamente",
@@ -224,11 +274,15 @@ async def generar_programacion_completa(
         }
         
     except ValueError as e:
+        db.rollback()
         raise HTTPException(status_code=400, detail=f"Formato de fecha inválido: {str(e)}")
+    except HTTPException:
+        # Re-raise HTTP exceptions (como 403)
+        raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al generar programación completa: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        # Incluir el error real para debugging
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 async def generar_programacion_dia(
     fecha: datetime,
@@ -256,7 +310,7 @@ async def generar_programacion_dia(
         try:
             categorias_ids = [int(c) for c in politica.categorias_seleccionadas.split(',') if c.strip()]
         except ValueError:
-            logger.warning(f"Error al parsear categorias_seleccionadas: {politica.categorias_seleccionadas}")
+            categorias_ids = []
     
     # Si no hay categorías en la política, usar todas
     if not categorias_ids:
@@ -294,8 +348,8 @@ async def generar_programacion_dia(
             'separaciones': {sep.valor: sep.separacion for sep in separaciones}
         }
     
-    logger.info(f"📋 Cargadas {len(reglas_con_separaciones)} reglas habilitadas para la política {politica_id}")
-    print(f"📋 Cargadas {len(reglas_con_separaciones)} reglas habilitadas para la política {politica_id}")
+
+
     
     # Crear pools de canciones sin repetir para cada categoría
     # Cada pool es una lista que se mezcla aleatoriamente
@@ -759,16 +813,12 @@ async def generar_programacion_dia(
                 return cancion
         
         # Si no encontramos ninguna canción que cumpla las reglas, devolver la primera disponible
-        logger.warning(f"⚠️ No se encontró canción que cumpla todas las reglas después de {intentos_maximos} intentos. Usando primera disponible.")
+
         pool_info['index'] = 0
         return pool_info['pool'][0]
     
     # Ordenar relojes por su clave (R00, R01, ..., R23)
     relojes_ordenados = sorted(relojes, key=lambda r: r.clave)
-    
-    print(f"📋 Total de relojes a procesar: {len(relojes_ordenados)}")
-    for r in relojes_ordenados:
-        print(f"  - Reloj {r.clave} (ID: {r.id}, habilitado: {r.habilitado})")
     
     # Variable para rastrear el tiempo real de finalización del reloj anterior
     tiempo_fin_reloj_anterior = 0
@@ -825,17 +875,17 @@ async def generar_programacion_dia(
                 accion_normalizada = accion_etm_inicio.lower().strip() if accion_etm_inicio else None
                 if accion_normalizada in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']:
                     tiene_etm_cortar_inicio = True
-                    print(f"  ✅ ETM al inicio detectado con acción '{accion_etm_inicio}' (normalizada: '{accion_normalizada}')")
+
                 elif accion_etm_inicio is None or accion_etm_inicio == '':
                     # Si no hay acción definida, asumir "cortar" por defecto para ETM al inicio
                     tiene_etm_cortar_inicio = True
-                    print(f"  ℹ️ ETM al inicio sin acción definida, asumiendo 'cortar' por defecto")
+
         
         # Establecer tiempo_inicio_segundos según si hay ETM que corta o no
         if tiene_etm_cortar_inicio:
             # Si hay ETM "cortar" al inicio, el reloj DEBE empezar exactamente en su hora programada
             tiempo_inicio_segundos = hora_programada_reloj
-            print(f"🔪 Reloj {reloj.clave} tiene ETM 'cortar' al inicio - Forzando inicio a hora programada: {hora_programada_reloj//3600}:00:00")
+
         else:
             # Si no hay ETM que corte, ajustar según el fin del reloj anterior
             tiempo_inicio_segundos = max(hora_programada_reloj, tiempo_fin_reloj_anterior)
@@ -845,17 +895,17 @@ async def generar_programacion_dia(
         
         # Log para debugging
         hora_inicio_hhmmss = f"{tiempo_inicio_segundos//3600:02d}:{(tiempo_inicio_segundos%3600)//60:02d}:{tiempo_inicio_segundos%60:02d}"
-        print(f"🕐 Reloj {reloj.clave} (índice {idx}) - Inicio: {hora_inicio_hhmmss}, Eventos configurados: {len(eventos_reloj)}")
+
         
         if not eventos_reloj:
             # Si no hay eventos configurados, llenar con canciones aleatorias
             eventos_reloj = []
-            print(f"⚠️ Reloj {reloj.clave} no tiene eventos configurados")
+
         
         # Ahora procesar el ETM al inicio y cortar la canción anterior si es necesario
         if tiene_etm_cortar_inicio:
             # Hay un ETM "cortar" al inicio del reloj, cortar la última canción del reloj anterior
-            print(f"🔍 FORZANDO corte con ETM 'cortar' al inicio del reloj {reloj.clave}: hora_programada_reloj={hora_programada_reloj} ({hora_programada_reloj//3600}:00:00)")
+
             if ultima_cancion_entre_relojes and ultima_cancion_tiempo_inicio_global:
                 tiempo_etm_segundos = hora_programada_reloj  # Exactamente en la hora programada
                 tiempo_transcurrido = tiempo_etm_segundos - ultima_cancion_tiempo_inicio_global
@@ -868,9 +918,9 @@ async def generar_programacion_dia(
                     duracion_actual = convertir_duracion_a_segundos(ultima_cancion_entre_relojes.duracion_real or '00:00:00')
                     if duracion_actual > 0:
                         duracion_original_real = duracion_actual
-                        print(f"  ⚠️ No se encontró duración original, usando duración actual como fallback: {duracion_original_real}s")
+
                 
-                print(f"  📊 Canción anterior: inicio={ultima_cancion_tiempo_inicio_global} (hora {ultima_cancion_tiempo_inicio_global//3600}:{(ultima_cancion_tiempo_inicio_global%3600)//60:02d}:{ultima_cancion_tiempo_inicio_global%60:02d}), duración_original={duracion_original_real}s, tiempo_transcurrido={tiempo_transcurrido}s")
+
                 
                 if tiempo_transcurrido > 0:
                     # FORZAR el corte: SIEMPRE cortar la canción en el tiempo del ETM
@@ -880,9 +930,6 @@ async def generar_programacion_dia(
                     # Asegurar que no sea mayor que la duración original
                     if nueva_duracion_segundos > duracion_original_real:
                         nueva_duracion_segundos = duracion_original_real
-                        print(f"  ⚠️ Tiempo transcurrido ({tiempo_transcurrido}s) > duración original ({duracion_original_real}s), cortando a duración original")
-                    else:
-                        print(f"  ✂️ FORZANDO corte: duración original {duracion_original_real}s -> nueva duración {nueva_duracion_segundos}s")
                     
                     dur_horas = nueva_duracion_segundos // 3600
                     dur_minutos = (nueva_duracion_segundos % 3600) // 60
@@ -894,19 +941,14 @@ async def generar_programacion_dia(
                     ultima_cancion_entre_relojes.duracion_planeada = nueva_duracion_str
                     db.add(ultima_cancion_entre_relojes)  # Asegurar que se guarde en la DB
                     db.flush()  # Forzar el flush inmediato para asegurar que los cambios se reflejen
-                    
-                    logger.info(f"✂️ ETM al inicio del reloj ({accion_etm_inicio}): Canción FORZADA a cortarse a {nueva_duracion_str} en {tiempo_etm_segundos} segundos")
-                    print(f"✂️ ETM al inicio del reloj ({accion_etm_inicio}): Canción FORZADA a cortarse a {nueva_duracion_str} en hora {hora_programada_reloj//3600}:00:00")
-                else:
-                    print(f"  ⚠️ El ETM está antes del inicio de la canción anterior (tiempo_transcurrido={tiempo_transcurrido}), no se corta")
                 
                 # Asegurar que tiempo_inicio_segundos esté en la hora programada (ya debería estar así)
                 tiempo_inicio_segundos = hora_programada_reloj
                 tiempo_fin_reloj_anterior = hora_programada_reloj
-                print(f"  ✅ tiempo_inicio_segundos FORZADO a: {tiempo_inicio_segundos} (hora {tiempo_inicio_segundos//3600}:00:00)")
+
             else:
                 # No hay canción anterior
-                print(f"  ℹ️ No hay canción anterior del reloj previo para cortar")
+
                 tiempo_inicio_segundos = hora_programada_reloj
                 tiempo_fin_reloj_anterior = hora_programada_reloj
         
@@ -925,9 +967,9 @@ async def generar_programacion_dia(
         evento_anterior_etm_cortar_inicio = False
         
         # Generar solo los eventos configurados en el reloj
-        print(f"🔄 Reloj {reloj.clave}: Procesando {len(eventos_reloj)} eventos...")
+
         for evento_idx, evento in enumerate(eventos_reloj):
-            print(f"  ▶️ Procesando evento {evento_idx+1}/{len(eventos_reloj)}: tipo={evento.tipo}, categoria={evento.categoria}, offset={evento.offset_value}")
+
             duracion_evento_segundos = convertir_duracion_a_segundos(evento.duracion)
             tipo_evento = evento.tipo
             categoria_evento = evento.categoria
@@ -939,8 +981,8 @@ async def generar_programacion_dia(
             # Calcular el tiempo absoluto del evento usando su offset_value
             offset_evento_segundos = get_offset_seconds(evento.offset_value or '00:00:00')
             
-            print(f"  📐 Offset del evento: offset_value='{evento.offset_value}', offset_evento_segundos={offset_evento_segundos}, tiempo_inicio_segundos={tiempo_inicio_segundos}, hora_programada_reloj={hora_programada_reloj}")
-            print(f"  📐 Verificación ETM: es_etm={es_etm}, evento_idx={evento_idx}, accion_etm={accion_etm}, tiene_etm_cortar_inicio={tiene_etm_cortar_inicio}")
+
+
             
             # Inicializar tiempo_evento_absoluto por defecto
             tiempo_evento_absoluto = tiempo_inicio_segundos + offset_evento_segundos
@@ -954,16 +996,13 @@ async def generar_programacion_dia(
                 tiempo_inicio_segundos = hora_programada_reloj
                 # Para ETM al inicio, el tiempo absoluto es exactamente la hora programada (offset = 0)
                 tiempo_evento_absoluto = hora_programada_reloj  # offset_evento_segundos = 0, así que no se suma
-                print(f"  🔪 FORZANDO ETM al inicio (usando tiene_etm_cortar_inicio): tiempo_inicio_segundos={tiempo_inicio_segundos} ({tiempo_inicio_segundos//3600}:00:00), tiempo_evento_absoluto={tiempo_evento_absoluto} ({tiempo_evento_absoluto//3600}:00:00)")
+
             elif es_etm and offset_evento_segundos == 0 and evento_idx == 0 and accion_etm_normalizada in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']:
                 # Fallback: si accion_etm está definida pero tiene_etm_cortar_inicio no se activó
-                print(f"  🔪 FORZANDO ETM al inicio (usando accion_etm normalizada): tiempo_inicio_segundos={tiempo_inicio_segundos} -> {hora_programada_reloj}")
+
                 tiempo_inicio_segundos = hora_programada_reloj
                 tiempo_evento_absoluto = hora_programada_reloj
-                print(f"  🔪 ETM forzado: tiempo_inicio_segundos={tiempo_inicio_segundos}, tiempo_evento_absoluto={tiempo_evento_absoluto}")
-            elif es_etm:
-                print(f"  ⚠️ ETM NO al inicio: usando tiempo_evento_absoluto={tiempo_evento_absoluto} (tiempo_inicio_segundos={tiempo_inicio_segundos} + offset={offset_evento_segundos})")
-            
+
             # Inicializar cancion_seleccionada como None (se establece solo para eventos normales)
             cancion_seleccionada = None
             categoria_nombre = None
@@ -990,8 +1029,8 @@ async def generar_programacion_dia(
                         ultima_cancion_entry.duracion_real = nueva_duracion_str
                         ultima_cancion_entry.duracion_planeada = nueva_duracion_str
                         
-                        logger.info(f"✂️ ETM ({accion_etm}): Canción cortada a {nueva_duracion_str}")
-                        print(f"✂️ ETM ({accion_etm}): Canción cortada a {nueva_duracion_str} en offset {evento.offset_value}")
+
+
                 
                 # Si es ETM al inicio del reloj (offset 0), también cortar la última canción del reloj anterior
                 # ESTO ES REDUNDANTE si ya se procesó arriba, pero por si acaso lo verificamos de nuevo
@@ -1000,8 +1039,6 @@ async def generar_programacion_dia(
                     # para asegurar que la canción esté cortada
                     tiempo_etm_segundos = hora_programada_reloj
                     tiempo_transcurrido = tiempo_etm_segundos - ultima_cancion_tiempo_inicio_global
-                    print(f"  🔄 Verificación adicional de corte: tiempo_transcurrido={tiempo_transcurrido}, duración_original={ultima_cancion_duracion_original_global}")
-                    
                     if tiempo_transcurrido > 0:
                         # SIEMPRE cortar si el ETM está después del inicio de la canción
                         # No importa si la canción ya debería haber terminado - el ETM fuerza el corte
@@ -1017,8 +1054,8 @@ async def generar_programacion_dia(
                             ultima_cancion_entre_relojes.duracion_planeada = nueva_duracion_str
                             db.add(ultima_cancion_entre_relojes)  # Asegurar que se guarde
                             
-                            logger.info(f"✂️ ETM al inicio ({accion_etm}) - Corte adicional: Canción cortada a {nueva_duracion_str}")
-                            print(f"✂️ ETM al inicio ({accion_etm}) - Corte adicional: Canción cortada a {nueva_duracion_str}")
+
+
                 
                 # Para ETM "cortar", no avanzar tiempo (su duración es 0)
                 # La siguiente canción debe empezar inmediatamente después del ETM
@@ -1036,8 +1073,8 @@ async def generar_programacion_dia(
                     # Esperar: la canción anterior termina completamente, el siguiente evento empieza después
                     tiempo_usado = ultima_cancion_tiempo_inicio - tiempo_inicio_segundos + ultima_cancion_duracion_original
                     hora_actual_segundos = tiempo_inicio_segundos + tiempo_usado
-                    logger.info(f"⏳ ETM ({accion_etm}): Esperando a que termine la canción anterior")
-                    print(f"⏳ ETM ({accion_etm}): Esperando a que termine la canción anterior")
+
+
                 
                 # Para ETM "espera", no avanzar tiempo (su duración es 0)
                 duracion_evento_segundos = 0
@@ -1057,7 +1094,7 @@ async def generar_programacion_dia(
                 if duracion_evento_segundos > tiempo_restante:
                     duracion_evento_segundos = tiempo_restante
                     if duracion_evento_segundos <= 0:
-                        print(f"⚠️ Reloj {reloj.clave}: Evento {evento_idx+1} tiene duración <= 0, saltando...")
+
                         continue  # Continuar con el siguiente evento en lugar de romper el bucle
                 
                 # Seleccionar canción sin repetir de la categoría específica del evento
@@ -1106,7 +1143,7 @@ async def generar_programacion_dia(
                     hora_real_segundos = hora_programada_reloj  # offset_evento_segundos = 0, así que no se suma
                     # Asegurar que tiempo_inicio_segundos también esté en la hora programada para eventos siguientes
                     tiempo_inicio_segundos = hora_programada_reloj
-                    print(f"  ⏰ ETM FORZADO al inicio: hora_real_segundos = {hora_real_segundos} ({hora_real_segundos//3600}:00:00) usando SOLO hora_programada={hora_programada_reloj} (offset={offset_evento_segundos} no se suma)")
+
                 elif offset_evento_segundos == 0 and accion_etm_normalizada_hora in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']:
                     # ETM "cortar" en otro momento del reloj: usar tiempo absoluto
                     hora_real_segundos = tiempo_evento_absoluto
@@ -1139,10 +1176,6 @@ async def generar_programacion_dia(
             hora_real_horas = hora_real_segundos // 3600
             hora_real_minutos = (hora_real_segundos % 3600) // 60
             hora_real_seg = hora_real_segundos % 60
-            
-            # Log adicional para ETM al inicio para verificar el cálculo
-            if es_etm and offset_evento_segundos == 0 and evento_idx == 0 and (tiene_etm_cortar_inicio or accion_etm_normalizada in ['cortar', 'cortar cancion', 'cortar canción', 'cortar cancíon', 'fadeout']):
-                print(f"  ✅ VALOR FINAL ETM: hora_real_segundos={hora_real_segundos}, hora_real={hora_real_horas:02d}:{hora_real_minutos:02d}:{hora_real_seg:02d}")
             
             # Convertir duración a formato HH:MM:SS
             dur_horas = duracion_evento_segundos // 3600
@@ -1216,7 +1249,7 @@ async def generar_programacion_dia(
             # Log para depuración de eventos generados
             if evento_idx == 0 or es_etm:
                 hora_log = f"{hora_real_horas:02d}:{hora_real_minutos:02d}:{hora_real_seg:02d}"
-                print(f"  📝 Evento {evento_idx+1} del reloj {reloj.clave}: {categoria_nombre} - {descripcion_evento} - Hora: {hora_log}")
+
             
             # Guardar referencia a la última canción para procesamiento de ETM
             if cancion_seleccionada:
@@ -1267,7 +1300,7 @@ async def generar_programacion_dia(
             else:
                 ultima_cancion_duracion_original_global = 0
             
-            print(f"  📝 Última canción guardada: inicio={ultima_cancion_tiempo_inicio_global}s, duración_original={ultima_cancion_duracion_original_global}s, duración_actual={convertir_duracion_a_segundos(ultima_cancion_entry.duracion_real or '00:00:00')}s")
+
         
         # Calcular tiempo_fin_reloj_anterior inicialmente basado en donde terminó el reloj
         tiempo_fin_reloj_anterior = tiempo_inicio_segundos + tiempo_usado
@@ -1301,7 +1334,7 @@ async def generar_programacion_dia(
                         if duracion_actual > 0:
                             duracion_original = duracion_actual
                     
-                    print(f"  🔍 Verificando corte: canción inicio={ultima_cancion_tiempo_inicio_global}s, duración_original={duracion_original}s, tiempo_corte={tiempo_corte}s, tiempo_transcurrido={tiempo_transcurrido}s")
+
                     
                     if tiempo_transcurrido > 0 and tiempo_transcurrido <= duracion_original:
                         # Cortar la canción al tiempo del siguiente reloj
@@ -1320,22 +1353,22 @@ async def generar_programacion_dia(
                         # AJUSTAR tiempo_fin_reloj_anterior para que el siguiente reloj empiece en su hora programada
                         tiempo_fin_reloj_anterior = siguiente_hora_programada
                         
-                        print(f"  ✂️ CORTE ANTICIPADO: Canción cortada a {nueva_duracion_str} para ETM del reloj {siguiente_reloj.clave} a las {siguiente_hora_programada//3600}:00:00")
-                        logger.info(f"✂️ CORTE ANTICIPADO: Canción cortada a {nueva_duracion_str} para ETM del reloj {siguiente_reloj.clave}")
+
+
         
         # Log de eventos generados para este reloj
         eventos_del_reloj = [e for e in eventos_generados if e.reloj_id == reloj.id]
-        print(f"📊 Reloj {reloj.clave}: {len(eventos_del_reloj)} eventos generados")
+
         
         # Log para debugging
         hora_fin_hhmmss = f"{tiempo_fin_reloj_anterior//3600:02d}:{(tiempo_fin_reloj_anterior%3600)//60:02d}:{tiempo_fin_reloj_anterior%60:02d}"
         hora_programada_hhmmss = f"{hora_programada_reloj//3600:02d}:{(hora_programada_reloj%3600)//60:02d}:{hora_programada_reloj%60:02d}"
-        print(f"✅ Reloj {reloj.clave} completado - Programado: {hora_programada_hhmmss}, Inicio real: {hora_inicio_hhmmss}, Fin: {hora_fin_hhmmss}")
+
     
     # Guardar en la base de datos
-    print(f"💾 Guardando {len(eventos_generados)} eventos en la base de datos...")
+
     db.commit()
-    print(f"✅ {len(eventos_generados)} eventos guardados exitosamente")
+
     
     # Verificar cuántos eventos se guardaron realmente
     eventos_guardados = db.query(ProgramacionModel).filter(
@@ -1343,7 +1376,7 @@ async def generar_programacion_dia(
         ProgramacionModel.politica_id == politica_id,
         ProgramacionModel.fecha == fecha.date()
     ).count()
-    print(f"✅ Verificación: {eventos_guardados} eventos en la BD para fecha {fecha.date()}")
+
     
     return eventos_generados
 
@@ -1357,7 +1390,7 @@ async def obtener_dias_simple(
 ):
     """Obtener días de programación en formato simple"""
     try:
-        print(f"🔍 DEBUG: Iniciando dias-simple - difusora: {difusora}, politica_id: {politica_id}")
+
         # Convertir fechas
         fecha_inicio_dt = datetime.strptime(fecha_inicio, "%d/%m/%Y")
         fecha_fin_dt = datetime.strptime(fecha_fin, "%d/%m/%Y")
@@ -1389,7 +1422,7 @@ async def obtener_dias_simple(
                 )
                 
                 programacion_count = programacion_existente.count()
-                logger.info(f"Programación count para {fecha_actual.strftime('%d/%m/%Y')}: {programacion_count}")
+
                 
                 # Solo asignar "Con Programación" si realmente existe programación
                 if programacion_count > 0:
@@ -1397,8 +1430,8 @@ async def obtener_dias_simple(
                     tiene_programacion = True
                     
                     # Buscar día modelo usado en la programación existente
-                    print(f"🔍 DEBUG: Buscando día modelo para {fecha_actual.strftime('%d/%m/%Y')} - difusora: {difusora}, politica_id: {politica_id}")
-                    logger.info(f"Buscando día modelo para {fecha_actual.strftime('%d/%m/%Y')} - difusora: {difusora}, politica_id: {politica_id}")
+
+
                     dia_modelo = db.query(DiaModeloModel).join(
                         ProgramacionModel,
                         DiaModeloModel.id == ProgramacionModel.dia_modelo_id
@@ -1410,10 +1443,10 @@ async def obtener_dias_simple(
                     
                     if dia_modelo:
                         dia_modelo_nombre = dia_modelo.nombre
-                        logger.info(f"✅ Día modelo encontrado por dia_modelo_id: {dia_modelo_nombre}")
-                        print(f"✅ DEBUG: Día modelo que se devolverá: {dia_modelo_nombre}")
+
+
                     else:
-                        logger.info("No se encontró día modelo por dia_modelo_id, usando fallback")
+
                         # Si no se encuentra el día modelo almacenado, usar el método anterior como fallback
                         dia_modelo = db.query(DiaModeloModel).filter(
                             DiaModeloModel.politica_id == politica_id,
@@ -1424,7 +1457,7 @@ async def obtener_dias_simple(
                         
                         if dia_modelo:
                             dia_modelo_nombre = dia_modelo.nombre
-                            logger.info(f"Día modelo encontrado por día de semana: {dia_modelo_nombre}")
+
                 else:
                     # Si no hay programación, usar el día modelo por defecto de la política
                     status = "Sin Configuración"
@@ -1445,17 +1478,17 @@ async def obtener_dias_simple(
                             ).first()
                             if dia_modelo_default:
                                 dia_modelo_nombre = dia_modelo_default.nombre
-                                logger.info(f"✅ Día modelo por defecto asignado: {dia_modelo_nombre}")
-                                print(f"✅ DEBUG: Día modelo por defecto asignado: {dia_modelo_nombre}")
+
+
                             else:
                                 dia_modelo_nombre = ""
-                                logger.info(f"No se encontró día modelo por defecto con ID {dia_modelo_id}")
+
                         else:
                             dia_modelo_nombre = ""
-                            logger.info(f"No hay día modelo por defecto configurado para {dia_semana_espanol}")
+
                     else:
                         dia_modelo_nombre = ""
-                        logger.info(f"No se encontró la política con ID {politica_id}")
+
             
             # Nombres de días en español
             dias_espanol = {
@@ -1477,7 +1510,7 @@ async def obtener_dias_simple(
                 "tiene_programacion": tiene_programacion,
                 "dia_modelo": dia_modelo_nombre
             }
-            print(f"📤 DEBUG: Enviando día al frontend: {dia_data}")
+
             dias.append(dia_data)
             
             fecha_actual += timedelta(days=1)
@@ -1490,7 +1523,7 @@ async def obtener_dias_simple(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Formato de fecha inválido: {str(e)}")
     except Exception as e:
-        logger.error(f"Error al obtener días simples: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/programacion-detallada")
@@ -1498,10 +1531,30 @@ async def obtener_programacion_detallada(
     difusora: str = Query(..., description="Difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato DD/MM/YYYY"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtener programación detallada para un día específico"""
+    """Obtener programación detallada para un día específico (solo de las difusoras del usuario)"""
     try:
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para acceder a la programación de la difusora {difusora}"
+            )
+        
+        # Verificar que la política pertenece a la difusora del usuario
+        from app.models.programacion import PoliticaProgramacion as PoliticaProgramacionModel
+        politica = db.query(PoliticaProgramacionModel).filter(
+            PoliticaProgramacionModel.id == politica_id,
+            PoliticaProgramacionModel.difusora == difusora
+        ).first()
+        if not politica:
+            raise HTTPException(
+                status_code=404,
+                detail="Política no encontrada o no pertenece a esta difusora"
+            )
         # Convertir fecha
         fecha_dt = datetime.strptime(fecha, "%d/%m/%Y").date()
         
@@ -1517,9 +1570,9 @@ async def obtener_programacion_detallada(
             ProgramacionModel.id
         ).all()
         
-        logger.info(f"📊 Consulta programación: difusora={difusora}, politica_id={politica_id}, fecha={fecha_dt}")
-        logger.info(f"📊 Total de eventos encontrados en BD: {len(programacion)}")
-        print(f"📊 Total de eventos encontrados en BD: {len(programacion)}")
+
+
+
         
         if not programacion:
             return {
@@ -1532,26 +1585,26 @@ async def obtener_programacion_detallada(
         # Primero, obtener todos los relojes únicos ordenados por primera aparición
         relojes_unicos = {}
         relojes_orden = []
-        numero_reloj_contador = 1
+        nnumero_reloj_contador = 1
         
         for prog, reloj in programacion:
             reloj_id = prog.reloj_id if prog.reloj_id else None
             if reloj_id and reloj_id not in relojes_unicos:
-                relojes_unicos[reloj_id] = numero_reloj_contador
+                relojes_unicos[reloj_id] = nnumero_reloj_contador
                 relojes_orden.append(reloj_id)
-                numero_reloj_contador += 1
+                nnumero_reloj_contador += 1
         
         # Formatear respuesta
         eventos = []
         for prog, reloj in programacion:
             reloj_id = prog.reloj_id if prog.reloj_id else None
-            numero_reloj = relojes_unicos.get(reloj_id, 0) if reloj_id else 0
+            nnumero_reloj = relojes_unicos.get(reloj_id, 0) if reloj_id else 0
             clave_reloj = reloj.clave if reloj else (prog.numero_reloj if prog.numero_reloj else "")
             
             eventos.append({
                 "id": prog.id,
                 "mc": prog.mc,
-                "numero_reloj": numero_reloj,  # Número secuencial (1, 2, 3...)
+                "nnumero_reloj": nnumero_reloj,  # Número secuencial (1, 2, 3...)
                 "clave_reloj": clave_reloj,  # Clave/Nombre del reloj
                 "hora_real": prog.hora_real.strftime("%H:%M:%S") if prog.hora_real else "",
                 "hora_transmision": prog.hora_transmision.strftime("%H:%M:%S") if prog.hora_transmision else "",
@@ -1586,7 +1639,7 @@ async def obtener_programacion_detallada(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Formato de fecha inválido: {str(e)}")
     except Exception as e:
-        logger.error(f"Error al obtener programación detallada: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/generar-logfile")
@@ -1594,10 +1647,18 @@ async def generar_logfile(
     difusora: str = Query(..., description="Difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato DD/MM/YYYY"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Generar log file para un día específico"""
+    """Generar log file para un día específico (solo de las difusoras del usuario)"""
     try:
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para generar logfile de la difusora {difusora}"
+            )
         from app.services.programacion.logfiles_service import LogfilesService
         
         # Crear instancia del servicio
@@ -1628,7 +1689,7 @@ async def generar_logfile(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al generar log file: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
@@ -1637,13 +1698,20 @@ async def eliminar_programacion(
     difusora: str = Query(..., description="Nombre de la difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato YYYY-MM-DD"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
     """
-    Eliminar programación para una fecha específica
+    Eliminar programación para una fecha específica (solo de las difusoras del usuario)
     """
     try:
-        logger.info(f"Eliminando programación para difusora: {difusora}, política: {politica_id}, fecha: {fecha}")
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para eliminar programación de la difusora {difusora}"
+            )
         
         # Buscar la programación a eliminar
         programacion = db.query(ProgramacionModel).filter(
@@ -1660,13 +1728,13 @@ async def eliminar_programacion(
             db.delete(entrada)
         db.commit()
         
-        logger.info(f"Programación eliminada exitosamente")
+
         return {"message": "Programación eliminada exitosamente"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al eliminar programación: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
@@ -1675,13 +1743,20 @@ async def generar_carta_tiempo(
     difusora: str = Query(..., description="Nombre de la difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato YYYY-MM-DD"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
     """
-    Generar carta de tiempo para una fecha específica
+    Generar carta de tiempo para una fecha específica (solo de las difusoras del usuario)
     """
     try:
-        logger.info(f"Generando carta de tiempo para difusora: {difusora}, política: {politica_id}, fecha: {fecha}")
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para generar carta de tiempo de la difusora {difusora}"
+            )
         
         # Buscar la programación
         programacion = db.query(ProgramacionModel).filter(
@@ -1707,7 +1782,7 @@ async def generar_carta_tiempo(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al generar carta de tiempo: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
@@ -1715,14 +1790,14 @@ async def generar_carta_tiempo(
 async def actualizar_cancion_programacion(
     programacion_id: int,
     cancion_id: int = Query(..., description="ID de la nueva canción"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
     """
-    Actualizar la canción asignada a una entrada de programación
+    Actualizar la canción asignada a una entrada de programación (solo de las difusoras del usuario)
     """
     try:
-        logger.info(f"Actualizando canción en programación ID {programacion_id} con canción ID {cancion_id}")
-        
         # Buscar la entrada de programación
         programacion_entry = db.query(ProgramacionModel).filter(
             ProgramacionModel.id == programacion_id
@@ -1731,11 +1806,28 @@ async def actualizar_cancion_programacion(
         if not programacion_entry:
             raise HTTPException(status_code=404, detail="Entrada de programación no encontrada")
         
-        # Buscar la nueva canción
+        # Verificar que el usuario tenga acceso a la difusora de la programación
+        if programacion_entry.difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para actualizar programación de la difusora {programacion_entry.difusora}"
+            )
+        
+        # Buscar la nueva canción y verificar que pertenece a una categoría de las difusoras del usuario
+        from app.models.categorias import Categoria
         cancion = db.query(CancionModel).filter(CancionModel.id == cancion_id).first()
         
         if not cancion:
             raise HTTPException(status_code=404, detail="Canción no encontrada")
+        
+        # Verificar que la categoría de la canción pertenece a una difusora del usuario
+        if cancion.categoria_id:
+            categoria = db.query(Categoria).filter(Categoria.id == cancion.categoria_id).first()
+            if categoria and categoria.difusora not in difusoras_allowed:
+                raise HTTPException(
+                    status_code=403,
+                    detail="No tienes permiso para usar esta canción (pertenece a otra organización)"
+                )
         
         # Actualizar los campos de la programación con los datos de la nueva canción
         programacion_entry.id_media = str(cancion.id)
@@ -1758,7 +1850,7 @@ async def actualizar_cancion_programacion(
         db.commit()
         db.refresh(programacion_entry)
         
-        logger.info(f"✅ Canción actualizada exitosamente en programación ID {programacion_id}")
+
         
         return {
             "id": programacion_entry.id,
@@ -1774,7 +1866,7 @@ async def actualizar_cancion_programacion(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al actualizar canción en programación: {str(e)}")
+
         raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 

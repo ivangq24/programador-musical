@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Plus, Edit, Trash2, Search, X, CheckCircle, AlertCircle, FolderTree, Clock, Music, Filter } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, X, CheckCircle, AlertCircle, FolderTree, Clock, Music, Filter, ChevronDown } from 'lucide-react'
 import { listCategoriasStats, createCategoria, updateCategoria, deleteCategoria, getElementosCategoria } from '../../../../api'
 import { getDifusoras } from '../../../../api/catalogos'
 
@@ -34,7 +34,7 @@ export default function MantenimientoCategorias() {
       const data = await listCategoriasStats()
       setCategorias(data || [])
     } catch (err) {
-      console.error('Error cargando categorías:', err)
+
       setCategorias([])
     } finally {
       setLoading(false)
@@ -47,7 +47,7 @@ export default function MantenimientoCategorias() {
       const d = await getDifusoras()
       setDifusoras(d || [])
     } catch (err) {
-      console.error('Error cargando difusoras:', err)
+
       setDifusoras([])
     }
   }, [])
@@ -92,7 +92,7 @@ export default function MantenimientoCategorias() {
     setForm({ 
       difusora: cat.difusora || '', 
       clave: cat.clave || '', 
-      nombre: cat.nombre || '', 
+ombre: cat.nombre || '', 
       descripcion: cat.descripcion || '', 
       activa: !!cat.activa 
     })
@@ -104,7 +104,7 @@ export default function MantenimientoCategorias() {
         const els = await getElementosCategoria(cat.id)
         setElementos(els || [])
       } catch (err) {
-        console.error('Error cargando elementos:', err)
+
         setElementos([])
       }
     })()
@@ -478,17 +478,20 @@ export default function MantenimientoCategorias() {
                         <label className="block text-sm font-bold text-gray-700 mb-2">
                           Difusora
                         </label>
-                        <select 
-                          disabled={mode==='consult'} 
-                          value={form.difusora} 
-                          onChange={e=>setForm({...form, difusora:e.target.value})} 
-                          className={inputClass}
-                        >
-                          <option value="">Seleccionar difusora</option>
-                          {Array.isArray(difusoras) && difusoras.map((d)=> (
-                            <option key={d.id||d.siglas} value={d.siglas||d.nombre}>{d.siglas || d.nombre}</option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select 
+                            disabled={mode==='consult'} 
+                            value={form.difusora} 
+                            onChange={e=>setForm({...form, difusora:e.target.value})} 
+                            className={`${inputClass} appearance-none pr-10 cursor-pointer`}
+                          >
+                            <option value="">Seleccionar difusora</option>
+                            {Array.isArray(difusoras) && difusoras.map((d)=> (
+                              <option key={d.id||d.siglas} value={d.siglas||d.nombre}>{d.siglas || d.nombre}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                        </div>
                       </div>
                       <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm md:mt-0 mt-4">
                         <input 

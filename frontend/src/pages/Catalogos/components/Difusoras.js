@@ -38,7 +38,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       const data = await getDifusoras({});
       setDifusoras(data);
     } catch (err) {
-      console.error('Error loading difusoras:', err);
+
       setError(err.message);
       setDifusoras([]);
     } finally {
@@ -52,7 +52,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       const statsData = await getDifusorasStats();
       setStats(statsData);
     } catch (err) {
-      console.error('Error loading stats:', err);
+
       // Fallback: usar calculatedStats que ya está memoizado
       // No necesitamos actualizar stats aquí, calculatedStats se actualiza automáticamente
     }
@@ -150,7 +150,7 @@ export default function Difusoras({ onDifusoraSelect }) {
         // Actualizar estado local en lugar de recargar todo
         setDifusoras(prev => prev.filter(d => d.id !== id));
       } catch (err) {
-        console.error('Error deleting difusora:', err);
+
         showNotification(`Error al eliminar la difusora: ${err.message}`, 'error');
       }
     }
@@ -176,7 +176,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       await exportDifusorasToCSV(params);
       showNotification('Exportación CSV completada', 'success');
     } catch (err) {
-      console.error('Error exporting CSV:', err);
+
       showNotification(`Error al exportar CSV: ${err.message}`, 'error');
     }
   }, [showOnlyActive, searchTerm, showNotification]);
@@ -209,7 +209,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       setSelectedDifusora(null);
       setFormMode('new');
     } catch (err) {
-      console.error('Error saving difusora:', err);
+
       showNotification(`Error al guardar la difusora: ${err.message}`, 'error');
     }
   }, [formMode, selectedDifusora, showNotification]);
@@ -644,7 +644,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
 
       await onSave(dataToSave);
     } catch (err) {
-      console.error('Error in form submission:', err);
+
     } finally {
       setIsLoading(false);
     }

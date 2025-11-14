@@ -2,26 +2,33 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.core.database import get_db
+from app.core.auth import get_current_user
+from app.models.auth import Usuario
 from app.models.catalogos import Difusora
 from app.schemas.catalogos import Difusora as DifusoraSchema
 from typing import List, Optional
-import logging
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # General endpoints
 @router.get("/general/difusoras", response_model=List[DifusoraSchema])
 async def get_difusoras(
     db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
     skip: int = Query(0, ge=0, description="Número de registros a omitir"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros a retornar"),
     search: Optional[str] = Query(None, description="Término de búsqueda"),
     activa: Optional[bool] = Query(None, description="Filtrar por estado activo")
 ):
-    """Obtener lista de difusoras con filtros opcionales"""
+    """Obtener lista de difusoras con filtros opcionales (solo de la organización del usuario)"""
     try:
-        query = db.query(Difusora)
+        # Verificar que organizacion_id existe
+        if not hasattr(usuario, 'organizacion_id') or not usuario.organizacion_id:
+            # Si organizacion_id no existe, la migración aún no se ha ejecutado
+            return []
+        
+        # Filtrar por organización del usuario (multi-tenancy)
+        query = db.query(Difusora).filter(Difusora.organizacion_id == usuario.organizacion_id)
         
         # Aplicar filtro de estado activo
         if activa is not None:
@@ -48,15 +55,29 @@ async def get_difusoras(
         return difusoras
         
     except Exception as e:
-        logger.error(f"Error al obtener difusoras: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/general/difusoras/stats")
-async def get_difusoras_stats(db: Session = Depends(get_db)):
-    """Obtener estadísticas de difusoras"""
+async def get_difusoras_stats(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user)
+):
+    """Obtener estadísticas de difusoras (solo de la organización del usuario)"""
     try:
-        total = db.query(Difusora).count()
-        activas = db.query(Difusora).filter(Difusora.activa == True).count()
+        # Verificar que organizacion_id existe
+        if not hasattr(usuario, 'organizacion_id') or not usuario.organizacion_id:
+            # Si organizacion_id no existe, la migración aún no se ha ejecutado
+            return {
+                "total": 0,
+                "activas": 0,
+                "inactivas": 0
+            }
+        
+        # Filtrar por organización del usuario (multi-tenancy)
+        query = db.query(Difusora).filter(Difusora.organizacion_id == usuario.organizacion_id)
+        total = query.count()
+        activas = query.filter(Difusora.activa == True).count()
         inactivas = total - activas
         
         return {
@@ -66,7 +87,7 @@ async def get_difusoras_stats(db: Session = Depends(get_db)):
         }
         
     except Exception as e:
-        logger.error(f"Error al obtener estadísticas de difusoras: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 

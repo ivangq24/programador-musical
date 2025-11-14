@@ -65,12 +65,12 @@ export default function MantenimientoCanciones() {
         const statsResponse = await getCancionesStats()
         setStats(statsResponse)
       } catch (statsErr) {
-        console.error('Error cargando estadísticas:', statsErr)
+
         // Usar calculatedStats como fallback
       }
       
     } catch (err) {
-      console.error('Error cargando canciones:', err)
+
       setError('Error al cargar las canciones')
       setCanciones([])
     } finally {
@@ -218,7 +218,7 @@ export default function MantenimientoCanciones() {
   }, [filteredCanciones])
 
   const handleBulkAction = useCallback((action) => {
-    console.log(`Bulk action: ${action} on ${selectedCanciones.length} canciones`)
+
     // TODO: Implementar acciones en lote
   }, [selectedCanciones.length])
 
@@ -236,7 +236,7 @@ export default function MantenimientoCanciones() {
       {/* Notification Component */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 ${
-          notification.type === 'success'
+otification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 text-red-800'
         }`}>

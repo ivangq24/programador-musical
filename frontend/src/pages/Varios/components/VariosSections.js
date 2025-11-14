@@ -1,31 +1,111 @@
+'use client'
+
 import React from 'react';
-import { Settings } from 'lucide-react';
+import { Users, User, Settings } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 // Sección Varios
-export const VariosSection = () => {
+export const VariosSection = ({ onSectionClick }) => {
+  const { user } = useAuth();
+  // Verificar si es admin - considerar tanto rol como is_admin
+  const isAdmin = user?.rol === 'admin' || user?.is_admin === true || user?.groups?.includes('admin');
+  
   const items = [
-    { name: 'Configuraciones', icon: Settings }
+    { 
+      name: 'Mi Perfil', 
+      icon: User, 
+      id: 'mi-perfil',
+      description: 'Gestiona tu información personal y configuración de cuenta',
+      color: 'from-purple-500 to-purple-600',
+      bgColor: 'bg-purple-50',
+      iconColor: 'text-purple-600',
+      hoverColor: 'hover:bg-purple-50'
+    },
+    ...(isAdmin ? [{ 
+      name: 'Usuarios', 
+      icon: Users, 
+      id: 'usuarios',
+      description: 'Administra usuarios, roles y permisos del sistema',
+      color: 'from-indigo-500 to-indigo-600',
+      bgColor: 'bg-indigo-50',
+      iconColor: 'text-indigo-600',
+      hoverColor: 'hover:bg-indigo-50'
+    }] : [])
   ];
+  
+  const handleItemClick = (itemId) => {
+    if (onSectionClick) {
+      onSectionClick(itemId);
+    }
+  };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 flex flex-col">
-      <div className="p-3 rounded-t-xl flex-none bg-gradient-to-r from-gray-500 to-gray-600">
-        <h3 className="text-white font-semibold text-sm">Varios</h3>
-      </div>
-      <div className="flex-1 p-3 overflow-hidden">
-        <div className="space-y-2 h-full flex flex-col justify-center overflow-hidden">
-          {items.map((item, itemIndex) => {
-            const ItemIcon = item.icon;
-            return (
-              <button key={itemIndex} className="w-full flex items-center space-x-2 p-2 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 group text-left">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors flex-none bg-gray-100 group-hover:bg-gray-200">
-                  <ItemIcon className="w-3 h-3 text-gray-600" />
-                </div>
-                <span className="text-xs font-medium text-gray-700 group-hover:text-gray-900 leading-tight truncate">{item.name}</span>
-              </button>
-            );
-          })}
+    <div className="space-y-6">
+      {/* Header con gradiente mejorado */}
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 p-8 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/90 to-indigo-600/90"></div>
+          <div className="relative z-10 flex items-center space-x-5">
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm shadow-lg">
+              <Settings className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h3 className="text-3xl font-bold text-white mb-1">Varios</h3>
+              <p className="text-purple-100 text-base">Configuración y administración del sistema</p>
+            </div>
+          </div>
+          {/* Efecto de partículas decorativas */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-20 translate-x-20"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-16 -translate-x-16"></div>
+          <div className="absolute top-1/2 right-1/4 w-24 h-24 bg-white/5 rounded-full"></div>
         </div>
+      </div>
+
+      {/* Tarjetas de secciones mejoradas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {items.map((item, itemIndex) => {
+          const ItemIcon = item.icon;
+          return (
+            <button 
+              key={itemIndex} 
+              onClick={() => handleItemClick(item.id)}
+              className={`group relative bg-white rounded-2xl shadow-xl border-2 border-gray-200 hover:border-gray-300 hover:shadow-2xl transition-all duration-300 text-left overflow-hidden transform hover:scale-[1.02] hover:-translate-y-2`}
+            >
+              {/* Background con gradiente sutil */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${item.bgColor} opacity-30 group-hover:opacity-50 transition-opacity duration-300`}></div>
+              
+              {/* Contenido */}
+              <div className="relative p-8">
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                    <ItemIcon className="w-8 h-8 text-white" />
+                  </div>
+                  
+                  {/* Indicador de flecha mejorado */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center shadow-md">
+                      <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="text-2xl font-bold text-gray-900 group-hover:text-gray-800 transition-colors">
+                    {item.name}
+                  </h4>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {item.description}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Borde inferior con gradiente en hover */}
+              <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

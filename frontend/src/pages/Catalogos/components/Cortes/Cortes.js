@@ -15,7 +15,8 @@ import {
   CheckCircle,
   Eye,
   Download,
-  Scissors
+  Scissors,
+  ChevronDown
 } from 'lucide-react'
 import { 
   getCortes, 
@@ -48,7 +49,7 @@ export default function Cortes() {
     nombre: '',
     descripcion: '',
     duracion: '',
-    tipo: 'comercial', // 'comercial' o 'vacio'
+    tipo: '', // 'comercial' o 'vacio'
     activo: true,
     observaciones: ''
   })
@@ -65,7 +66,7 @@ export default function Cortes() {
       setCortes(response || [])
     } catch (err) {
       setError('Error al cargar los cortes')
-      console.error('Error:', err)
+
       setCortes([])
     } finally {
       setLoading(false)
@@ -174,6 +175,10 @@ export default function Cortes() {
       errors.duracion = 'Formato de duración inválido (HH:MM:SS)'
     }
     
+    if (!formData.tipo.trim()) {
+      errors.tipo = 'El tipo es requerido'
+    }
+    
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }, [formData])
@@ -187,7 +192,7 @@ export default function Cortes() {
       nombre: '',
       descripcion: '',
       duracion: '',
-      tipo: 'comercial',
+      tipo: '',
       activo: true,
       observaciones: ''
     })
@@ -220,7 +225,7 @@ export default function Cortes() {
       handleCloseForm()
     } catch (err) {
       showNotification(`Error al guardar el corte: ${err.message}`, 'error')
-      console.error('Error saving corte:', err)
+
     } finally {
       setLoading(false)
     }
@@ -232,7 +237,7 @@ export default function Cortes() {
       nombre: corte.nombre || '',
       descripcion: corte.descripcion || '',
       duracion: corte.duracion || '',
-      tipo: corte.tipo || 'comercial',
+      tipo: corte.tipo || '',
       activo: corte.activo ?? true,
       observaciones: corte.observaciones || ''
     })
@@ -246,7 +251,7 @@ export default function Cortes() {
       nombre: corte.nombre || '',
       descripcion: corte.descripcion || '',
       duracion: corte.duracion || '',
-      tipo: corte.tipo || 'comercial',
+      tipo: corte.tipo || '',
       activo: corte.activo ?? true,
       observaciones: corte.observaciones || ''
     })
@@ -267,7 +272,7 @@ export default function Cortes() {
         setCortes(prev => prev.filter(c => c.id !== corte.id))
       } catch (err) {
         showNotification(`Error al eliminar el corte: ${err.message}`, 'error')
-        console.error('Error deleting corte:', err)
+
       } finally {
         setLoading(false)
       }
@@ -280,7 +285,7 @@ export default function Cortes() {
       nombre: '',
       descripcion: '',
       duracion: '',
-      tipo: 'comercial',
+      tipo: '',
       activo: true,
       observaciones: ''
     })
@@ -504,34 +509,40 @@ export default function Cortes() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Tipo</label>
-                    <select
-                      value={filterTipo}
-                      onChange={(e) => setFilterTipo(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-md transition-all duration-200 hover:border-gray-400"
-                    >
-                      <option value="">Todos los tipos</option>
-                      <option value="comercial">Comercial</option>
-                      <option value="vacio">Vacío</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={filterTipo}
+                        onChange={(e) => setFilterTipo(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-md transition-all duration-200 hover:border-gray-400 appearance-none pr-10 cursor-pointer"
+                      >
+                        <option value="">Todos los tipos</option>
+                        <option value="comercial">Comercial</option>
+                        <option value="vacio">Vacío</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">Duración</label>
-                    <select
-                      value={filterDuracion}
-                      onChange={(e) => setFilterDuracion(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-md transition-all duration-200 hover:border-gray-400"
-                    >
-                      <option value="">Todas las duraciones</option>
-                      <option value="00:00:05">00:00:05</option>
-                      <option value="00:00:08">00:00:08</option>
-                      <option value="00:00:10">00:00:10</option>
-                      <option value="00:00:15">00:00:15</option>
-                      <option value="00:00:20">00:00:20</option>
+                    <div className="relative">
+                      <select
+                        value={filterDuracion}
+                        onChange={(e) => setFilterDuracion(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-md transition-all duration-200 hover:border-gray-400 appearance-none pr-10 cursor-pointer"
+                      >
+                        <option value="">Todas las duraciones</option>
+                        <option value="00:00:05">00:00:05</option>
+                        <option value="00:00:08">00:00:08</option>
+                        <option value="00:00:10">00:00:10</option>
+                        <option value="00:00:15">00:00:15</option>
+                        <option value="00:00:20">00:00:20</option>
                       <option value="00:00:25">00:00:25</option>
                       <option value="00:00:30">00:00:30</option>
                       <option value="00:01:00">00:01:00</option>
                     </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>
+                </div>
                 </div>
                 <div className="mt-4 flex justify-end">
                   <button
@@ -803,16 +814,26 @@ export default function Cortes() {
                         <label className="block text-sm font-bold text-gray-700 mb-2">
                           Tipo <span className="text-red-500">*</span>
                         </label>
-                        <select
-                          name="tipo"
-                          value={formData.tipo}
-                          onChange={handleInputChange}
-                          disabled={formMode === 'view'}
-                          className={inputClass}
-                        >
-                          <option value="comercial">Comercial</option>
-                          <option value="vacio">Vacío</option>
-                        </select>
+                        <div className="relative">
+                          <select
+                            name="tipo"
+                            value={formData.tipo}
+                            onChange={handleInputChange}
+                            disabled={formMode === 'view'}
+                            className={`${inputClass} appearance-none pr-10 cursor-pointer`}
+                          >
+                            <option value="">Seleccionar tipo</option>
+                            <option value="comercial">Comercial</option>
+                            <option value="vacio">Vacío</option>
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                        </div>
+                        {formErrors.tipo && (
+                          <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>{formErrors.tipo}</span>
+                          </p>
+                        )}
                       </div>
 
                       {/* Observaciones */}

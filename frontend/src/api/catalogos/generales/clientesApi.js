@@ -1,9 +1,9 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1'
+import { buildApiUrl } from '../../../utils/apiConfig'
 
 export const clientesApi = {
   // Obtener todos los clientes
   getClientes: async () => {
-    const response = await fetch(`${API_BASE_URL}/catalogos/generales/clientes`)
+    const response = await fetch(buildApiUrl('/catalogos/generales/clientes'))
     if (!response.ok) {
       throw new Error('Error al obtener clientes')
     }
@@ -12,7 +12,7 @@ export const clientesApi = {
 
   // Obtener un cliente por ID
   getClienteById: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/catalogos/generales/clientes/${id}`)
+    const response = await fetch(buildApiUrl(`/catalogos/generales/clientes/${id}`))
     if (!response.ok) {
       throw new Error('Error al obtener cliente')
     }
@@ -21,7 +21,7 @@ export const clientesApi = {
 
   // Crear un nuevo cliente
   createCliente: async (clienteData) => {
-    const response = await fetch(`${API_BASE_URL}/catalogos/generales/clientes`, {
+    const response = await fetch(buildApiUrl('/catalogos/generales/clientes'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -36,7 +36,7 @@ export const clientesApi = {
 
   // Actualizar un cliente
   updateCliente: async (id, clienteData) => {
-    const response = await fetch(`${API_BASE_URL}/catalogos/generales/clientes/${id}`, {
+    const response = await fetch(buildApiUrl(`/catalogos/generales/clientes/${id}`), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -51,7 +51,7 @@ export const clientesApi = {
 
   // Eliminar un cliente
   deleteCliente: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/catalogos/generales/clientes/${id}`, {
+    const response = await fetch(buildApiUrl(`/catalogos/generales/clientes/${id}`), {
       method: 'DELETE',
     })
     if (!response.ok) {

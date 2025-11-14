@@ -12,8 +12,6 @@ const getBaseURL = () => {
 };
 
 const baseURL = getBaseURL();
-console.log('API Base URL:', baseURL);
-console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
 
 const apiClient = axios.create({
   baseURL: baseURL,
@@ -23,11 +21,42 @@ const apiClient = axios.create({
   },
 });
 
+// Interceptor para agregar token de autenticación
+apiClient.interceptors.request.use(
+  async (config) => {
+    // Obtener token del localStorage o de Cognito
+    if (typeof window !== 'undefined') {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`;
+      }
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Interceptor para manejar errores
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('API Error:', error);
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    // Manejar errores de autenticación
+    if (error.response?.status === 401) {
+      // Token expirado o inválido
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('idToken');
+        localStorage.removeItem('refreshToken');
+        // Redirigir a login
+        window.location.href = '/auth/login';
+      }
+    }
+    
     return Promise.reject(error);
   }
 );

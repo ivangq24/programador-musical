@@ -1,13 +1,17 @@
 // API para Generar Programación
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { buildApiUrl } from '../../utils/apiConfig';
 
 // Función helper para hacer peticiones HTTP
 const apiRequest = async (endpoint, options = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = buildApiUrl(endpoint);
+  
+  // Obtener token de autenticación
+  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
   
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
+      ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
       ...options.headers,
     },
   };
@@ -16,13 +20,25 @@ const apiRequest = async (endpoint, options = {}) => {
     const response = await fetch(url, { ...defaultOptions, ...options });
     
     if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error('No tienes permisos para acceder a este recurso. Por favor, inicia sesión.');
+      }
+      if (response.status === 401) {
+        // Token expirado o inválido
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('idToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/auth/login';
+        }
+        throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      }
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
     }
     
     return await response.json();
   } catch (error) {
-    console.error('API Error:', error);
     throw error;
   }
 };

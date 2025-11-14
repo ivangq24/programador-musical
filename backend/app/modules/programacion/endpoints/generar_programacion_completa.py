@@ -13,10 +13,8 @@ from app.modules.programacion.models.programacion import (
 from app.modules.categorias.models.categorias import Cancion as CancionModel, Categoria as CategoriaModel
 from datetime import datetime, time, timedelta
 import random
-import logging
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 def convertir_duracion_a_segundos(duracion_str: str) -> int:
     """Convertir duración HH:MM:SS a segundos"""
@@ -49,11 +47,11 @@ async def generar_programacion_completa(
         
         # Crear un diccionario de días modelo seleccionados por fecha
         dias_modelo_por_fecha = {}
-        print(f"🔍 DEBUG: Días modelo recibidos del frontend: {request.dias_modelo}")
-        logger.info(f"Días modelo recibidos del frontend: {request.dias_modelo}")
+
+
         for dia_seleccionado in request.dias_modelo:
-            print(f"🔍 DEBUG: Procesando día {dia_seleccionado.fecha} con modelo '{dia_seleccionado.dia_modelo}'")
-            logger.info(f"Procesando día {dia_seleccionado.fecha} con modelo '{dia_seleccionado.dia_modelo}'")
+
+
             dias_modelo_por_fecha[dia_seleccionado.fecha] = dia_seleccionado.dia_modelo
         
         # Obtener día modelo para esta política
@@ -71,7 +69,7 @@ async def generar_programacion_completa(
             # Buscar día modelo seleccionado por el usuario
             dia_modelo_nombre = dias_modelo_por_fecha.get(fecha_str)
             if not dia_modelo_nombre:
-                logger.warning(f"No hay día modelo seleccionado para {fecha_str}")
+
                 dias_procesados.append({
                     "fecha": fecha_str,
                     "dia_semana": fecha_actual.strftime("%A"),
@@ -82,8 +80,8 @@ async def generar_programacion_completa(
                 continue
             
             # Buscar el día modelo por nombre
-            print(f"🔍 DEBUG: Buscando día modelo '{dia_modelo_nombre}' para política {politica_id}, difusora {difusora}")
-            logger.info(f"Buscando día modelo '{dia_modelo_nombre}' para política {politica_id}, difusora {difusora}")
+
+
             dia_modelo = db.query(DiaModeloModel).filter(
                 DiaModeloModel.politica_id == politica_id,
                 DiaModeloModel.difusora == difusora,
@@ -92,14 +90,14 @@ async def generar_programacion_completa(
             ).first()
             
             if dia_modelo:
-                print(f"✅ DEBUG: Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}'")
-                logger.info(f"Día modelo encontrado: ID={dia_modelo.id}, nombre='{dia_modelo.nombre}'")
+
+
             else:
-                print(f"❌ DEBUG: No se encontró día modelo con nombre '{dia_modelo_nombre}'")
-                logger.warning(f"No se encontró día modelo con nombre '{dia_modelo_nombre}'")
+
+
             
             if not dia_modelo:
-                logger.warning(f"No se encontró el día modelo '{dia_modelo_nombre}' para {fecha_str}")
+
                 dias_procesados.append({
                     "fecha": fecha_str,
                     "dia_semana": fecha_actual.strftime("%A"),
@@ -119,7 +117,7 @@ async def generar_programacion_completa(
             ).order_by(RelojDiaModeloModel.orden).all()
             
             if not relojes_dia:
-                logger.warning(f"No hay relojes configurados para {fecha_actual.strftime('%d/%m/%Y')}")
+
                 dias_procesados.append({
                     "fecha": fecha_actual.strftime("%d/%m/%Y"),
                     "dia_semana": fecha_actual.strftime("%A"),
@@ -137,7 +135,7 @@ async def generar_programacion_completa(
             ).all()
             
             if programacion_existente:
-                logger.info(f"Eliminando {len(programacion_existente)} eventos existentes para {fecha_actual.strftime('%d/%m/%Y')}")
+
                 for evento in programacion_existente:
                     db.delete(evento)
                 db.flush()  # Aplicar eliminaciones antes de generar nueva programación
@@ -148,7 +146,7 @@ async def generar_programacion_completa(
                     fecha_actual, difusora, politica_id, relojes_dia, dia_modelo.id, db
                 )
                 
-                logger.info(f"Generados {len(eventos_generados)} eventos para {fecha_actual.strftime('%d/%m/%Y')}")
+
                 
                 dias_generados += 1
                 dias_procesados.append({
@@ -160,7 +158,7 @@ async def generar_programacion_completa(
                 })
                 
             except Exception as e:
-                logger.error(f"Error al generar programación para {fecha_actual}: {str(e)}")
+
                 dias_procesados.append({
                     "fecha": fecha_actual.strftime("%d/%m/%Y"),
                     "dia_semana": fecha_actual.strftime("%A"),
@@ -184,7 +182,7 @@ async def generar_programacion_completa(
         raise HTTPException(status_code=400, detail=f"Formato de fecha inválido: {str(e)}")
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al generar programación completa: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 async def generar_programacion_dia(
@@ -213,7 +211,7 @@ async def generar_programacion_dia(
         try:
             categorias_ids = [int(c) for c in politica.categorias_seleccionadas.split(',') if c.strip()]
         except ValueError:
-            logger.warning(f"Error al parsear categorias_seleccionadas: {politica.categorias_seleccionadas}")
+
     
     # Si no hay categorías en la política, usar todas
     if not categorias_ids:
@@ -283,7 +281,7 @@ async def generar_programacion_dia(
         
         # Log para debugging
         hora_inicio_hhmmss = f"{tiempo_inicio_segundos//3600:02d}:{(tiempo_inicio_segundos%3600)//60:02d}:{tiempo_inicio_segundos%60:02d}"
-        print(f"🕐 Reloj {reloj.clave} (índice {idx}) - Inicio: {hora_inicio_hhmmss}")
+
         
         # Obtener eventos del reloj
         eventos_reloj = db.query(EventoRelojModel).filter(
@@ -353,7 +351,7 @@ async def generar_programacion_dia(
             # Crear entrada de programación
             programacion_entry = ProgramacionModel(
                 mc=True if cancion_seleccionada else False,
-                numero_reloj=reloj.clave,
+umero_reloj=reloj.clave,
                 hora_real=time(hora_real_horas % 24, hora_real_minutos, hora_real_seg),
                 hora_transmision=time(hora_real_horas % 24, hora_real_minutos, hora_real_seg),
                 duracion_real=duracion_str,
@@ -390,7 +388,7 @@ async def generar_programacion_dia(
         # Log para debugging
         hora_fin_hhmmss = f"{tiempo_fin_reloj_anterior//3600:02d}:{(tiempo_fin_reloj_anterior%3600)//60:02d}:{tiempo_fin_reloj_anterior%60:02d}"
         hora_programada_hhmmss = f"{hora_programada_reloj//3600:02d}:{(hora_programada_reloj%3600)//60:02d}:{hora_programada_reloj%60:02d}"
-        print(f"✅ Reloj {reloj.clave} completado - Programado: {hora_programada_hhmmss}, Inicio real: {hora_inicio_hhmmss}, Fin: {hora_fin_hhmmss}")
+
     
     # Guardar en la base de datos
     db.commit()
@@ -407,7 +405,7 @@ async def obtener_dias_simple(
 ):
     """Obtener días de programación en formato simple"""
     try:
-        print(f"🔍 DEBUG: Iniciando dias-simple - difusora: {difusora}, politica_id: {politica_id}")
+
         # Convertir fechas
         fecha_inicio_dt = datetime.strptime(fecha_inicio, "%d/%m/%Y")
         fecha_fin_dt = datetime.strptime(fecha_fin, "%d/%m/%Y")
@@ -439,7 +437,7 @@ async def obtener_dias_simple(
                 )
                 
                 programacion_count = programacion_existente.count()
-                logger.info(f"Programación count para {fecha_actual.strftime('%d/%m/%Y')}: {programacion_count}")
+
                 
                 # Solo asignar "Con Programación" si realmente existe programación
                 if programacion_count > 0:
@@ -447,8 +445,8 @@ async def obtener_dias_simple(
                     tiene_programacion = True
                     
                     # Buscar día modelo usado en la programación existente
-                    print(f"🔍 DEBUG: Buscando día modelo para {fecha_actual.strftime('%d/%m/%Y')} - difusora: {difusora}, politica_id: {politica_id}")
-                    logger.info(f"Buscando día modelo para {fecha_actual.strftime('%d/%m/%Y')} - difusora: {difusora}, politica_id: {politica_id}")
+
+
                     dia_modelo = db.query(DiaModeloModel).join(
                         ProgramacionModel,
                         DiaModeloModel.id == ProgramacionModel.dia_modelo_id
@@ -460,10 +458,10 @@ async def obtener_dias_simple(
                     
                     if dia_modelo:
                         dia_modelo_nombre = dia_modelo.nombre
-                        logger.info(f"✅ Día modelo encontrado por dia_modelo_id: {dia_modelo_nombre}")
-                        print(f"✅ DEBUG: Día modelo que se devolverá: {dia_modelo_nombre}")
+
+
                     else:
-                        logger.info("No se encontró día modelo por dia_modelo_id, usando fallback")
+
                         # Si no se encuentra el día modelo almacenado, usar el método anterior como fallback
                         dia_modelo = db.query(DiaModeloModel).filter(
                             DiaModeloModel.politica_id == politica_id,
@@ -474,7 +472,7 @@ async def obtener_dias_simple(
                         
                         if dia_modelo:
                             dia_modelo_nombre = dia_modelo.nombre
-                            logger.info(f"Día modelo encontrado por día de semana: {dia_modelo_nombre}")
+
                 else:
                     # Si no hay programación, usar el día modelo por defecto de la política
                     status = "Sin Configuración"
@@ -495,17 +493,17 @@ async def obtener_dias_simple(
                             ).first()
                             if dia_modelo_default:
                                 dia_modelo_nombre = dia_modelo_default.nombre
-                                logger.info(f"✅ Día modelo por defecto asignado: {dia_modelo_nombre}")
-                                print(f"✅ DEBUG: Día modelo por defecto asignado: {dia_modelo_nombre}")
+
+
                             else:
                                 dia_modelo_nombre = ""
-                                logger.info(f"No se encontró día modelo por defecto con ID {dia_modelo_id}")
+
                         else:
                             dia_modelo_nombre = ""
-                            logger.info(f"No hay día modelo por defecto configurado para {dia_semana_espanol}")
+
                     else:
                         dia_modelo_nombre = ""
-                        logger.info(f"No se encontró la política con ID {politica_id}")
+
             
             # Nombres de días en español
             dias_espanol = {
@@ -527,7 +525,7 @@ async def obtener_dias_simple(
                 "tiene_programacion": tiene_programacion,
                 "dia_modelo": dia_modelo_nombre
             }
-            print(f"📤 DEBUG: Enviando día al frontend: {dia_data}")
+
             dias.append(dia_data)
             
             fecha_actual += timedelta(days=1)
@@ -540,7 +538,7 @@ async def obtener_dias_simple(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Formato de fecha inválido: {str(e)}")
     except Exception as e:
-        logger.error(f"Error al obtener días simples: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/programacion-detallada")
@@ -612,7 +610,7 @@ async def obtener_programacion_detallada(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Formato de fecha inválido: {str(e)}")
     except Exception as e:
-        logger.error(f"Error al obtener programación detallada: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/generar-logfile")
@@ -654,7 +652,7 @@ async def generar_logfile(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error al generar log file: {str(e)}")
+
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 

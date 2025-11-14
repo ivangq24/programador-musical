@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { PoliticasSection, ProgramacionSection, LogfilesSection } from './components/ProgramacionSections'
+import { ProgramacionSection } from './components/ProgramacionSections'
 import { PoliticasProgramacion } from './components/Politicas'
 import { GenerarProgramacionComponent } from './components/Programacion'
-import { GenerarLogfilesComponent } from './components/Logfiles'
 import SimplePage from './components/SimplePage'
 
 export default function ProgramacionPage() {
@@ -24,14 +23,14 @@ export default function ProgramacionPage() {
   }, [])
 
   const handleItemClick = (itemId) => {
-    console.log('=== NAVIGATION DEBUG ===')
-    console.log('Item clicked:', itemId)
-    console.log('Current view before:', currentView)
-    console.log('Selected section before:', selectedSection)
+
+
+
+
     setSelectedSection(itemId)
     setCurrentView('section')
-    console.log('Navigation state updated')
-    console.log('========================')
+
+
   }
 
   const handleBackToMain = () => {
@@ -41,17 +40,15 @@ export default function ProgramacionPage() {
 
   // Renderizar componente específico según la sección seleccionada
   const renderSection = () => {
-    console.log('=== RENDER SECTION DEBUG ===')
-    console.log('Rendering section:', selectedSection)
-    console.log('Current view:', currentView)
-    console.log('============================')
+
+
+
+
     switch (selectedSection) {
       case 'politicas-programacion':
         return <PoliticasProgramacion />
       case 'generar-programacion':
         return <GenerarProgramacionComponent />
-      case 'generar-logfiles':
-        return <GenerarLogfilesComponent />
       default:
         return null
     }
@@ -71,11 +68,9 @@ export default function ProgramacionPage() {
       </div>
       
       {/* Contenido principal */}
-      <div className="relative z-10 h-full flex items-center justify-center p-5">
-        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-5 h-full max-h-[calc(100vh-120px)]">
-          <PoliticasSection onItemClick={handleItemClick} />
+      <div className="relative z-10 h-full flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-5xl py-8">
           <ProgramacionSection onItemClick={handleItemClick} />
-          <LogfilesSection onItemClick={handleItemClick} />
         </div>
       </div>
     </div>

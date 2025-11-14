@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rnUz0Rd2UzBVUvDwsZFIKgsgJTmChXJNhUbkli0pw24kbYo6BPhsL2PSk7awMuy
+\restrict WDOxBe2CzPwnFah0IUnC7L6xilAE9dIJ9YuYvSF8oiGrxSAuhh0PkCRuwiWcuHD
 
 -- Dumped from database version 15.14
 -- Dumped by pg_dump version 15.14
@@ -658,6 +658,121 @@ ALTER SEQUENCE public.separaciones_regla_id_seq OWNED BY public.separaciones_reg
 
 
 --
+-- Name: usuario_difusoras; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.usuario_difusoras (
+    id integer NOT NULL,
+    usuario_id integer NOT NULL,
+    difusora_id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.usuario_difusoras OWNER TO postgres;
+
+--
+-- Name: usuario_difusoras_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.usuario_difusoras_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.usuario_difusoras_id_seq OWNER TO postgres;
+
+--
+-- Name: usuario_difusoras_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.usuario_difusoras_id_seq OWNED BY public.usuario_difusoras.id;
+
+
+--
+-- Name: usuarios; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.usuarios (
+    id integer NOT NULL,
+    cognito_user_id character varying(255) NOT NULL,
+    email character varying(255) NOT NULL,
+    nombre character varying(255) NOT NULL,
+    rol character varying(50) NOT NULL,
+    activo boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone,
+    nombre_empresa character varying(255),
+    telefono character varying(50),
+    direccion character varying(500),
+    ciudad character varying(100)
+);
+
+
+ALTER TABLE public.usuarios OWNER TO postgres;
+
+--
+-- Name: COLUMN usuarios.rol; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.usuarios.rol IS 'admin, manager, operador';
+
+
+--
+-- Name: COLUMN usuarios.nombre_empresa; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.usuarios.nombre_empresa IS 'Nombre de la empresa/organización';
+
+
+--
+-- Name: COLUMN usuarios.telefono; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.usuarios.telefono IS 'Teléfono de contacto';
+
+
+--
+-- Name: COLUMN usuarios.direccion; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.usuarios.direccion IS 'Dirección';
+
+
+--
+-- Name: COLUMN usuarios.ciudad; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.usuarios.ciudad IS 'Ciudad';
+
+
+--
+-- Name: usuarios_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.usuarios_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.usuarios_id_seq OWNER TO postgres;
+
+--
+-- Name: usuarios_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.usuarios_id_seq OWNED BY public.usuarios.id;
+
+
+--
 -- Name: canciones id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -756,11 +871,26 @@ ALTER TABLE ONLY public.separaciones_regla ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
+-- Name: usuario_difusoras id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuario_difusoras ALTER COLUMN id SET DEFAULT nextval('public.usuario_difusoras_id_seq'::regclass);
+
+
+--
+-- Name: usuarios id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios ALTER COLUMN id SET DEFAULT nextval('public.usuarios_id_seq'::regclass);
+
+
+--
 -- Data for Name: alembic_version; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.alembic_version (version_num) FROM stdin;
 9caddcadd001
+20250108000000
 \.
 
 
@@ -3721,6 +3851,58 @@ COPY public.programacion (id, mc, numero_reloj, hora_real, hora_transmision, dur
 3999	t	test	02:50:07	02:50:07	00:03:29	1	02:50:07	00:03:29	Pop	142	Pop Extra 49	Español	Artista Pop X10	Álbum Pop X10		0	0	TEST1	3	2025-11-03	33	642	11	2025-11-03 17:47:29.695182+00	2025-11-03 17:47:29.695182+00
 4000	t	test	02:54:07	02:54:07	00:03:13	1	02:54:07	00:03:13	Pop	126	Pop Extra 33	Español	Artista Pop X14	Álbum Pop X4		0	0	TEST1	3	2025-11-03	33	643	11	2025-11-03 17:47:29.695182+00	2025-11-03 17:47:29.695182+00
 4001	t	test	02:58:07	02:58:07	00:03:04	1	02:58:07	00:03:04	Pop	117	Pop Extra 24	Español	Artista Pop X5	Álbum Pop X5		0	0	TEST1	3	2025-11-03	33	644	11	2025-11-03 17:47:29.695182+00	2025-11-03 17:47:29.695182+00
+4002	t	General	00:00:00	00:00:00	00:03:34	1	00:00:00	00:03:34	Jazz	277	Jazz Extra 34	Español	Quartet X10	Live X3		0	0	TEST1	3	2025-11-04	28	500	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4003	t	General	00:04:01	00:04:01	00:03:14	1	00:04:01	00:03:14	Pop	127	Pop Extra 34	Español	Artista Pop X15	Álbum Pop X5		0	0	TEST1	3	2025-11-04	28	501	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4004	t	General	00:08:02	00:08:02	00:02:52	1	00:08:02	00:02:52	Rock	145	Rock Extra 2	Español	Banda Rock X3	Álbum Rock X3		0	0	TEST1	3	2025-11-04	28	502	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4005	f	General	00:12:03	00:12:03	00:03:00	2	00:12:03	00:03:00	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-11-04	28	503	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4006	f	General	00:15:04	00:15:04	00:03:00	2	00:15:04	00:03:00	Corte Comercial	\N	Corte 1					0	0	TEST1	3	2025-11-04	28	504	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4007	f	General	00:18:05	00:18:05	00:03:00	2	00:18:05	00:03:00	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-11-04	28	505	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4008	f	General	00:21:06	00:21:06	00:03:00	2	00:21:06	00:03:00	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-11-04	28	506	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4009	f	General	00:24:07	00:24:07	00:03:00	2	00:24:07	00:03:00	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-11-04	28	507	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4010	f	General	00:27:08	00:27:08	00:03:00	2	00:27:08	00:03:00	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-11-04	28	508	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4011	t	General	00:30:09	00:30:09	00:03:38	1	00:30:09	00:03:38	Rock	191	Rock Extra 48	Español	Banda Rock X9	Álbum Rock X9		0	0	TEST1	3	2025-11-04	28	509	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4012	t	General	00:34:10	00:34:10	00:02:55	1	00:34:10	00:02:55	Rock	148	Rock Extra 5	Español	Banda Rock X6	Álbum Rock X6		0	0	TEST1	3	2025-11-04	28	510	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4013	t	General	00:38:11	00:38:11	00:03:09	1	00:38:11	00:03:09	Rock	162	Rock Extra 19	Español	Banda Rock X20	Álbum Rock X10		0	0	TEST1	3	2025-11-04	28	511	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4014	t	General	00:42:12	00:42:12	00:03:01	1	00:42:12	00:03:01	Rock	154	Rock Extra 11	Español	Banda Rock X12	Álbum Rock X2		0	0	TEST1	3	2025-11-04	28	512	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4015	t	General	00:46:13	00:46:13	00:02:43	1	00:46:13	00:02:43	Pop	96	Pop Extra 3	Español	Artista Pop X4	Álbum Pop X4		0	0	TEST1	3	2025-11-04	28	513	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4016	t	General	00:50:14	00:50:14	00:03:25	1	00:50:14	00:03:25	Rock	178	Rock Extra 35	Español	Banda Rock X16	Álbum Rock X6		0	0	TEST1	3	2025-11-04	28	514	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4017	t	General	00:54:15	00:54:15	00:03:26	1	00:54:15	00:03:26	Rock	179	Rock Extra 36	Español	Banda Rock X17	Álbum Rock X7		0	0	TEST1	3	2025-11-04	28	515	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4018	t	General	00:58:16	00:58:16	00:01:44	1	00:58:16	00:01:44	Rock	159	Rock Extra 16	Español	Banda Rock X17	Álbum Rock X7		0	0	TEST1	3	2025-11-04	28	516	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4019	f	etm	01:00:00	01:00:00	00:00:00	6	01:00:00	00:00:00	ETM	\N	Guillotina					0	0	TEST1	3	2025-11-04	32	578	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4020	t	etm	01:00:00	01:00:00	00:03:07	1	01:00:00	00:03:07	Pop	120	Pop Extra 27	Español	Artista Pop X8	Álbum Pop X8		0	0	TEST1	3	2025-11-04	32	579	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4021	t	etm	01:04:00	01:04:00	00:03:10	1	01:04:00	00:03:10	Jazz	253	Jazz Extra 10	Español	Quartet X11	Live X3		0	0	TEST1	3	2025-11-04	32	580	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4022	t	etm	01:08:00	01:08:00	00:03:33	1	01:08:00	00:03:33	Rock	186	Rock Extra 43	Español	Banda Rock X4	Álbum Rock X4		0	0	TEST1	3	2025-11-04	32	581	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4023	t	etm	01:12:00	01:12:00	00:03:25	1	01:12:00	00:03:25	Jazz	268	Jazz Extra 25	Español	Quartet X1	Live X2		0	0	TEST1	3	2025-11-04	32	582	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4024	f	etm	01:16:00	01:16:00	00:00:30	2	01:16:00	00:00:30	Corte Comercial	\N	Corte 1					0	0	TEST1	3	2025-11-04	32	583	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4025	f	etm	01:16:30	01:16:30	00:00:15	2	01:16:30	00:00:15	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-11-04	32	584	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4026	f	etm	01:16:45	01:16:45	00:10:00	4	01:16:45	00:10:00	Vacío	\N	Corte 3					0	0	TEST1	3	2025-11-04	32	585	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4027	f	etm	01:26:45	01:26:45	00:01:00	5	01:26:45	00:01:00	HORA_EXACTA	HORA001	HORA EXACTA					0	0	TEST1	3	2025-11-04	32	586	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4028	f	etm	01:27:45	01:27:45	00:01:00	5	01:27:45	00:01:00	IDENTIFICACION	ID001	IDENTIFICACION					0	0	TEST1	3	2025-11-04	32	587	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4029	f	etm	01:28:45	01:28:45	00:01:00	5	01:28:45	00:01:00	LINEA_INOLVIDABLE	LINEA001	LINEA INOLVIDABLE					0	0	TEST1	3	2025-11-04	32	588	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4030	t	etm	01:29:45	01:29:45	00:03:27	1	01:29:45	00:03:27	Rock	180	Rock Extra 37	Español	Banda Rock X18	Álbum Rock X8		0	0	TEST1	3	2025-11-04	32	589	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4031	t	etm	01:33:45	01:33:45	00:03:43	1	01:33:45	00:03:43	Jazz	286	Jazz Extra 43	Español	Quartet X19	Live X4		0	0	TEST1	3	2025-11-04	32	590	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4032	t	etm	01:37:45	01:37:45	00:03:11	1	01:37:45	00:03:11	Rock	164	Rock Extra 21	Español	Banda Rock X2	Álbum Rock X2		0	0	TEST1	3	2025-11-04	32	591	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4033	f	etm	01:41:45	01:41:45	00:00:30	2	01:41:45	00:00:30	Corte Comercial	\N	Corte de Prueba DB					0	0	TEST1	3	2025-11-04	32	592	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4034	f	etm	01:42:15	01:42:15	00:00:30	2	01:42:15	00:00:30	Corte Comercial	\N	Corte de Prueba DB					0	0	TEST1	3	2025-11-04	32	593	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4035	f	etm	01:42:45	01:42:45	00:10:00	4	01:42:45	00:10:00	Vacío	\N	Corte 3					0	0	TEST1	3	2025-11-04	32	594	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4036	t	etm	01:52:45	01:52:45	00:03:16	1	01:52:45	00:03:16	Jazz	259	Jazz Extra 16	Español	Quartet X17	Live X1		0	0	TEST1	3	2025-11-04	32	595	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4037	t	etm	01:56:45	01:56:45	00:03:19	1	01:56:45	00:03:19	Jazz	262	Jazz Extra 19	Español	Quartet X20	Live X4		0	0	TEST1	3	2025-11-04	32	596	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4038	f	test	02:00:04	02:00:04	00:00:00	6	02:00:04	00:00:00	ETM	\N	Esperar a terminar					0	0	TEST1	3	2025-11-04	33	629	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4039	f	test	02:00:04	02:00:04	00:01:00	5	02:00:04	00:01:00	HIMNO	HIMNO001	HIMNO NACIONAL					0	0	TEST1	3	2025-11-04	33	630	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4040	f	test	02:01:04	02:01:04	00:10:00	4	02:01:04	00:10:00	Vacío	\N	Corte 3					0	0	TEST1	3	2025-11-04	33	631	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4041	f	test	02:11:04	02:11:04	00:10:00	4	02:11:04	00:10:00	Vacío	\N	Corte 3					0	0	TEST1	3	2025-11-04	33	632	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4042	f	test	02:21:04	02:21:04	00:00:30	2	02:21:04	00:00:30	Corte Comercial	\N	Corte 1					0	0	TEST1	3	2025-11-04	33	633	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4043	f	test	02:21:34	02:21:34	00:00:15	2	02:21:34	00:00:15	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-11-04	33	634	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4044	t	test	02:21:49	02:21:49	00:03:47	1	02:21:49	00:03:47	Jazz	290	Jazz Extra 47	Español	Quartet X23	Live X8		0	0	TEST1	3	2025-11-04	33	635	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4045	t	test	02:25:49	02:25:49	00:03:57	1	02:25:49	00:03:57	Electrónica	330	EDM Extra 37	Español	DJ X8	Festival X2		0	0	TEST1	3	2025-11-04	33	636	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4046	t	test	02:29:49	02:29:49	00:03:30	1	02:29:49	00:03:30	Rock	183	Rock Extra 40	Español	Banda Rock X1	Álbum Rock X1		0	0	TEST1	3	2025-11-04	33	637	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4047	t	test	02:33:49	02:33:49	00:03:18	1	02:33:49	00:03:18	Pop	131	Pop Extra 38	Español	Artista Pop X19	Álbum Pop X9		0	0	TEST1	3	2025-11-04	33	638	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4048	t	test	02:37:49	02:37:49	00:02:58	1	02:37:49	00:02:58	Rock	151	Rock Extra 8	Español	Banda Rock X9	Álbum Rock X9		0	0	TEST1	3	2025-11-04	33	639	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4049	t	test	02:41:49	02:41:49	00:03:42	1	02:41:49	00:03:42	Jazz	285	Jazz Extra 42	Español	Quartet X18	Live X3		0	0	TEST1	3	2025-11-04	33	640	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4050	t	test	02:45:49	02:45:49	00:02:42	1	02:45:49	00:02:42	Pop	95	Pop Extra 2	Español	Artista Pop X3	Álbum Pop X3		0	0	TEST1	3	2025-11-04	33	641	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4051	t	test	02:49:49	02:49:49	00:03:24	1	02:49:49	00:03:24	Pop	137	Pop Extra 44	Español	Artista Pop X5	Álbum Pop X5		0	0	TEST1	3	2025-11-04	33	642	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4052	t	test	02:53:49	02:53:49	00:03:27	1	02:53:49	00:03:27	Pop	140	Pop Extra 47	Español	Artista Pop X8	Álbum Pop X8		0	0	TEST1	3	2025-11-04	33	643	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
+4053	t	test	02:57:49	02:57:49	00:03:20	1	02:57:49	00:03:20	Pop	133	Pop Extra 40	Español	Artista Pop X1	Álbum Pop X1		0	0	TEST1	3	2025-11-04	33	644	11	2025-11-04 21:27:56.392181+00	2025-11-04 21:27:56.392181+00
 3899	t	General	00:04:01	00:04:01	00:03:30	1	00:04:01	00:03:30	Pop	143	Pop Extra 50	Español	Artista Pop X11	Álbum Pop X1		0	0	TEST1	3	2025-10-31	28	501	11	2025-10-31 19:00:33.603531+00	2025-10-31 19:00:33.603531+00
 3900	t	General	00:08:02	00:08:02	00:03:07	1	00:08:02	00:03:07	Rock	160	Rock Extra 17	Español	Banda Rock X18	Álbum Rock X8		0	0	TEST1	3	2025-10-31	28	502	11	2025-10-31 19:00:33.603531+00	2025-10-31 19:00:33.603531+00
 3901	f	General	00:12:03	00:12:03	00:03:00	2	00:12:03	00:03:00	Corte Comercial	\N	Corte 2					0	0	TEST1	3	2025-10-31	28	503	11	2025-10-31 19:00:33.603531+00	2025-10-31 19:00:33.603531+00
@@ -3875,6 +4057,24 @@ COPY public.separaciones_regla (id, regla_id, valor, separacion, created_at, upd
 
 
 --
+-- Data for Name: usuario_difusoras; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.usuario_difusoras (id, usuario_id, difusora_id, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: usuarios; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.usuarios (id, cognito_user_id, email, nombre, rol, activo, created_at, updated_at, nombre_empresa, telefono, direccion, ciudad) FROM stdin;
+17	14585458-6071-70b5-dc72-03d5eb38c253	ivanquezadas123@gmail.com	Ivan	admin	t	2025-11-06 22:30:55.287423+00	\N	quatro	2282778122	Av. Principal 123	México
+18	94e87488-8091-70a1-9d54-2982ce2a5685	arturoleyker@gmail.com	Arturo Arana Blanco	admin	t	2025-11-06 22:31:33.928843+00	\N	\N	\N	\N	\N
+\.
+
+
+--
 -- Name: canciones_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -3941,7 +4141,7 @@ SELECT pg_catalog.setval('public.politicas_programacion_id_seq', 5, true);
 -- Name: programacion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.programacion_id_seq', 4001, true);
+SELECT pg_catalog.setval('public.programacion_id_seq', 4053, true);
 
 
 --
@@ -3970,6 +4170,20 @@ SELECT pg_catalog.setval('public.relojes_id_seq', 33, true);
 --
 
 SELECT pg_catalog.setval('public.separaciones_regla_id_seq', 8, true);
+
+
+--
+-- Name: usuario_difusoras_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.usuario_difusoras_id_seq', 5, true);
+
+
+--
+-- Name: usuarios_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.usuarios_id_seq', 18, true);
 
 
 --
@@ -4133,6 +4347,46 @@ ALTER TABLE ONLY public.separaciones_regla
 
 
 --
+-- Name: usuario_difusoras uq_usuario_difusora; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuario_difusoras
+    ADD CONSTRAINT uq_usuario_difusora UNIQUE (usuario_id, difusora_id);
+
+
+--
+-- Name: usuario_difusoras usuario_difusoras_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuario_difusoras
+    ADD CONSTRAINT usuario_difusoras_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: usuarios usuarios_cognito_user_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_cognito_user_id_key UNIQUE (cognito_user_id);
+
+
+--
+-- Name: usuarios usuarios_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_email_key UNIQUE (email);
+
+
+--
+-- Name: usuarios usuarios_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: idx_politicas_domingo; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -4182,6 +4436,20 @@ CREATE INDEX idx_politicas_viernes ON public.politicas_programacion USING btree 
 
 
 --
+-- Name: idx_usuario_difusoras_difusora; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_usuario_difusoras_difusora ON public.usuario_difusoras USING btree (difusora_id);
+
+
+--
+-- Name: idx_usuario_difusoras_usuario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_usuario_difusoras_usuario ON public.usuario_difusoras USING btree (usuario_id);
+
+
+--
 -- Name: ix_programacion_fecha_difusora; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -4214,6 +4482,34 @@ CREATE INDEX ix_reglas_id ON public.reglas USING btree (id);
 --
 
 CREATE INDEX ix_separaciones_regla_id ON public.separaciones_regla USING btree (id);
+
+
+--
+-- Name: ix_usuario_difusoras_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ix_usuario_difusoras_id ON public.usuario_difusoras USING btree (id);
+
+
+--
+-- Name: ix_usuarios_cognito_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX ix_usuarios_cognito_user_id ON public.usuarios USING btree (cognito_user_id);
+
+
+--
+-- Name: ix_usuarios_email; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX ix_usuarios_email ON public.usuarios USING btree (email);
+
+
+--
+-- Name: ix_usuarios_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ix_usuarios_id ON public.usuarios USING btree (id);
 
 
 --
@@ -4385,8 +4681,24 @@ ALTER TABLE ONLY public.separaciones_regla
 
 
 --
+-- Name: usuario_difusoras usuario_difusoras_difusora_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuario_difusoras
+    ADD CONSTRAINT usuario_difusoras_difusora_id_fkey FOREIGN KEY (difusora_id) REFERENCES public.difusoras(id) ON DELETE CASCADE;
+
+
+--
+-- Name: usuario_difusoras usuario_difusoras_usuario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuario_difusoras
+    ADD CONSTRAINT usuario_difusoras_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuarios(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rnUz0Rd2UzBVUvDwsZFIKgsgJTmChXJNhUbkli0pw24kbYo6BPhsL2PSk7awMuy
+\unrestrict WDOxBe2CzPwnFah0IUnC7L6xilAE9dIJ9YuYvSF8oiGrxSAuhh0PkCRuwiWcuHD
 

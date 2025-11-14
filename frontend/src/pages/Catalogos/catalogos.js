@@ -36,7 +36,7 @@ export default function CatalogosPage() {
   const renderSection = () => {
     switch (selectedSection) {
       case 'Difusoras':
-        return <Difusoras onDifusoraSelect={(difusora) => console.log('Difusora seleccionada:', difusora)} />
+        return <Difusoras />
       case 'Cortes':
         return <Cortes />
       default:
