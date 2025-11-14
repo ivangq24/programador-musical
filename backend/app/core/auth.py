@@ -531,76 +531,107 @@ class CognitoAuth:
                         'instructions': f'Verifica el email {email} en la sección "Verificar Emails" antes de invitar, o activa SES_PRODUCTION_MODE=true en backend/.env'
                     }
             
-            # Contenido del email mejorado y profesional
-            subject = "¡Bienvenido a Programador Musical! 🎵"
+            # Contenido del email corporativo profesional
+            subject = "Bienvenido a Programador Musical - Credenciales de Acceso"
             frontend_url = settings.FRONTEND_URL
             body_html = f"""
             <!DOCTYPE html>
-            <html>
+            <html lang="es">
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <title>Bienvenido a Programador Musical</title>
                 <style>
-                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #ffffff; padding: 40px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none; }}
-                    .button {{ display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3); }}
-                    .button:hover {{ box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4); }}
-                    .credentials-box {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #667eea; }}
-                    .credential-item {{ margin: 12px 0; font-size: 15px; }}
-                    .credential-label {{ font-weight: 600; color: #495057; }}
-                    .credential-value {{ font-family: 'Courier New', monospace; font-size: 16px; color: #667eea; font-weight: bold; margin-top: 4px; }}
-                    .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px; }}
-                    .info {{ background: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; margin: 25px 0; border-radius: 4px; }}
-                    .footer {{ text-align: center; margin-top: 40px; color: #666; font-size: 12px; padding-top: 20px; border-top: 1px solid #e0e0e0; }}
-                    .footer p {{ margin: 5px 0; }}
+                    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; line-height: 1.7; color: #1a1a1a; margin: 0; padding: 0; background-color: #f4f6f9; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }}
+                    .email-wrapper {{ max-width: 650px; margin: 0 auto; background-color: #ffffff; }}
+                    .email-header {{ background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #ffffff; padding: 50px 40px; text-align: center; }}
+                    .email-header h1 {{ font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 8px 0; }}
+                    .email-header p {{ font-size: 16px; opacity: 0.95; margin: 0; font-weight: 400; }}
+                    .email-body {{ padding: 50px 40px; background-color: #ffffff; }}
+                    .email-body h2 {{ font-size: 24px; font-weight: 600; color: #1e293b; margin: 0 0 20px 0; line-height: 1.3; }}
+                    .email-body p {{ font-size: 16px; color: #475569; margin: 0 0 20px 0; line-height: 1.7; }}
+                    .info-box {{ background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #3b82f6; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .info-box strong {{ display: block; font-size: 16px; color: #1e40af; margin-bottom: 8px; font-weight: 600; }}
+                    .info-box p {{ margin: 0; font-size: 15px; color: #1e40af; line-height: 1.6; }}
+                    .credentials-container {{ background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; padding: 28px; margin: 32px 0; }}
+                    .credentials-container h3 {{ font-size: 18px; font-weight: 600; color: #1e293b; margin: 0 0 20px 0; }}
+                    .credential-row {{ display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid #e2e8f0; }}
+                    .credential-row:last-child {{ border-bottom: none; }}
+                    .credential-label {{ font-size: 14px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }}
+                    .credential-value {{ font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace; font-size: 16px; font-weight: 600; color: #1e3a8a; background: #ffffff; padding: 8px 16px; border-radius: 6px; border: 1px solid #cbd5e1; }}
+                    .warning-box {{ background: #fffbeb; border-left: 4px solid #f59e0b; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .warning-box strong {{ display: block; font-size: 16px; color: #92400e; margin-bottom: 8px; font-weight: 600; }}
+                    .warning-box p {{ margin: 0; font-size: 15px; color: #78350f; line-height: 1.6; }}
+                    .cta-button {{ display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #ffffff; text-decoration: none; border-radius: 8px; margin: 32px 0; font-weight: 600; font-size: 16px; text-align: center; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25); transition: all 0.3s ease; }}
+                    .cta-button:hover {{ box-shadow: 0 6px 20px rgba(30, 58, 138, 0.35); transform: translateY(-1px); }}
+                    .help-box {{ background: #f0fdf4; border-left: 4px solid #22c55e; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .help-box strong {{ display: block; font-size: 16px; color: #166534; margin-bottom: 8px; font-weight: 600; }}
+                    .help-box p {{ margin: 0; font-size: 15px; color: #15803d; line-height: 1.6; }}
+                    .email-footer {{ background-color: #f8fafc; padding: 40px; text-align: center; border-top: 1px solid #e2e8f0; }}
+                    .email-footer p {{ font-size: 13px; color: #64748b; margin: 8px 0; line-height: 1.6; }}
+                    .email-footer .copyright {{ font-weight: 600; color: #475569; }}
+                    .divider {{ height: 1px; background: linear-gradient(90deg, transparent, #e2e8f0, transparent); margin: 40px 0; }}
+                    @media only screen and (max-width: 600px) {{
+                        .email-body {{ padding: 40px 30px; }}
+                        .email-header {{ padding: 40px 30px; }}
+                        .email-header h1 {{ font-size: 28px; }}
+                        .email-body h2 {{ font-size: 22px; }}
+                        .credential-row {{ flex-direction: column; align-items: flex-start; gap: 8px; }}
+                        .credential-value {{ width: 100%; }}
+                    }}
                 </style>
             </head>
             <body>
-                <div class="container">
-                    <div class="header">
-                        <h1 style="margin: 0; font-size: 32px;">🎵 Programador Musical</h1>
-                        <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 16px;">Sistema de Programación Musical</p>
-                    </div>
-                    <div class="content">
-                        <h2 style="color: #333; margin-top: 0;">¡Bienvenido, {nombre}!</h2>
-                        <p>Nos complace darte la bienvenida a <strong>Programador Musical</strong>, la plataforma profesional para la gestión y programación de contenido musical.</p>
-                        
-                        <div class="info">
-                            <strong>ℹ️ Tu cuenta ha sido creada exitosamente</strong><br>
-                            Ya puedes acceder al sistema y comenzar a gestionar tu programación musical.
+                <div style="background-color: #f4f6f9; padding: 40px 20px;">
+                    <div class="email-wrapper">
+                        <div class="email-header">
+                            <h1>Programador Musical</h1>
+                            <p>Sistema Profesional de Programación Musical</p>
                         </div>
-                        
-                        <p><strong>Tus credenciales de acceso:</strong></p>
-                        <div class="credentials-box">
-                            <div class="credential-item">
-                                <div class="credential-label">📧 Email:</div>
-                                <div class="credential-value">{email}</div>
+                        <div class="email-body">
+                            <h2>Estimado/a {nombre},</h2>
+                            <p>Nos complace darle la bienvenida a <strong>Programador Musical</strong>, la plataforma empresarial líder para la gestión y programación de contenido musical.</p>
+                            
+                            <div class="info-box">
+                                <strong>Cuenta Creada Exitosamente</strong>
+                                <p>Su cuenta ha sido configurada y está lista para usar. Ya puede acceder al sistema y comenzar a gestionar su programación musical de manera profesional.</p>
                             </div>
-                            <div class="credential-item">
-                                <div class="credential-label">🔑 Contraseña temporal:</div>
-                                <div class="credential-value">{temporary_password}</div>
+                            
+                            <div class="credentials-container">
+                                <h3>Credenciales de Acceso</h3>
+                                <div class="credential-row">
+                                    <span class="credential-label">Correo Electrónico</span>
+                                    <span class="credential-value">{email}</span>
+                                </div>
+                                <div class="credential-row">
+                                    <span class="credential-label">Contraseña Temporal</span>
+                                    <span class="credential-value">{temporary_password}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="warning-box">
+                                <strong>Importante - Seguridad</strong>
+                                <p>Por razones de seguridad, debe cambiar esta contraseña temporal en su primer inicio de sesión. Esta contraseña es temporal y expirará en 7 días. Le recomendamos crear una contraseña segura y única.</p>
+                            </div>
+                            
+                            <div style="text-align: center;">
+                                <a href="{frontend_url}/auth/login" class="cta-button">Iniciar Sesión</a>
+                            </div>
+                            
+                            <div class="divider"></div>
+                            
+                            <div class="help-box">
+                                <strong>¿Necesita Asistencia?</strong>
+                                <p>Si tiene alguna pregunta, necesita ayuda con la configuración inicial, o tiene alguna consulta sobre el sistema, nuestro equipo de soporte está disponible para asistirle. No dude en contactar al administrador del sistema.</p>
                             </div>
                         </div>
-                        
-                        <div class="warning">
-                            <strong>⚠️ Importante:</strong> Por seguridad, debes cambiar esta contraseña temporal en tu primer inicio de sesión. Esta contraseña es temporal y expirará en 7 días.
+                        <div class="email-footer">
+                            <p class="copyright">© 2025 Programador Musical. Todos los derechos reservados.</p>
+                            <p>Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.</p>
+                            <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">Si recibió este correo por error, por favor ignore este mensaje.</p>
                         </div>
-                        
-                        <p style="text-align: center;">
-                            <a href="{frontend_url}/auth/login" class="button">Iniciar Sesión Ahora</a>
-                        </p>
-                        
-                        <div class="info">
-                            <strong>💡 ¿Necesitas ayuda?</strong><br>
-                            Si tienes alguna pregunta o necesitas asistencia, no dudes en contactar al administrador del sistema. Estamos aquí para ayudarte.
-                        </div>
-                    </div>
-                    <div class="footer">
-                        <p><strong>© 2025 Programador Musical</strong></p>
-                        <p>Todos los derechos reservados.</p>
-                        <p style="font-size: 11px; color: #999; margin-top: 15px;">Este es un email automático, por favor no respondas.</p>
                     </div>
                 </div>
             </body>
@@ -608,29 +639,32 @@ class CognitoAuth:
             """
             
             body_text = f"""
-¡Bienvenido a Programador Musical! 🎵
+Bienvenido a Programador Musical - Credenciales de Acceso
 
-Hola {nombre},
+Estimado/a {nombre},
 
-Nos complace darte la bienvenida a Programador Musical, la plataforma profesional para la gestión y programación de contenido musical.
+Nos complace darle la bienvenida a Programador Musical, la plataforma empresarial líder para la gestión y programación de contenido musical.
 
-Tu cuenta ha sido creada exitosamente. Ya puedes acceder al sistema y comenzar a gestionar tu programación musical.
+CUENTA CREADA EXITOSAMENTE
+Su cuenta ha sido configurada y está lista para usar. Ya puede acceder al sistema y comenzar a gestionar su programación musical de manera profesional.
 
-TUS CREDENCIALES DE ACCESO:
+CREDENCIALES DE ACCESO:
 
-📧 Email: {email}
-🔑 Contraseña temporal: {temporary_password}
+Correo Electrónico: {email}
+Contraseña Temporal: {temporary_password}
 
-⚠️ IMPORTANTE: Por seguridad, debes cambiar esta contraseña temporal en tu primer inicio de sesión. Esta contraseña es temporal y expirará en 7 días.
+IMPORTANTE - SEGURIDAD
+Por razones de seguridad, debe cambiar esta contraseña temporal en su primer inicio de sesión. Esta contraseña es temporal y expirará en 7 días. Le recomendamos crear una contraseña segura y única.
 
-Accede en: {frontend_url}/auth/login
+Para acceder al sistema, visite: {frontend_url}/auth/login
 
-💡 ¿Necesitas ayuda?
-Si tienes alguna pregunta o necesitas asistencia, no dudes en contactar al administrador del sistema. Estamos aquí para ayudarte.
+¿NECESITA ASISTENCIA?
+Si tiene alguna pregunta, necesita ayuda con la configuración inicial, o tiene alguna consulta sobre el sistema, nuestro equipo de soporte está disponible para asistirle. No dude en contactar al administrador del sistema.
 
 © 2025 Programador Musical. Todos los derechos reservados.
 
-Este es un email automático, por favor no respondas.
+Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.
+Si recibió este correo por error, por favor ignore este mensaje.
             """
             
             # Enviar email usando SES
@@ -691,41 +725,70 @@ Este es un email automático, por favor no respondas.
 
                 return
             
-            subject = "Tu cuenta ha sido eliminada - Programador Musical"
+            subject = "Confirmación: Cuenta Eliminada - Programador Musical"
             body_html = f"""
             <!DOCTYPE html>
-            <html>
+            <html lang="es">
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <title>Cuenta Eliminada - Programador Musical</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                    .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }}
-                    .footer {{ text-align: center; margin-top: 30px; color: #666; font-size: 12px; }}
+                    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; line-height: 1.7; color: #1a1a1a; margin: 0; padding: 0; background-color: #f4f6f9; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }}
+                    .email-wrapper {{ max-width: 650px; margin: 0 auto; background-color: #ffffff; }}
+                    .email-header {{ background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%); color: #ffffff; padding: 50px 40px; text-align: center; }}
+                    .email-header h1 {{ font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 8px 0; }}
+                    .email-header p {{ font-size: 16px; opacity: 0.95; margin: 0; font-weight: 400; }}
+                    .email-body {{ padding: 50px 40px; background-color: #ffffff; }}
+                    .email-body h2 {{ font-size: 24px; font-weight: 600; color: #1e293b; margin: 0 0 20px 0; line-height: 1.3; }}
+                    .email-body p {{ font-size: 16px; color: #475569; margin: 0 0 20px 0; line-height: 1.7; }}
+                    .warning-box {{ background: #fef2f2; border-left: 4px solid #dc2626; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .warning-box strong {{ display: block; font-size: 16px; color: #991b1b; margin-bottom: 12px; font-weight: 600; }}
+                    .warning-box p {{ margin: 0; font-size: 15px; color: #7f1d1d; line-height: 1.6; }}
+                    .info-box {{ background: #f8fafc; border-left: 4px solid #64748b; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .info-box p {{ margin: 0; font-size: 15px; color: #475569; line-height: 1.6; }}
+                    .email-footer {{ background-color: #f8fafc; padding: 40px; text-align: center; border-top: 1px solid #e2e8f0; }}
+                    .email-footer p {{ font-size: 13px; color: #64748b; margin: 8px 0; line-height: 1.6; }}
+                    .email-footer .copyright {{ font-weight: 600; color: #475569; }}
+                    @media only screen and (max-width: 600px) {{
+                        .email-body {{ padding: 40px 30px; }}
+                        .email-header {{ padding: 40px 30px; }}
+                        .email-header h1 {{ font-size: 28px; }}
+                        .email-body h2 {{ font-size: 22px; }}
+                    }}
                 </style>
             </head>
             <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>🎵 Programador Musical</h1>
-                    </div>
-                    <div class="content">
-                        <h2>Hola {nombre},</h2>
-                        <p>Te informamos que tu cuenta en <strong>Programador Musical</strong> ha sido eliminada exitosamente.</p>
-                        
-                        <div class="warning">
-                            <strong>⚠️ Importante:</strong> Todos tus datos han sido eliminados del sistema. 
-                            Si necesitas recuperar tu cuenta, contacta al administrador.
+                <div style="background-color: #f4f6f9; padding: 40px 20px;">
+                    <div class="email-wrapper">
+                        <div class="email-header">
+                            <h1>Programador Musical</h1>
+                            <p>Sistema Profesional de Programación Musical</p>
                         </div>
-                        
-                        <p>Gracias por haber sido parte de nuestra plataforma.</p>
-                        
-                        <p>Si no solicitaste esta eliminación, contacta inmediatamente al administrador del sistema.</p>
-                    </div>
-                    <div class="footer">
-                        <p>© 2025 Programador Musical. Todos los derechos reservados.</p>
+                        <div class="email-body">
+                            <h2>Estimado/a {nombre},</h2>
+                            <p>Le confirmamos que su cuenta en <strong>Programador Musical</strong> ha sido eliminada exitosamente del sistema.</p>
+                            
+                            <div class="warning-box">
+                                <strong>Eliminación Completa de Datos</strong>
+                                <p>Todos sus datos personales, configuraciones y contenido asociado a su cuenta han sido eliminados permanentemente del sistema. Esta acción no puede ser revertida.</p>
+                            </div>
+                            
+                            <div class="info-box">
+                                <p>Si necesita recuperar su cuenta o tiene alguna consulta sobre esta eliminación, debe contactar inmediatamente al administrador del sistema. Tenga en cuenta que la recuperación de datos puede no ser posible una vez completada la eliminación.</p>
+                            </div>
+                            
+                            <p>Agradecemos haber sido parte de nuestra plataforma y le deseamos lo mejor en sus proyectos futuros.</p>
+                            
+                            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; color: #dc2626; font-weight: 600;">Si no solicitó esta eliminación, contacte inmediatamente al administrador del sistema para reportar esta actividad.</p>
+                        </div>
+                        <div class="email-footer">
+                            <p class="copyright">© 2025 Programador Musical. Todos los derechos reservados.</p>
+                            <p>Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.</p>
+                            <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">Si no solicitó esta eliminación, contacte inmediatamente al administrador del sistema.</p>
+                        </div>
                     </div>
                 </div>
             </body>
@@ -733,20 +796,25 @@ Este es un email automático, por favor no respondas.
             """
             
             body_text = f"""
-Tu cuenta ha sido eliminada - Programador Musical
+Confirmación: Cuenta Eliminada - Programador Musical
 
-Hola {nombre},
+Estimado/a {nombre},
 
-Te informamos que tu cuenta en Programador Musical ha sido eliminada exitosamente.
+Le confirmamos que su cuenta en Programador Musical ha sido eliminada exitosamente del sistema.
 
-⚠️ IMPORTANTE: Todos tus datos han sido eliminados del sistema. 
-Si necesitas recuperar tu cuenta, contacta al administrador.
+ELIMINACIÓN COMPLETA DE DATOS
+Todos sus datos personales, configuraciones y contenido asociado a su cuenta han sido eliminados permanentemente del sistema. Esta acción no puede ser revertida.
 
-Gracias por haber sido parte de nuestra plataforma.
+Si necesita recuperar su cuenta o tiene alguna consulta sobre esta eliminación, debe contactar inmediatamente al administrador del sistema. Tenga en cuenta que la recuperación de datos puede no ser posible una vez completada la eliminación.
 
-Si no solicitaste esta eliminación, contacta inmediatamente al administrador del sistema.
+Agradecemos haber sido parte de nuestra plataforma y le deseamos lo mejor en sus proyectos futuros.
+
+IMPORTANTE: Si no solicitó esta eliminación, contacte inmediatamente al administrador del sistema para reportar esta actividad.
 
 © 2025 Programador Musical. Todos los derechos reservados.
+
+Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.
+Si no solicitó esta eliminación, contacte inmediatamente al administrador del sistema.
             """
             
             # Enviar email usando SES
@@ -814,52 +882,75 @@ Si no solicitaste esta eliminación, contacta inmediatamente al administrador de
             
             body_html = f"""
             <!DOCTYPE html>
-            <html>
+            <html lang="es">
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <title>Recuperación de Contraseña - Programador Musical</title>
                 <style>
-                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #ffffff; padding: 40px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none; }}
-                    .code-box {{ background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; margin: 30px 0; border: 2px dashed #667eea; }}
-                    .code {{ font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 8px; font-family: 'Courier New', monospace; }}
-                    .button {{ display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; }}
-                    .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }}
-                    .info {{ background: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; border-radius: 4px; }}
-                    .footer {{ text-align: center; margin-top: 40px; color: #666; font-size: 12px; padding-top: 20px; border-top: 1px solid #e0e0e0; }}
+                    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; line-height: 1.7; color: #1a1a1a; margin: 0; padding: 0; background-color: #f4f6f9; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }}
+                    .email-wrapper {{ max-width: 650px; margin: 0 auto; background-color: #ffffff; }}
+                    .email-header {{ background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #ffffff; padding: 50px 40px; text-align: center; }}
+                    .email-header h1 {{ font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 8px 0; }}
+                    .email-header p {{ font-size: 16px; opacity: 0.95; margin: 0; font-weight: 400; }}
+                    .email-body {{ padding: 50px 40px; background-color: #ffffff; }}
+                    .email-body h2 {{ font-size: 24px; font-weight: 600; color: #1e293b; margin: 0 0 20px 0; line-height: 1.3; }}
+                    .email-body p {{ font-size: 16px; color: #475569; margin: 0 0 20px 0; line-height: 1.7; }}
+                    .info-box {{ background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #3b82f6; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .info-box strong {{ display: block; font-size: 16px; color: #1e40af; margin-bottom: 8px; font-weight: 600; }}
+                    .info-box p {{ margin: 0; font-size: 15px; color: #1e40af; line-height: 1.6; }}
+                    .warning-box {{ background: #fffbeb; border-left: 4px solid #f59e0b; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .warning-box strong {{ display: block; font-size: 16px; color: #92400e; margin-bottom: 8px; font-weight: 600; }}
+                    .warning-box p {{ margin: 0; font-size: 15px; color: #78350f; line-height: 1.6; }}
+                    .cta-button {{ display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #ffffff; text-decoration: none; border-radius: 8px; margin: 32px 0; font-weight: 600; font-size: 16px; text-align: center; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25); transition: all 0.3s ease; }}
+                    .cta-button:hover {{ box-shadow: 0 6px 20px rgba(30, 58, 138, 0.35); transform: translateY(-1px); }}
+                    .email-footer {{ background-color: #f8fafc; padding: 40px; text-align: center; border-top: 1px solid #e2e8f0; }}
+                    .email-footer p {{ font-size: 13px; color: #64748b; margin: 8px 0; line-height: 1.6; }}
+                    .email-footer .copyright {{ font-weight: 600; color: #475569; }}
+                    .link-text {{ color: #3b82f6; text-decoration: none; word-break: break-all; }}
+                    @media only screen and (max-width: 600px) {{
+                        .email-body {{ padding: 40px 30px; }}
+                        .email-header {{ padding: 40px 30px; }}
+                        .email-header h1 {{ font-size: 28px; }}
+                        .email-body h2 {{ font-size: 22px; }}
+                    }}
                 </style>
             </head>
             <body>
-                <div class="container">
-                    <div class="header">
-                        <h1 style="margin: 0; font-size: 28px;">🎵 Programador Musical</h1>
-                    </div>
-                    <div class="content">
-                        <h2 style="color: #333; margin-top: 0;">Hola {nombre},</h2>
-                        <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>Programador Musical</strong>.</p>
-                        
-                        <p>Has solicitado restablecer la contraseña de tu cuenta. Revisa tu bandeja de entrada (y carpeta de spam) para encontrar el código de verificación enviado por nuestro sistema.</p>
-                        
-                        <div class="info">
-                            <strong>ℹ️ ¿Dónde está el código?</strong><br>
-                            El código de verificación ha sido enviado a este mismo email. Busca un email con el asunto "Código de verificación" o "Verification Code". El código es de 6 dígitos.
+                <div style="background-color: #f4f6f9; padding: 40px 20px;">
+                    <div class="email-wrapper">
+                        <div class="email-header">
+                            <h1>Programador Musical</h1>
+                            <p>Sistema Profesional de Programación Musical</p>
                         </div>
-                        
-                        <div class="warning">
-                            <strong>⚠️ Importante:</strong> El código expirará en 15 minutos. Si no solicitaste este cambio, ignora este email y contacta al administrador del sistema.
+                        <div class="email-body">
+                            <h2>Estimado/a {nombre},</h2>
+                            <p>Hemos recibido una solicitud para restablecer la contraseña de su cuenta en <strong>Programador Musical</strong>.</p>
+                            
+                            <div class="info-box">
+                                <strong>Instrucciones para Restablecer su Contraseña</strong>
+                                <p>Para completar el proceso de recuperación, revise su bandeja de entrada (incluyendo la carpeta de spam) para encontrar el código de verificación enviado por nuestro sistema. El código de verificación es de 6 dígitos y ha sido enviado a esta dirección de correo electrónico.</p>
+                            </div>
+                            
+                            <div class="warning-box">
+                                <strong>Importante - Seguridad</strong>
+                                <p>El código de verificación expirará en 15 minutos por razones de seguridad. Si no solicitó este cambio de contraseña, ignore este correo electrónico y contacte inmediatamente al administrador del sistema para reportar esta actividad sospechosa.</p>
+                            </div>
+                            
+                            <div style="text-align: center;">
+                                <a href="{frontend_url}/auth/login?mode=reset-password" class="cta-button">Restablecer Contraseña</a>
+                            </div>
+                            
+                            <p style="color: #64748b; font-size: 14px; margin-top: 30px;">Si el botón no funciona, copie y pegue el siguiente enlace en su navegador:<br>
+                            <a href="{frontend_url}/auth/login?mode=reset-password" class="link-text">{frontend_url}/auth/login?mode=reset-password</a></p>
                         </div>
-                        
-                        <p style="text-align: center;">
-                            <a href="{frontend_url}/auth/login?mode=reset-password" class="button">Restablecer Contraseña</a>
-                        </p>
-                        
-                        <p style="color: #666; font-size: 14px;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
-                        <a href="{frontend_url}/auth/login?mode=reset-password" style="color: #667eea;">{frontend_url}/auth/login?mode=reset-password</a></p>
-                    </div>
-                    <div class="footer">
-                        <p>© 2025 Programador Musical. Todos los derechos reservados.</p>
-                        <p style="font-size: 11px; color: #999;">Este es un email automático, por favor no respondas.</p>
+                        <div class="email-footer">
+                            <p class="copyright">© 2025 Programador Musical. Todos los derechos reservados.</p>
+                            <p>Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.</p>
+                            <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">Si no solicitó este cambio, ignore este mensaje o contacte al administrador del sistema.</p>
+                        </div>
                     </div>
                 </div>
             </body>
@@ -869,20 +960,22 @@ Si no solicitaste esta eliminación, contacta inmediatamente al administrador de
             body_text = f"""
 Recuperación de Contraseña - Programador Musical
 
-Hola {nombre},
+Estimado/a {nombre},
 
-Recibimos una solicitud para restablecer la contraseña de tu cuenta en Programador Musical.
+Hemos recibido una solicitud para restablecer la contraseña de su cuenta en Programador Musical.
 
-Has solicitado restablecer la contraseña de tu cuenta. Revisa tu bandeja de entrada (y carpeta de spam) para encontrar el código de verificación enviado por nuestro sistema.
+INSTRUCCIONES PARA RESTABLECER SU CONTRASEÑA
+Para completar el proceso de recuperación, revise su bandeja de entrada (incluyendo la carpeta de spam) para encontrar el código de verificación enviado por nuestro sistema. El código de verificación es de 6 dígitos y ha sido enviado a esta dirección de correo electrónico.
 
-¿Dónde está el código?
-El código de verificación ha sido enviado a este mismo email. Busca un email con el asunto "Código de verificación" o "Verification Code". El código es de 6 dígitos.
+IMPORTANTE - SEGURIDAD
+El código de verificación expirará en 15 minutos por razones de seguridad. Si no solicitó este cambio de contraseña, ignore este correo electrónico y contacte inmediatamente al administrador del sistema para reportar esta actividad sospechosa.
 
-⚠️ IMPORTANTE: El código expirará en 15 minutos. Si no solicitaste este cambio, ignora este email y contacta al administrador del sistema.
-
-Accede a: {frontend_url}/auth/login?mode=reset-password
+Para restablecer su contraseña, visite: {frontend_url}/auth/login?mode=reset-password
 
 © 2025 Programador Musical. Todos los derechos reservados.
+
+Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.
+Si no solicitó este cambio, ignore este mensaje o contacte al administrador del sistema.
             """
             
             response = self.ses_client.send_email(
@@ -953,48 +1046,77 @@ Accede a: {frontend_url}/auth/login?mode=reset-password
                     }
             
             frontend_url = settings.FRONTEND_URL
-            subject = "Tu cuenta ha sido desactivada - Programador Musical"
+            subject = "Notificación: Cuenta Desactivada - Programador Musical"
             
             body_html = f"""
             <!DOCTYPE html>
-            <html>
+            <html lang="es">
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <title>Cuenta Desactivada - Programador Musical</title>
                 <style>
-                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 40px; text-align: center; border-radius: 10px 10px 0 0; }}
-                    .content {{ background: #ffffff; padding: 40px; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none; }}
-                    .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 30px 0; border-radius: 4px; }}
-                    .info {{ background: #e7f3ff; border-left: 4px solid #2196F3; padding: 20px; margin: 30px 0; border-radius: 4px; }}
-                    .footer {{ text-align: center; margin-top: 40px; color: #666; font-size: 12px; padding-top: 20px; border-top: 1px solid #e0e0e0; }}
+                    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; line-height: 1.7; color: #1a1a1a; margin: 0; padding: 0; background-color: #f4f6f9; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }}
+                    .email-wrapper {{ max-width: 650px; margin: 0 auto; background-color: #ffffff; }}
+                    .email-header {{ background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: #ffffff; padding: 50px 40px; text-align: center; }}
+                    .email-header h1 {{ font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 8px 0; }}
+                    .email-header p {{ font-size: 16px; opacity: 0.95; margin: 0; font-weight: 400; }}
+                    .email-body {{ padding: 50px 40px; background-color: #ffffff; }}
+                    .email-body h2 {{ font-size: 24px; font-weight: 600; color: #1e293b; margin: 0 0 20px 0; line-height: 1.3; }}
+                    .email-body p {{ font-size: 16px; color: #475569; margin: 0 0 20px 0; line-height: 1.7; }}
+                    .warning-box {{ background: #fef2f2; border-left: 4px solid #dc2626; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .warning-box strong {{ display: block; font-size: 16px; color: #991b1b; margin-bottom: 12px; font-weight: 600; }}
+                    .warning-box p {{ margin: 0 0 12px 0; font-size: 15px; color: #7f1d1d; line-height: 1.6; }}
+                    .info-box {{ background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #3b82f6; padding: 24px; margin: 30px 0; border-radius: 6px; }}
+                    .info-box strong {{ display: block; font-size: 16px; color: #1e40af; margin-bottom: 12px; font-weight: 600; }}
+                    .info-box ul {{ margin: 0; padding-left: 20px; }}
+                    .info-box li {{ margin: 8px 0; font-size: 15px; color: #1e40af; line-height: 1.6; }}
+                    .email-footer {{ background-color: #f8fafc; padding: 40px; text-align: center; border-top: 1px solid #e2e8f0; }}
+                    .email-footer p {{ font-size: 13px; color: #64748b; margin: 8px 0; line-height: 1.6; }}
+                    .email-footer .copyright {{ font-weight: 600; color: #475569; }}
+                    @media only screen and (max-width: 600px) {{
+                        .email-body {{ padding: 40px 30px; }}
+                        .email-header {{ padding: 40px 30px; }}
+                        .email-header h1 {{ font-size: 28px; }}
+                        .email-body h2 {{ font-size: 22px; }}
+                    }}
                 </style>
             </head>
             <body>
-                <div class="container">
-                    <div class="header">
-                        <h1 style="margin: 0; font-size: 28px;">🔒 Programador Musical</h1>
-                    </div>
-                    <div class="content">
-                        <h2 style="color: #333; margin-top: 0;">Hola {nombre},</h2>
-                        <p>Te informamos que tu cuenta en <strong>Programador Musical</strong> ha sido desactivada.</p>
-                        
-                        <div class="warning">
-                            <strong>⚠️ Acceso Restringido:</strong> Ya no podrás iniciar sesión en el sistema hasta que un administrador reactive tu cuenta.
+                <div style="background-color: #f4f6f9; padding: 40px 20px;">
+                    <div class="email-wrapper">
+                        <div class="email-header">
+                            <h1>Programador Musical</h1>
+                            <p>Sistema Profesional de Programación Musical</p>
                         </div>
-                        
-                        <div class="info">
-                            <strong>ℹ️ ¿Qué significa esto?</strong><br>
-                            • Tu información permanece en el sistema pero no puedes acceder<br>
-                            • Para reactivar tu cuenta, contacta al administrador del sistema<br>
-                            • Si crees que esto es un error, contacta inmediatamente al soporte
+                        <div class="email-body">
+                            <h2>Estimado/a {nombre},</h2>
+                            <p>Le informamos que su cuenta en <strong>Programador Musical</strong> ha sido desactivada por un administrador del sistema.</p>
+                            
+                            <div class="warning-box">
+                                <strong>Acceso Restringido</strong>
+                                <p>Su cuenta ha sido desactivada y ya no podrá iniciar sesión en el sistema hasta que un administrador reactive su cuenta.</p>
+                            </div>
+                            
+                            <div class="info-box">
+                                <strong>¿Qué significa esto?</strong>
+                                <ul>
+                                    <li>Su información permanece almacenada en el sistema de forma segura</li>
+                                    <li>No podrá acceder a ninguna funcionalidad del sistema hasta la reactivación</li>
+                                    <li>Para reactivar su cuenta, debe contactar al administrador del sistema</li>
+                                    <li>Si considera que esto es un error, contacte inmediatamente al equipo de soporte</li>
+                                </ul>
+                            </div>
+                            
+                            <p>Si tiene alguna pregunta sobre esta acción o necesita asistencia, no dude en contactar al administrador del sistema o al equipo de soporte técnico.</p>
                         </div>
-                        
-                        <p>Si tienes alguna pregunta o necesitas ayuda, no dudes en contactar al administrador del sistema.</p>
-                    </div>
-                    <div class="footer">
-                        <p>© 2025 Programador Musical. Todos los derechos reservados.</p>
-                        <p style="font-size: 11px; color: #999;">Este es un email automático, por favor no respondas.</p>
+                        <div class="email-footer">
+                            <p class="copyright">© 2025 Programador Musical. Todos los derechos reservados.</p>
+                            <p>Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.</p>
+                            <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">Si considera que esta acción es un error, contacte inmediatamente al administrador del sistema.</p>
+                        </div>
                     </div>
                 </div>
             </body>
@@ -1002,22 +1124,27 @@ Accede a: {frontend_url}/auth/login?mode=reset-password
             """
             
             body_text = f"""
-Tu cuenta ha sido desactivada - Programador Musical
+Notificación: Cuenta Desactivada - Programador Musical
 
-Hola {nombre},
+Estimado/a {nombre},
 
-Te informamos que tu cuenta en Programador Musical ha sido desactivada.
+Le informamos que su cuenta en Programador Musical ha sido desactivada por un administrador del sistema.
 
-⚠️ ACCESO RESTRINGIDO: Ya no podrás iniciar sesión en el sistema hasta que un administrador reactive tu cuenta.
+ACCESO RESTRINGIDO
+Su cuenta ha sido desactivada y ya no podrá iniciar sesión en el sistema hasta que un administrador reactive su cuenta.
 
-¿Qué significa esto?
-• Tu información permanece en el sistema pero no puedes acceder
-• Para reactivar tu cuenta, contacta al administrador del sistema
-• Si crees que esto es un error, contacta inmediatamente al soporte
+¿QUÉ SIGNIFICA ESTO?
+• Su información permanece almacenada en el sistema de forma segura
+• No podrá acceder a ninguna funcionalidad del sistema hasta la reactivación
+• Para reactivar su cuenta, debe contactar al administrador del sistema
+• Si considera que esto es un error, contacte inmediatamente al equipo de soporte
 
-Si tienes alguna pregunta o necesitas ayuda, no dudes en contactar al administrador del sistema.
+Si tiene alguna pregunta sobre esta acción o necesita asistencia, no dude en contactar al administrador del sistema o al equipo de soporte técnico.
 
 © 2025 Programador Musical. Todos los derechos reservados.
+
+Este es un mensaje automático generado por el sistema. Por favor, no responda a este correo electrónico.
+Si considera que esta acción es un error, contacte inmediatamente al administrador del sistema.
             """
             
             response = self.ses_client.send_email(
