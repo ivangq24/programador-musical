@@ -69,18 +69,58 @@ resource "aws_cognito_user_pool" "main" {
     allow_admin_create_user_only = true  # Solo admins pueden crear usuarios (PRODUCCIÓN)
     
     invite_message_template {
-      email_message = "Usuario: {username}\nTu contraseña temporal es {####}"
-      email_subject = "Bienvenido a Programador Musical"
-      sms_message   = "Usuario: {username}\nTu contraseña temporal es {####}"
+      email_message = """
+Bienvenido a Programador Musical
+
+Estimado/a {username},
+
+Su cuenta ha sido creada exitosamente en Programador Musical, la plataforma profesional para la gestión y programación de contenido musical.
+
+CREDENCIALES DE ACCESO:
+Email: {username}
+Contraseña temporal: {####}
+
+IMPORTANTE: Por seguridad, debe cambiar esta contraseña temporal en su primer inicio de sesión. Esta contraseña expirará en 7 días.
+
+Para acceder al sistema, visite: https://programador-musical.com/auth/login
+
+Si tiene alguna pregunta o necesita asistencia, no dude en contactar al administrador del sistema.
+
+Atentamente,
+Equipo de Programador Musical
+
+---
+Este es un mensaje automático. Por favor, no responda a este correo.
+      """
+      email_subject = "Bienvenido a Programador Musical - Credenciales de Acceso"
+      sms_message   = "Programador Musical: Su contraseña temporal es {####}. Acceda en: https://programador-musical.com/auth/login"
     }
   }
 
   # Configuración de verificación - Usar código como opción más simple
   verification_message_template {
     default_email_option = "CONFIRM_WITH_CODE"
-    email_message        = "Tu código de verificación para Programador Musical es: {####}"
-    email_subject        = "Verifica tu email - Programador Musical"
-    sms_message          = "Tu código de verificación es {####}"
+    email_message        = """
+Verificación de Email - Programador Musical
+
+Estimado/a usuario,
+
+Para completar el proceso de verificación de su cuenta en Programador Musical, utilice el siguiente código de verificación:
+
+CÓDIGO DE VERIFICACIÓN: {####}
+
+Este código es válido por 15 minutos. Si no solicitó este código, puede ignorar este mensaje.
+
+Si tiene alguna pregunta, contacte al administrador del sistema.
+
+Atentamente,
+Equipo de Programador Musical
+
+---
+Este es un mensaje automático. Por favor, no responda a este correo.
+      """
+    email_subject        = "Código de Verificación - Programador Musical"
+    sms_message          = "Programador Musical: Su código de verificación es {####}. Válido por 15 minutos."
   }
 
   # Configuración de dispositivo
