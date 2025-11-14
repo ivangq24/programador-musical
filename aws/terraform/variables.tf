@@ -22,6 +22,12 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "use_route53" {
+  description = "Whether to use Route 53 for DNS management (false for external DNS like GoDaddy)"
+  type        = bool
+  default     = false
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string

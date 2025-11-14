@@ -200,15 +200,18 @@ export default function PoliticasProgramacion() {
       setLoading(true);
       setError(null);
       
-
       const data = await politicasApi.getAll();
-
+      
+      if (!data || !Array.isArray(data)) {
+        setPoliticas([]);
+        return;
+      }
       
       // Mapear datos de la API al formato esperado por el componente
       const politicasMapeadas = data.map(politica => ({
         id: politica.id,
         clave: politica.clave,
-nombre: politica.nombre,
+        nombre: politica.nombre,
         descripcion: politica.descripcion || `Política para ${politica.difusora}`,
         habilitada: politica.habilitada,
         tipo: 'General',
@@ -223,8 +226,8 @@ nombre: politica.nombre,
       
       setPoliticas(politicasMapeadas);
     } catch (err) {
-
-      setError(err.message || 'Error al cargar las políticas');
+      const errorMessage = err.response?.data?.detail || err.message || 'Error al cargar las políticas';
+      setError(errorMessage);
       setPoliticas([]);
     } finally {
       setLoading(false);
@@ -422,8 +425,8 @@ nombre: politica.nombre,
   // Función para obtener los eventos del reloj seleccionado en la tabla - Memoizada
   const getSelectedRelojEvents = useCallback(() => {
     // Si estamos en el formulario de reloj (creando o editando), usar relojEvents
-    if (showRelojForm && relojEvents.length > 0) {
-      return relojEvents;
+    if (showRelojForm) {
+      return relojEvents || [];
     }
 
     // Si hay un reloj seleccionado en la tabla, buscar sus eventos
@@ -536,9 +539,9 @@ nombre: politica.nombre,
     setExpandedCategories(prev => {
       const newExpanded = new Set(prev);
       if (newExpanded.has(category)) {
-ewExpanded.delete(category);
+        newExpanded.delete(category);
       } else {
-ewExpanded.add(category);
+        newExpanded.add(category);
       }
       return newExpanded;
     });
@@ -1282,7 +1285,7 @@ numero_cancion: evento.numeroCancion || evento.numero_cancion || '-',
       return newState;
     });
 
-  }, [relojEvents]);
+  }, []); // No necesita relojEvents en dependencias porque usa la forma funcional de setState
 
   const handleEventClick = useCallback((eventType, eventName) => {
     setSelectedEventType({ type: eventType, name: eventName });
@@ -1378,7 +1381,7 @@ numero_cancion: evento.numeroCancion || evento.numero_cancion || '-',
     
     // Añadir directamente al reloj
     const newEvent = {
-      id: relojEvents.length + 1,
+      id: Date.now(), // Usar timestamp para evitar conflictos de ID
       numero: generateConsecutivo(),
       tipo: getEventTypeNumber(eventType),
       categoria: categoria,
@@ -1526,7 +1529,7 @@ numero_cancion: evento.numeroCancion || evento.numero_cancion || '-',
       {/* Notification Component */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 border-2 ${
-otification.type === 'success'
+          notification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-300 text-red-800'
         }`}>
@@ -2101,12 +2104,40 @@ otification.type === 'success'
           const loadCortes = async () => {
             setLoadingCortes(true);
             try {
-              const response = await fetch(buildApiUrl('/catalogos/general/cortes/?activo=true'));
+              // Obtener token de autenticación
+              const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+              const headers = {
+                'Content-Type': 'application/json',
+              };
+              if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+              }
+              
+              const response = await fetch(buildApiUrl('/catalogos/general/cortes/?activo=true'), {
+                headers: headers
+              });
+              
+              if (!response.ok) {
+                if (response.status === 403) {
+                  throw new Error('No tienes permisos para acceder a los cortes. Por favor, inicia sesión.');
+                }
+                if (response.status === 401) {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('idToken');
+                    localStorage.removeItem('refreshToken');
+                    window.location.href = '/auth/login';
+                  }
+                  throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+                }
+                throw new Error(`Error al cargar cortes: ${response.status}`);
+              }
+              
               const data = await response.json();
               setCortes(data || []);
 
             } catch (error) {
-
+              console.error('Error al cargar cortes:', error);
               setCortes([]);
             } finally {
               setLoadingCortes(false);
@@ -2137,8 +2168,6 @@ otification.type === 'success'
 
         const [formData, setFormData] = useState({
           habilitado: reloj?.habilitado ?? true,
-          perteneceGrupo: reloj?.pertenece_grupo ?? false,
-          grupo: reloj?.grupo || '',
           clave: reloj?.clave || '',
           numeroRegla: reloj?.numero_regla || '',
           nombre: reloj?.nombre || '',
@@ -2152,17 +2181,11 @@ otification.type === 'success'
         
 
 
-        // Mock data
-        const grupos = [
-          { value: 'GRUPO_A', label: 'Grupo A' },
-          { value: 'GRUPO_B', label: 'Grupo B' },
-          { value: 'GRUPO_C', label: 'Grupo C' }
-        ];
 
         const tabs = [
           { 
             id: 0, 
-ame: 'Datos generales', 
+            name: 'Datos generales', 
             icon: (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2171,7 +2194,7 @@ ame: 'Datos generales',
           },
           { 
             id: 1, 
-ame: 'Eventos del reloj', 
+            name: 'Eventos del reloj', 
             icon: (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2189,9 +2212,8 @@ ame: 'Eventos del reloj',
 
         const validateForm = () => {
           const newErrors = {};
-          if (!formData.clave) nnewErrors.clave = 'La clave es requerida';
-          if (!formData.nombre) nnewErrors.nombre = 'El nombre es requerido';
-          if (formData.perteneceGrupo && !formData.grupo) nnewErrors.grupo = 'El grupo es requerido cuando pertenece a un grupo';
+          if (!formData.clave) newErrors.clave = 'La clave es requerida';
+          if (!formData.nombre) newErrors.nombre = 'El nombre es requerido';
           setErrors(newErrors);
           return Object.keys(newErrors).length === 0;
         };
@@ -2212,7 +2234,7 @@ ame: 'Eventos del reloj',
             const relojDataForBackend = {
               habilitado: formData.habilitado ?? true,
               clave: formData.clave || '',
-              nombre: formData.nombre || '',
+                  nombre: formData.nombre || '',
               numero_eventos: relojEvents.length || 0,
               duracion: '00:00:00'
             };
@@ -2281,7 +2303,7 @@ ame="habilitado"
                       </label>
                       <input 
                         type="text" 
-ame="clave" 
+                        name="clave" 
                         value={formData.clave || ''} 
                         onChange={handleChange} 
                         disabled={isReadOnly} 
@@ -2303,7 +2325,7 @@ ame="clave"
                       <label className="block text-sm font-bold text-gray-700 mb-2">Número de Regla</label>
                       <input 
                         type="text" 
-ame="numeroRegla" 
+                        name="numeroRegla" 
                         value={formData.numeroRegla || ''} 
                         onChange={handleChange} 
                         disabled={isReadOnly} 
@@ -2313,51 +2335,9 @@ ame="numeroRegla"
                     </div>
                     
                     <div className="md:col-span-2">
-                      <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm mb-4">
-                        <input 
-                          type="checkbox" 
-ame="perteneceGrupo" 
-                          checked={formData.perteneceGrupo} 
-                          onChange={handleChange} 
-                          disabled={isReadOnly} 
-                          className="h-5 w-5 text-blue-600 focus:ring-2 focus:ring-blue-500 border-gray-300 rounded transition-all cursor-pointer disabled:cursor-not-allowed" 
-                        />
-                        <label className="text-base font-semibold text-gray-700 cursor-pointer">Pertenece al grupo de relojes</label>
-                      </div>
-                      
-                      {formData.perteneceGrupo && (
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-2">Grupo</label>
-                          <select 
-ame="grupo" 
-                            value={formData.grupo || ''} 
-                            onChange={handleChange} 
-                            disabled={isReadOnly} 
-                            className={selectClass}
-                          >
-                            <option value="">Seleccionar grupo</option>
-                            {grupos.map((grupo) => (
-                              <option key={grupo.value} value={grupo.value}>
-                                {grupo.label}
-                              </option>
-                            ))}
-                          </select>
-                          {errors.grupo && (
-                            <p className="mt-2 text-sm text-red-600 font-medium flex items-center space-x-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>{errors.grupo}</span>
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-gray-700 mb-2">Descripción</label>
                       <textarea 
-ame="descripcion" 
+                        name="descripcion" 
                         value={formData.descripcion || ''} 
                         onChange={handleChange} 
                         readOnly={isReadOnly} 
@@ -2591,16 +2571,31 @@ ame="descripcion"
                           <tbody className="bg-white divide-y divide-gray-200">
                             {(() => {
                               const events = getSelectedRelojEvents();
+                              if (!events || events.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan="9" className="px-3 py-8 text-center text-gray-500">
+                                      <div className="flex flex-col items-center justify-center space-y-2">
+                                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                        </svg>
+                                        <p className="text-sm font-medium">No hay eventos en el reloj</p>
+                                        <p className="text-xs text-gray-400">Agrega eventos desde el panel izquierdo</p>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              }
                               return events.map((event, index) => (
                               <tr
-                                key={event.id}
+                                key={event.id || index}
                                 className={`hover:bg-gray-50`}
                                 style={{ borderLeft: `4px solid ${colorForCategory(event.categoria)}` }}
                               >
                                 <td className="px-3 py-2 text-sm font-medium text-gray-900">{event.numero}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.offset}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.offset || '00:00:00'}</td>
                                 
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.offsetFinal}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.offsetFinal || '00:00:00'}</td>
                                 <td className="px-3 py-2 text-sm text-gray-600">
                                   <span className="inline-flex items-center gap-2">
                                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorForCategory(event.categoria) }}></span>
@@ -2608,9 +2603,9 @@ ame="descripcion"
                                   </span>
                                 </td>
                                 <td className="px-3 py-2 text-sm text-gray-600">{event.descripcion}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.duracion}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.numeroCancion}</td>
-                                <td className="px-3 py-2 text-sm text-gray-600">{event.sinCategorias}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{typeof event.duracion === 'string' ? event.duracion : (typeof event.duracion === 'number' ? `${Math.floor(event.duracion / 60)}:${String(event.duracion % 60).padStart(2, '0')}` : event.duracion)}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.numeroCancion || '-'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{event.sinCategorias || '-'}</td>
                                 <td className="px-3 py-2 text-sm text-gray-600">
                                   <button
                                     onClick={() => deleteEventFromReloj(event.id)}
@@ -2793,14 +2788,14 @@ ame="descripcion"
                             
                             // Mapa de colores para cada categoría
                             const colorMap = {
-                              'Canciones': { color: 'bg-blue-500', nombre: 'Canciones' },
-                              'Corte Comercial': { color: 'bg-red-500', nombre: 'Corte Comercial' },
-                              'Nota Operador': { color: 'bg-yellow-500', nombre: 'Nota Operador' },
-                              'ETM': { color: 'bg-green-500', nombre: 'ETM' },
-                              'Cartucho Fijo': { color: 'bg-purple-500', nombre: 'Cartucho Fijo' },
-                              'Comando': { color: 'bg-indigo-500', nombre: 'Comando' },
-                              'Twofer': { color: 'bg-pink-500', nombre: 'Twofer' },
-                              'Característica Específica': { color: 'bg-lime-500', nombre: 'Característica Específica' }
+                              'Canciones': { color: 'bg-blue-500',     nombre: 'Canciones' },
+                              'Corte Comercial': { color: 'bg-red-500',     nombre: 'Corte Comercial' },
+                              'Nota Operador': { color: 'bg-yellow-500',     nombre: 'Nota Operador' },
+                              'ETM': { color: 'bg-green-500',     nombre: 'ETM' },
+                              'Cartucho Fijo': { color: 'bg-purple-500',     nombre: 'Cartucho Fijo' },
+                              'Comando': { color: 'bg-indigo-500',     nombre: 'Comando' },
+                              'Twofer': { color: 'bg-pink-500',     nombre: 'Twofer' },
+                              'Característica Específica': { color: 'bg-lime-500',     nombre: 'Característica Específica' }
                             };
                             
                             // Filtrar solo las categorías presentes
@@ -3092,15 +3087,15 @@ ame="descripcion"
 
         const validateForm = () => {
           const newErrors = {};
-          if (!localFormData.consecutivo) nnewErrors.consecutivo = 'El consecutivo es requerido';
-          if (!localFormData.offset) nnewErrors.offset = 'El offset es requerido';
-          if (!localFormData.duracion) nnewErrors.duracion = 'La duración es requerida';
-          if (!localFormData.descripcion) nnewErrors.descripcion = 'La descripción es requerida';
+          if (!localFormData.consecutivo) newErrors.consecutivo = 'El consecutivo es requerido';
+          if (!localFormData.offset) newErrors.offset = 'El offset es requerido';
+          if (!localFormData.duracion) newErrors.duracion = 'La duración es requerida';
+          if (!localFormData.descripcion) newErrors.descripcion = 'La descripción es requerida';
           
           // Validación adicional para Cartucho Fijo
           if (eventType?.type === 'cartucho-fijo') {
-            if (!localFormData.idMedia) nnewErrors.idMedia = 'El ID Media es requerido';
-            if (!localFormData.categoria) nnewErrors.categoria = 'La categoría es requerida';
+            if (!localFormData.idMedia) newErrors.idMedia = 'El ID Media es requerido';
+            if (!localFormData.categoria) newErrors.categoria = 'La categoría es requerida';
           }
           
           
@@ -3850,7 +3845,7 @@ ame="categoria"
   const [formData, setFormData] = useState({
     clave: politica?.clave || '',
     difusora: politica?.difusora || '',
-nombre: politica?.nombre || '',
+    nombre: politica?.nombre || '',
     descripcion: politica?.descripcion || '',
     habilitada: politica?.habilitada ?? true,
     // Datos adicionales para los otros tabs
@@ -3888,7 +3883,7 @@ nombre: politica?.nombre || '',
       setFormData({
         clave: politica.clave || '',
         difusora: politica.difusora || '',
-        nombre: politica.nombre || '',
+            nombre: politica.nombre || '',
         descripcion: politica.descripcion || '',
         habilitada: politica.habilitada ?? true,
         setsReglas: politica.setsReglas || [],
@@ -3919,44 +3914,38 @@ nombre: politica?.nombre || '',
   // Cargar difusoras desde la API
   const loadDifusoras = async () => {
     try {
-      // Usar apiClient que incluye el token de autenticación
-      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
+      // Usar la misma API que la página de gestión de difusoras
+      const { getDifusoras } = await import('../../../../api/catalogos/generales/difusorasApi');
+      
+      // Cargar todas las difusoras activas
+      const data = await getDifusoras({ activa: true });
+      
+      if (!data || !Array.isArray(data)) {
+        console.warn('No se recibieron difusoras o el formato es incorrecto:', data);
+        setDifusoras([]);
+        return;
       }
-      
-      const response = await fetch(buildApiUrl('/catalogos/general/difusoras/'), {
-        headers: headers
-      });
-      
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('No tienes permisos para acceder a las difusoras. Por favor, inicia sesión.');
-        }
-        throw new Error(`Error al cargar difusoras: ${response.status}`);
-      }
-      
-      const data = await response.json();
 
-      
       // Mapear datos de la API al formato esperado por el select
       const difusorasMapeadas = data.map(difusora => ({
         value: difusora.siglas,
         label: `${difusora.siglas} - ${difusora.nombre}`
       }));
       
-      // Agregar opción especial para "Todas las difusoras"
-      const difusorasConTodas = [
+      // Agregar opción especial para "Todas las difusoras" solo si hay difusoras
+      const difusorasConTodas = difusorasMapeadas.length > 0 ? [
         { value: 'TODAS', label: 'Todas las difusoras' },
         ...difusorasMapeadas
-      ];
+      ] : [];
       
       setDifusoras(difusorasConTodas);
+      
+      // Log para debugging
+      if (difusorasConTodas.length === 0) {
+        console.warn('No se encontraron difusoras para el usuario actual');
+      }
     } catch (err) {
-
+      console.error('Error al cargar difusoras:', err);
       setDifusoras([]);
     }
   };
@@ -3964,7 +3953,7 @@ nombre: politica?.nombre || '',
   const tabs = [
     { 
       id: 0, 
-ame: 'Datos generales', 
+      name: 'Datos generales', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -3973,7 +3962,7 @@ ame: 'Datos generales',
     },
     { 
       id: 1, 
-ame: 'Reglas', 
+      name: 'Reglas', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -3983,7 +3972,7 @@ ame: 'Reglas',
     },
     { 
       id: 2, 
-ame: 'Orden de asignación', 
+      name: 'Orden de asignación', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -3992,7 +3981,7 @@ ame: 'Orden de asignación',
     },
     { 
       id: 3, 
-ame: 'Relojes', 
+      name: 'Relojes', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -4001,7 +3990,7 @@ ame: 'Relojes',
     },
     { 
       id: 4, 
-ame: 'Días modelo', 
+      name: 'Días modelo', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -4014,7 +4003,7 @@ ame: 'Días modelo',
     const newErrors = {};
     
     if (!formData.clave || formData.clave.trim() === '') {
-newErrors.clave = 'La clave es obligatoria';
+      newErrors.clave = 'La clave es obligatoria';
     } else {
       // Verificar si la clave ya existe en otra política
       const claveExistente = politicas.find(p => 
@@ -4022,16 +4011,16 @@ newErrors.clave = 'La clave es obligatoria';
         p.id !== politica?.id
       );
       if (claveExistente) {
-        nnewErrors.clave = `La clave "${formData.clave.trim()}" ya existe en la política "${claveExistente.nombre || claveExistente.difusora}"`;
+        newErrors.clave = `La clave "${formData.clave.trim()}" ya existe en la política "${claveExistente.nombre || claveExistente.difusora}"`;
       }
     }
     
     if (!formData.difusora || formData.difusora.trim() === '') {
-newErrors.difusora = 'La difusora es obligatoria';
+      newErrors.difusora = 'La difusora es obligatoria';
     }
     
     if (!formData.nombre || formData.nombre.trim() === '') {
-      nnewErrors.nombre = 'El nombre es obligatorio';
+      newErrors.nombre = 'El nombre es obligatorio';
     }
     
     setErrors(newErrors);
@@ -4112,7 +4101,7 @@ newErrors.difusora = 'La difusora es obligatoria';
             <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
               <input
                 type="checkbox"
-ame="habilitada"
+                name="habilitada"
                 checked={formData.habilitada}
                 onChange={handleChange}
                 disabled={isReadOnly}
@@ -4131,7 +4120,7 @@ ame="habilitada"
                   </label>
                   <input
                     type="text"
-ame="clave"
+                    name="clave"
                     value={formData.clave || ''}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -4154,14 +4143,18 @@ ame="clave"
                     Difusora <span className="text-red-500">*</span>
                   </label>
                   <select
-ame="difusora"
+                    name="difusora"
                     value={formData.difusora || ''}
                     onChange={handleChange}
                     disabled={isReadOnly}
                     className={selectClass}
                     required={!isReadOnly}
                   >
-                    <option value="">Seleccionar difusora</option>
+                    <option value="">
+                      {difusoras.length === 0 
+                        ? 'No hay difusoras disponibles. Contacta al administrador para que te asigne difusoras.' 
+                        : 'Seleccionar difusora'}
+                    </option>
                     {difusoras.map((difusora) => (
                       <option key={difusora.value} value={difusora.value}>
                         {difusora.label}
@@ -4205,7 +4198,7 @@ ame="difusora"
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-gray-700 mb-2">Descripción</label>
                   <textarea
-ame="descripcion"
+                    name="descripcion"
                     value={formData.descripcion || ''}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -4739,14 +4732,14 @@ ame="descripcion"
                           
                           // Mapa de colores para cada categoría
                           const colorMap = {
-                            'Canciones': { color: 'bg-blue-500', border: 'border-blue-500', nombre: 'Canciones' },
-                            'Corte Comercial': { color: 'bg-red-500', border: 'border-red-500', nombre: 'Corte Comercial' },
-                            'Nota Operador': { color: 'bg-yellow-500', border: 'border-yellow-500', nombre: 'Nota Operador' },
-                            'ETM': { color: 'bg-green-500', border: 'border-green-500', nombre: 'ETM' },
-                            'Cartucho Fijo': { color: 'bg-purple-500', border: 'border-purple-500', nombre: 'Cartucho Fijo' },
-                            'Comando': { color: 'bg-indigo-500', border: 'border-indigo-500', nombre: 'Comando' },
-                            'Twofer': { color: 'bg-pink-500', border: 'border-pink-500', nombre: 'Twofer' },
-                            'Característica Específica': { color: 'bg-lime-500', border: 'border-lime-500', nombre: 'Característica Específica' }
+                            'Canciones': { color: 'bg-blue-500', border: 'border-blue-500',     nombre: 'Canciones' },
+                            'Corte Comercial': { color: 'bg-red-500', border: 'border-red-500',     nombre: 'Corte Comercial' },
+                            'Nota Operador': { color: 'bg-yellow-500', border: 'border-yellow-500',     nombre: 'Nota Operador' },
+                            'ETM': { color: 'bg-green-500', border: 'border-green-500',     nombre: 'ETM' },
+                            'Cartucho Fijo': { color: 'bg-purple-500', border: 'border-purple-500',     nombre: 'Cartucho Fijo' },
+                            'Comando': { color: 'bg-indigo-500', border: 'border-indigo-500',     nombre: 'Comando' },
+                            'Twofer': { color: 'bg-pink-500', border: 'border-pink-500',     nombre: 'Twofer' },
+                            'Característica Específica': { color: 'bg-lime-500', border: 'border-lime-500',     nombre: 'Característica Específica' }
                           };
                           
                           // Filtrar solo las categorías presentes
@@ -5501,9 +5494,9 @@ function DiaModeloForm({ diaModelo, mode, relojes, onSave, onCancel, diasModeloE
 
   const [formData, setFormData] = useState({
     habilitado: diaModelo?.habilitado ?? true,
-    difusora: diaModelo?.difusora || 'RADIO_1', // Valor por defecto
+    difusora: diaModelo?.difusora || '', // Sin valor por defecto
     clave: diaModelo?.clave || '',
-nombre: diaModelo?.nombre || '',
+    nombre: diaModelo?.nombre || '',
     descripcion: diaModelo?.descripcion || '',
     lunes: diaModelo?.lunes ?? false,
     martes: diaModelo?.martes ?? false,
@@ -5540,7 +5533,6 @@ nombre: diaModelo?.nombre || '',
     return (
       reloj.nombre?.toLowerCase().includes(searchTerm) ||
       reloj.clave?.toLowerCase().includes(searchTerm) ||
-      reloj.grupo?.toLowerCase().includes(searchTerm) ||
       reloj.numeroRegla?.toLowerCase().includes(searchTerm)
     );
   });
@@ -5568,7 +5560,7 @@ nombre: diaModelo?.nombre || '',
   const tabs = [
     { 
       id: 0, 
-ame: 'Datos generales', 
+      name: 'Datos generales', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -5577,7 +5569,7 @@ ame: 'Datos generales',
     },
     { 
       id: 1, 
-ame: 'Relojes que forman el día modelo', 
+      name: 'Relojes que forman el día modelo', 
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -5591,13 +5583,13 @@ ame: 'Relojes que forman el día modelo',
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.difusora) nnewErrors.difusora = 'La difusora es requerida';
-    if (!formData.clave) nnewErrors.clave = 'La clave es requerida';
-    if (!formData.nombre) nnewErrors.nombre = 'El nombre es requerido';
+    if (!formData.difusora) newErrors.difusora = 'La difusora es requerida';
+    if (!formData.clave) newErrors.clave = 'La clave es requerida';
+    if (!formData.nombre) newErrors.nombre = 'El nombre es requerido';
     
     // Verificar que al menos un reloj esté seleccionado
     if (relojesDiaModelo.length === 0) {
-newErrors.relojes = 'Debe seleccionar al menos un reloj para el día modelo';
+      newErrors.relojes = 'Debe seleccionar al menos un reloj para el día modelo';
     }
     
     // Verificar nombres duplicados dentro de la misma política
@@ -5608,7 +5600,7 @@ newErrors.relojes = 'Debe seleccionar al menos un reloj para el día modelo';
       );
       
       if (nombreExistente) {
-newErrors.nombre = 'Ya existe un día modelo con este nombre en la política';
+        newErrors.nombre = 'Ya existe un día modelo con este nombre en la política';
       }
     }
     
@@ -5654,12 +5646,12 @@ newErrors.nombre = 'Ya existe un día modelo con este nombre en la política';
       if (nombreExistente) {
         setErrors(prev => ({
           ...prev,
-nombre: 'Ya existe un día modelo con este nombre en la política'
+          nombre: 'Ya existe un día modelo con este nombre en la política'
         }));
       } else {
         setErrors(prev => {
           const newErrors = { ...prev };
-          delete nnewErrors.nombre;
+          delete newErrors.nombre;
           return newErrors;
         });
       }

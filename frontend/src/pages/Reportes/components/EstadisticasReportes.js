@@ -13,7 +13,8 @@ import {
   PieChart,
   Users,
   Disc,
-  Radio
+  Radio,
+  ChevronDown
 } from 'lucide-react'
 import * as reportesApi from '../../../api/reportes'
 import { getDifusoras } from '../../../api/difusoras'
@@ -562,66 +563,75 @@ const EstadisticasReportes = () => {
                 <Radio className="w-4 h-4 text-gray-500" />
                 Difusora
               </label>
-              <select
-                value={difusora}
-                onChange={(e) => setDifusora(e.target.value)}
-                className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400 bg-white cursor-pointer"
-              >
-                <option value="">Todas las difusoras</option>
-                {difusorasDisponibles.length === 0 ? (
-                  <option disabled>Cargando difusoras...</option>
-                ) : (
-                  difusorasDisponibles.map((dif) => (
-                    <option key={dif.id} value={dif.siglas || dif.nombre}>
-                      {dif.nombre} {dif.siglas ? `(${dif.siglas})` : ''}
-                    </option>
-                  ))
-                )}
-              </select>
+              <div className="relative">
+                <select
+                  value={difusora}
+                  onChange={(e) => setDifusora(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-10 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400 bg-white cursor-pointer appearance-none"
+                >
+                  <option value="">Todas las difusoras</option>
+                  {difusorasDisponibles.length === 0 ? (
+                    <option disabled>Cargando difusoras...</option>
+                  ) : (
+                    difusorasDisponibles.map((dif) => (
+                      <option key={dif.id} value={dif.siglas || dif.nombre}>
+                        {dif.nombre} {dif.siglas ? `(${dif.siglas})` : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <Music className="w-4 h-4 text-gray-500" />
                 Categoría
               </label>
-              <select
-                value={categoriaFiltro}
-                onChange={(e) => setCategoriaFiltro(e.target.value)}
-                className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400 bg-white cursor-pointer"
-              >
-                <option value="">Todas las categorías</option>
-                {categoriasDisponibles.length === 0 ? (
-                  <option disabled>Cargando categorías...</option>
-                ) : (
-                  categoriasDisponibles.map((cat) => (
-                    <option key={cat.id} value={cat.nombre}>
-                      {cat.nombre}
-                    </option>
-                  ))
-                )}
-              </select>
+              <div className="relative">
+                <select
+                  value={categoriaFiltro}
+                  onChange={(e) => setCategoriaFiltro(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-10 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400 bg-white cursor-pointer appearance-none"
+                >
+                  <option value="">Todas las categorías</option>
+                  {categoriasDisponibles.length === 0 ? (
+                    <option disabled>Cargando categorías...</option>
+                  ) : (
+                    categoriasDisponibles.map((cat) => (
+                      <option key={cat.id} value={cat.nombre}>
+                        {cat.nombre}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-gray-500" />
                 Política
               </label>
-              <select
-                value={politicaId}
-                onChange={(e) => setPoliticaId(e.target.value)}
-                className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400 bg-white cursor-pointer"
-              >
-                <option value="">Todas las políticas</option>
-                {politicasDisponibles.length === 0 ? (
-                  <option disabled>Cargando políticas...</option>
-                ) : (
-                  politicasDisponibles.map((politica) => (
-                    <option key={politica.id} value={politica.id}>
-                      {politica.nombre} ({politica.clave})
-                    </option>
-                  ))
-                )}
-              </select>
+              <div className="relative">
+                <select
+                  value={politicaId}
+                  onChange={(e) => setPoliticaId(e.target.value)}
+                  className="w-full px-4 py-2.5 pr-10 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400 bg-white cursor-pointer appearance-none"
+                >
+                  <option value="">Todas las políticas</option>
+                  {politicasDisponibles.length === 0 ? (
+                    <option disabled>Cargando políticas...</option>
+                  ) : (
+                    politicasDisponibles.map((politica) => (
+                      <option key={politica.id} value={politica.id}>
+                        {politica.nombre} ({politica.clave})
+                      </option>
+                    ))
+                  )}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
             <div className="flex items-end">
               <button

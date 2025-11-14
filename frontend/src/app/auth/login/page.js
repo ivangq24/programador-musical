@@ -8,7 +8,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState('login'); // 'login' | 'create-admin' | 'verify' | 'mfa-setup' | 'mfa-verify' | 'forgot-password' | 'reset-password' | 'new-password'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmPasswordValue, setConfirmPasswordValue] = useState('');
   const [name, setName] = useState('');
   const [nombreEmpresa, setNombreEmpresa] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -26,6 +26,21 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // Detectar si estamos en producción
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                        process.env.NEXT_PUBLIC_ENVIRONMENT === 'production';
+    
+    // Verificar si Cognito está configurado
+    const cognitoEnabled = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && 
+                          process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID !== '';
+    
+    // En producción, si Cognito no está configurado, mostrar error
+    if (isProduction && !cognitoEnabled) {
+      setError('Error de configuración: AWS Cognito no está configurado. Contacta al administrador del sistema.');
+      setLoading(false);
+      return;
+    }
+    
     // Verificar si ya está autenticado
     getCurrentUser()
       .then(() => {
@@ -49,17 +64,32 @@ export default function LoginPage() {
       setCheckingSetup(true);
       // Usar fetch directo para evitar problemas de autenticación
       const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      const response = await fetch(`${baseURL}/auth/check-setup`);
+      
+      // Construir URL correctamente
+      const url = baseURL.endsWith('/api/v1') 
+        ? `${baseURL}/auth/check-setup`
+        : `${baseURL}/api/v1/auth/check-setup`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // No incluir credenciales para este endpoint público
+        credentials: 'omit',
+      });
       
       if (!response.ok) {
-        throw new Error('Error al verificar configuración');
+        // Si hay error, asumir que no está configurado para permitir crear admin
+        setSetupComplete(false);
+        return;
       }
       
       const data = await response.json();
       setSetupComplete(data.setup_complete || false);
     } catch (err) {
-
       // Si falla, asumir que NO está configurado para mostrar la opción de crear admin
+      // Esto permite que el usuario pueda crear el primer admin incluso si hay problemas de conexión
       setSetupComplete(false);
     } finally {
       setCheckingSetup(false);
@@ -81,10 +111,44 @@ export default function LoginPage() {
         localStorage.setItem('idToken', tokens.idToken);
         localStorage.setItem('refreshToken', tokens.refreshToken);
         
+        // Verificar que el usuario existe en el backend (sincronización)
+        // Esto asegura que el usuario se cree en RDS si no existe
+        try {
+          const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+          const url = baseURL.endsWith('/api/v1') 
+            ? `${baseURL}/auth/me`
+            : `${baseURL}/api/v1/auth/me`;
+          
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `Bearer ${tokens.accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            // Si hay un error 500, puede ser un problema de sincronización
+            if (response.status === 500) {
+              const errorData = await response.json().catch(() => ({}));
+              if (errorData.detail && errorData.detail.includes('sincronizando')) {
+                setError('Tu cuenta se está sincronizando con la base de datos. Por favor, intenta iniciar sesión nuevamente en unos segundos.');
+                return;
+              }
+            }
+            // Otros errores se manejan normalmente
+            throw new Error('Error al verificar tu cuenta en el servidor');
+          }
+        } catch (backendError) {
+          // Si falla la verificación del backend pero Cognito funcionó,
+          // permitir continuar (el usuario se sincronizará en la próxima petición)
+          console.warn('Advertencia: No se pudo verificar el usuario en el backend:', backendError);
+        }
+        
         // Redirigir a la página principal
         router.push('/');
       } catch (err) {
-
+        // El error ya viene con un mensaje mejorado desde auth.js
+        const errorMessage = err.message || 'Error al iniciar sesión. Verifica tus credenciales.';
         
         // Manejar requerimientos de MFA
         if (err.message === 'MFA_SETUP_REQUIRED') {
@@ -105,8 +169,11 @@ export default function LoginPage() {
           setSuccess('Debes establecer una nueva contraseña para continuar.');
           setPassword('');
           // El email ya está en el estado, se usará para completeNewPasswordChallenge
+        } else if (errorMessage.includes('cambio de contraseña') || errorMessage.includes('FORCE_CHANGE_PASSWORD')) {
+          // Si el error sugiere cambio de contraseña, mostrar opción de recuperación
+          setError(errorMessage + ' O intenta usar la opción "¿Olvidaste tu contraseña?" para restablecer tu contraseña.');
         } else {
-          setError(err.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+          setError(errorMessage);
         }
       } finally {
         setLoading(false);
@@ -143,7 +210,7 @@ export default function LoginPage() {
       }
     } else if (mode === 'create-admin') {
       // Validar contraseñas
-      if (password !== confirmPassword) {
+      if (password !== confirmPasswordValue) {
         setError('Las contraseñas no coinciden');
         setLoading(false);
         return;
@@ -158,17 +225,21 @@ export default function LoginPage() {
 
       try {
         const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-        const response = await fetch(`${baseURL}/auth/create-first-admin`, {
+        const url = baseURL.endsWith('/api/v1') 
+          ? `${baseURL}/auth/create-first-admin`
+          : `${baseURL}/api/v1/auth/create-first-admin`;
+        
+        const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             email,
-ombre: name,
+            nombre: name,
             password,
-            confirm_password: confirmPassword,
-ombre_empresa: nombreEmpresa || null,
+            confirm_password: confirmPasswordValue,
+            nombre_empresa: nombreEmpresa || null,
             telefono: telefono || null,
             direccion: direccion || null,
             ciudad: ciudad || null,
@@ -181,8 +252,14 @@ ombre_empresa: nombreEmpresa || null,
           // Mejorar el mensaje de error para que sea más legible
           let errorMessage = data.detail || data.message || 'Error al crear el administrador';
           
-          // Si el error es sobre Cognito, formatearlo mejor y agregar instrucciones
-          if (errorMessage.includes('Cognito') || errorMessage.includes('AWS') || errorMessage.includes('credenciales')) {
+          // Si el error es sobre email ya registrado, dar instrucciones claras
+          if (errorMessage.includes('ya está registrado') || errorMessage.includes('already registered')) {
+            if (errorMessage.includes('Cognito')) {
+              errorMessage = 'Este email ya está registrado. Si olvidaste tu contraseña, usa la opción "¿Olvidaste tu contraseña?" en la página de login.';
+            } else {
+              errorMessage = 'Este email ya está registrado. Inicia sesión con tus credenciales o usa "¿Olvidaste tu contraseña?" si no las recuerdas.';
+            }
+          } else if (errorMessage.includes('Cognito') || errorMessage.includes('AWS') || errorMessage.includes('credenciales')) {
             errorMessage = errorMessage.replace(/\n/g, '<br>');
             errorMessage += '<br><br><strong>Alternativa:</strong> Puedes crear el administrador usando el script desde la terminal:<br><code>./aws/create-first-admin.sh tu-email@ejemplo.com "Tu Nombre" "TuPassword123!@#"</code>';
           }
@@ -205,7 +282,7 @@ ombre_empresa: nombreEmpresa || null,
             setMode('login');
             setSuccess('Cuenta creada. Por favor inicia sesión.');
             setPassword('');
-            setConfirmPassword('');
+            setConfirmPasswordValue('');
             setName('');
             setNombreEmpresa('');
             setTelefono('');
@@ -228,10 +305,11 @@ ombre_empresa: nombreEmpresa || null,
       // Solicitar reseteo de contraseña
       try {
         await forgotPassword(email);
-        setSuccess('Se ha enviado un link de recuperación a tu email. Revisa tu bandeja de entrada y haz clic en el link para restablecer tu contraseña.');
-        // No cambiar a reset-password, el usuario usará el link del email
+        setSuccess('✓ Código enviado. Revisa tu email (incluyendo spam) e ingresa el código de 6 dígitos en la siguiente pantalla.');
+        // Cambiar a reset-password para que el usuario ingrese el código
         setTimeout(() => {
-          setMode('login');
+          setMode('reset-password');
+          setSuccess('');
         }, 3000);
       } catch (err) {
 
@@ -241,7 +319,7 @@ ombre_empresa: nombreEmpresa || null,
       }
     } else if (mode === 'new-password') {
       // Establecer nueva contraseña (cambio de contraseña temporal)
-      if (password !== confirmPassword) {
+      if (password !== confirmPasswordValue) {
         setError('Las contraseñas no coinciden');
         setLoading(false);
         return;
@@ -277,7 +355,7 @@ ombre_empresa: nombreEmpresa || null,
           setTimeout(() => {
             setMode('login');
             setPassword('');
-            setConfirmPassword('');
+            setConfirmPasswordValue('');
             setError('Inicia sesión nuevamente con tu contraseña temporal para establecer tu nueva contraseña.');
           }, 3000);
         } else {
@@ -288,7 +366,7 @@ ombre_empresa: nombreEmpresa || null,
       }
     } else if (mode === 'reset-password') {
       // Confirmar nueva contraseña
-      if (password !== confirmPassword) {
+      if (password !== confirmPasswordValue) {
         setError('Las contraseñas no coinciden');
         setLoading(false);
         return;
@@ -306,7 +384,7 @@ ombre_empresa: nombreEmpresa || null,
         setTimeout(() => {
           setMode('login');
           setPassword('');
-          setConfirmPassword('');
+          setConfirmPasswordValue('');
           setVerificationCode('');
           setSuccess('');
         }, 2000);
@@ -359,8 +437,8 @@ ombre_empresa: nombreEmpresa || null,
                 {mode === 'create-admin' && 'Crea tu cuenta de administrador'}
                 {mode === 'verify' && 'Verifica tu email'}
                 {mode === 'new-password' && 'Establece tu nueva contraseña'}
-                {mode === 'forgot-password' && 'Recuperar contraseña'}
-                {mode === 'reset-password' && 'Nueva contraseña'}
+                {mode === 'forgot-password' && 'Ingresa tu email para recibir el código'}
+                {mode === 'reset-password' && 'Ingresa el código y tu nueva contraseña'}
                 {mode === 'mfa-setup' && 'Configurar autenticación de dos factores'}
                 {mode === 'mfa-verify' && 'Verificar código de autenticación'}
               </p>
@@ -504,8 +582,8 @@ ombre_empresa: nombreEmpresa || null,
                       <input
                         id="confirmPassword"
                         type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        value={confirmPasswordValue}
+                        onChange={(e) => setConfirmPasswordValue(e.target.value)}
                         required
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
                         placeholder="Repite tu contraseña"
@@ -535,14 +613,36 @@ ombre_empresa: nombreEmpresa || null,
                   />
                   <p className="mt-2 text-sm text-gray-600 text-center">
                     {mode === 'verify' 
-                      ? `Ingresa el código que enviamos a ${email}`
-                      : `Ingresa el código que enviamos a ${email} para resetear tu contraseña`
+                      ? `Ingresa el código de 6 dígitos que enviamos a ${email}`
+                      : `Revisa tu email ${email} e ingresa el código de 6 dígitos que recibiste`
                     }
                   </p>
                   {mode === 'verify' && (
                     <button
                       type="button"
                       onClick={handleResendCode}
+                      disabled={loading}
+                      className="mt-2 w-full text-sm text-blue-600 hover:text-blue-700 underline disabled:opacity-50"
+                    >
+                      Reenviar código
+                    </button>
+                  )}
+                  {mode === 'reset-password' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setLoading(true);
+                        setError('');
+                        try {
+                          await forgotPassword(email);
+                          setSuccess('Código reenviado. Revisa tu email.');
+                          setTimeout(() => setSuccess(''), 3000);
+                        } catch (err) {
+                          setError(err.message || 'Error al reenviar el código.');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
                       disabled={loading}
                       className="mt-2 w-full text-sm text-blue-600 hover:text-blue-700 underline disabled:opacity-50"
                     >
@@ -581,7 +681,7 @@ ombre_empresa: nombreEmpresa || null,
                     {mode === 'login' && 'Iniciando sesión...'}
                     {mode === 'create-admin' && 'Creando administrador...'}
                     {mode === 'verify' && 'Verificando...'}
-                    {mode === 'forgot-password' && 'Enviando código...'}
+                    {mode === 'forgot-password' && 'Enviando código de verificación...'}
                     {mode === 'reset-password' && 'Cambiando contraseña...'}
                     {mode === 'new-password' && 'Estableciendo contraseña...'}
                     {mode === 'mfa-setup' && 'Configurando MFA...'}
@@ -592,7 +692,7 @@ ombre_empresa: nombreEmpresa || null,
                     {mode === 'login' && 'Iniciar sesión'}
                     {mode === 'create-admin' && 'Crear Administrador'}
                     {mode === 'verify' && 'Verificar email'}
-                    {mode === 'forgot-password' && 'Enviar código'}
+                    {mode === 'forgot-password' && 'Enviar código de verificación'}
                     {mode === 'reset-password' && 'Cambiar contraseña'}
                     {mode === 'new-password' && 'Establecer contraseña'}
                     {mode === 'mfa-setup' && 'Confirmar MFA'}
@@ -602,33 +702,17 @@ ombre_empresa: nombreEmpresa || null,
               </button>
             </form>
 
-            {/* Enlace "Olvidé mi contraseña" (solo en login) */}
-            {mode === 'login' && (
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('forgot-password');
-                    setError('');
-                    setSuccess('');
-                    setPassword('');
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium underline"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
-            )}
-
             {/* Cambiar entre login y crear cuenta */}
             {!checkingSetup && mode !== 'verify' && mode !== 'forgot-password' && mode !== 'reset-password' && mode !== 'new-password' && (
               <div className="mt-6 text-center text-sm">
                 {mode === 'login' ? (
                   <>
-                    {setupComplete === false ? (
-                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                         <p className="text-gray-700 mb-3 font-medium">
-                          Bienvenido al sistema. Es la primera vez que accedes.
+                          {setupComplete === false 
+                            ? "Bienvenido al sistema. Crea tu cuenta de administrador para comenzar."
+                            : "Crea una cuenta de administrador para gestionar tu grupo de radiodifusoras."}
                         </p>
                         <button
                           type="button"
@@ -637,7 +721,7 @@ ombre_empresa: nombreEmpresa || null,
                             setError('');
                             setSuccess('');
                             setPassword('');
-                            setConfirmPassword('');
+                            setConfirmPasswordValue('');
                             setName('');
                             setNombreEmpresa('');
                             setTelefono('');
@@ -649,20 +733,23 @@ ombre_empresa: nombreEmpresa || null,
                           Crear cuenta de administrador
                         </button>
                       </div>
-                    ) : setupComplete === true ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setMode('forgot-password')}
-                          className="text-blue-600 hover:text-blue-700 text-sm underline"
-                        >
-                          ¿Olvidaste tu contraseña?
-                        </button>
-                        <p className="text-gray-600 text-sm mt-2">
-                          ¿Necesitas acceso? Contacta al administrador del sistema.
-                        </p>
-                      </>
-                    ) : null}
+                      {setupComplete === true && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMode('forgot-password');
+                              setError('');
+                              setSuccess('');
+                              setPassword('');
+                            }}
+                            className="text-blue-600 hover:text-blue-700 text-sm underline"
+                          >
+                            ¿Olvidaste tu contraseña?
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <p className="text-gray-600">
@@ -674,7 +761,7 @@ ombre_empresa: nombreEmpresa || null,
                         setError('');
                         setSuccess('');
                         setPassword('');
-                        setConfirmPassword('');
+                        setConfirmPasswordValue('');
                         setName('');
                       }}
                       className="text-blue-600 hover:text-blue-700 font-medium underline"
@@ -696,7 +783,7 @@ ombre_empresa: nombreEmpresa || null,
                     setError('');
                     setSuccess('');
                     setPassword('');
-                    setConfirmPassword('');
+                    setConfirmPasswordValue('');
                     setVerificationCode('');
                   }}
                   className="text-blue-600 hover:text-blue-700 font-medium underline"

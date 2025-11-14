@@ -17,19 +17,21 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   # Atributos personalizados
-  schema {
-    name                = "rol"
-    attribute_data_type = "String"
-    mutable             = true
-    required            = false
-  }
-
-  schema {
-    name                = "nombre"
-    attribute_data_type = "String"
-    mutable             = true
-    required            = false
-  }
+  # NOTA: No se pueden agregar atributos personalizados a un User Pool existente
+  # Si necesitas estos atributos, debes recrear el User Pool
+  # schema {
+  #   name                = "rol"
+  #   attribute_data_type = "String"
+  #   mutable             = true
+  #   required            = false
+  # }
+  #
+  # schema {
+  #   name                = "nombre"
+  #   attribute_data_type = "String"
+  #   mutable             = true
+  #   required            = false
+  # }
 
   # Configuración de MFA - OPCIONAL para desarrollo, puede cambiarse a "ON" para producción
   mfa_configuration = "OPTIONAL"
@@ -57,9 +59,10 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   # Configuración de seguridad avanzada (Anti-fraude)
-  user_pool_add_ons {
-    advanced_security_mode = "ENFORCED"  # Modo ENFORCED para máxima seguridad
-  }
+  # Comentado porque requiere tier PREMIUM, no disponible en ESSENTIALS
+  # user_pool_add_ons {
+  #   advanced_security_mode = "ENFORCED"  # Modo ENFORCED para máxima seguridad
+  # }
 
   # Configuración de protección contra ataques
   admin_create_user_config {
@@ -72,10 +75,10 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  # Configuración de verificación - Usar LINK como en Gmail/Facebook
+  # Configuración de verificación - Usar código como opción más simple
   verification_message_template {
-    default_email_option = "CONFIRM_WITH_LINK"
-    email_message        = "Haz clic en el siguiente link para verificar tu email: {##Verify Email##}"
+    default_email_option = "CONFIRM_WITH_CODE"
+    email_message        = "Tu código de verificación para Programador Musical es: {####}"
     email_subject        = "Verifica tu email - Programador Musical"
     sms_message          = "Tu código de verificación es {####}"
   }
@@ -107,18 +110,23 @@ resource "aws_cognito_user_pool_client" "web" {
   
   # Callback URLs - Solo URLs permitidas (whitelist)
   # Incluir URLs para OAuth y verificación de email
+  # Nota: Cognito solo permite HTTP para localhost, producción requiere HTTPS
   callback_urls = concat(
     [
       "http://localhost:3000/auth/callback",
       "http://127.0.0.1:3000/auth/callback",
       "http://localhost:3000/auth/verify-email",
-      "http://127.0.0.1:3000/auth/verify-email"
+      "http://127.0.0.1:3000/auth/verify-email",
+      "http://localhost:3000/",
+      "http://127.0.0.1:3000/"
     ],
     var.domain_name != "" ? [
       "https://${var.domain_name}/auth/callback",
       "https://www.${var.domain_name}/auth/callback",
       "https://${var.domain_name}/auth/verify-email",
-      "https://www.${var.domain_name}/auth/verify-email"
+      "https://www.${var.domain_name}/auth/verify-email",
+      "https://${var.domain_name}/",
+      "https://www.${var.domain_name}/"
     ] : []
   )
   
@@ -126,11 +134,15 @@ resource "aws_cognito_user_pool_client" "web" {
   logout_urls = concat(
     [
       "http://localhost:3000",
-      "http://127.0.0.1:3000"
+      "http://127.0.0.1:3000",
+      "http://localhost:3000/",
+      "http://127.0.0.1:3000/"
     ],
     var.domain_name != "" ? [
       "https://${var.domain_name}",
-      "https://www.${var.domain_name}"
+      "https://www.${var.domain_name}",
+      "https://${var.domain_name}/",
+      "https://www.${var.domain_name}/"
     ] : []
   )
   
@@ -146,19 +158,18 @@ resource "aws_cognito_user_pool_client" "web" {
   enable_token_revocation = true
   
   # Configuración de lectura de atributos
+  # Solo atributos estándar ya que no tenemos custom attributes
   read_attributes = [
     "email",
-    "name",
-    "custom:rol",
-    "custom:nombre"
+    "email_verified",
+    "name"
   ]
   
   # Configuración de escritura de atributos
+  # Solo atributos estándar ya que no tenemos custom attributes
   write_attributes = [
     "email",
-    "name",
-    "custom:rol",
-    "custom:nombre"
+    "name"
   ]
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Plus, Edit, Trash2, Search, X, CheckCircle, AlertCircle, FolderTree, Clock, Music, Filter } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, X, CheckCircle, AlertCircle, FolderTree, Clock, Music, Filter, ChevronDown } from 'lucide-react'
 import { listCategoriasStats, createCategoria, updateCategoria, deleteCategoria, getElementosCategoria } from '../../../../api'
 import { getDifusoras } from '../../../../api/catalogos'
 
@@ -193,7 +193,7 @@ ombre: cat.nombre || '',
       {/* Notification Component */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 ${
-otification.type === 'success'
+          notification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 text-red-800'
         }`}>
@@ -478,17 +478,20 @@ otification.type === 'success'
                         <label className="block text-sm font-bold text-gray-700 mb-2">
                           Difusora
                         </label>
-                        <select 
-                          disabled={mode==='consult'} 
-                          value={form.difusora} 
-                          onChange={e=>setForm({...form, difusora:e.target.value})} 
-                          className={inputClass}
-                        >
-                          <option value="">Seleccionar difusora</option>
-                          {Array.isArray(difusoras) && difusoras.map((d)=> (
-                            <option key={d.id||d.siglas} value={d.siglas||d.nombre}>{d.siglas || d.nombre}</option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select 
+                            disabled={mode==='consult'} 
+                            value={form.difusora} 
+                            onChange={e=>setForm({...form, difusora:e.target.value})} 
+                            className={`${inputClass} appearance-none pr-10 cursor-pointer`}
+                          >
+                            <option value="">Seleccionar difusora</option>
+                            {Array.isArray(difusoras) && difusoras.map((d)=> (
+                              <option key={d.id||d.siglas} value={d.siglas||d.nombre}>{d.siglas || d.nombre}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                        </div>
                       </div>
                       <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm md:mt-0 mt-4">
                         <input 

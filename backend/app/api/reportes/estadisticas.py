@@ -146,9 +146,14 @@ def get_base_filters(
         )
     )
     
-    # Filtrar por difusoras permitidas (a menos que sea admin)
-    if usuario_rol != "admin" and difusoras_allowed:
+    # Filtrar por difusoras permitidas (todos los usuarios, incluyendo admins)
+    # Cada admin solo ve las programaciones de sus propias difusoras asignadas (multi-tenancy)
+    if difusoras_allowed:
         query = query.filter(ProgramacionModel.difusora.in_(difusoras_allowed))
+    else:
+        # Si no tiene difusoras asignadas, retornar query vacío
+        # Esto asegura el aislamiento por organización
+        query = query.filter(False)  # Esto retorna 0 resultados
     
     if difusora:
         query = query.filter(ProgramacionModel.difusora == difusora)
@@ -221,11 +226,13 @@ async def get_estadisticas_categorias(
     difusora: Optional[str] = Query(None),
     politica_id: Optional[int] = Query(None),
     limite: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtiene estadísticas por categoría"""
+    """Obtiene estadísticas por categoría (solo de la organización del usuario)"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id)
+        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id, difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol)
         eventos = query.filter(ProgramacionModel.categoria.isnot(None)).all()
         
         # Agrupar por categoría
@@ -271,11 +278,13 @@ async def get_estadisticas_canciones(
     politica_id: Optional[int] = Query(None),
     categoria: Optional[str] = Query(None),
     limite: int = Query(100, ge=1, le=500),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtiene estadísticas por canción"""
+    """Obtiene estadísticas por canción (solo de la organización del usuario)"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id)
+        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id, difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol)
         query = query.filter(ProgramacionModel.mc == True).filter(
             ProgramacionModel.categoria != 'Corte Comercial'
         ).filter(ProgramacionModel.categoria != 'ETM').filter(ProgramacionModel.id_media.isnot(None))
@@ -332,11 +341,13 @@ async def get_estadisticas_artistas(
     difusora: Optional[str] = Query(None),
     politica_id: Optional[int] = Query(None),
     limite: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtiene estadísticas por artista"""
+    """Obtiene estadísticas por artista (solo de la organización del usuario)"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id)
+        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id, difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol)
         query = query.filter(ProgramacionModel.mc == True).filter(
             ProgramacionModel.categoria != 'Corte Comercial'
         ).filter(ProgramacionModel.categoria != 'ETM').filter(ProgramacionModel.interprete.isnot(None))
@@ -386,11 +397,13 @@ async def get_estadisticas_albums(
     difusora: Optional[str] = Query(None),
     politica_id: Optional[int] = Query(None),
     limite: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtiene estadísticas por álbum"""
+    """Obtiene estadísticas por álbum (solo de la organización del usuario)"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id)
+        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id, difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol)
         query = query.filter(ProgramacionModel.mc == True).filter(
             ProgramacionModel.categoria != 'Corte Comercial'
         ).filter(ProgramacionModel.categoria != 'ETM').filter(ProgramacionModel.disco.isnot(None))
@@ -484,11 +497,13 @@ async def get_distribucion_dia_semana(
     fecha_fin: Optional[date] = Query(None),
     difusora: Optional[str] = Query(None),
     politica_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtiene distribución de eventos por día de la semana"""
+    """Obtiene distribución de eventos por día de la semana (solo de la organización del usuario)"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id)
+        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, politica_id, difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol)
         eventos = query.all()
         
         dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -525,11 +540,13 @@ async def get_distribucion_dia_semana(
 async def get_estadisticas_difusoras(
     fecha_inicio: Optional[date] = Query(None),
     fecha_fin: Optional[date] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtiene estadísticas por difusora"""
+    """Obtiene estadísticas por difusora (solo de la organización del usuario)"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin)
+        query = get_base_filters(db, fecha_inicio, fecha_fin, difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol)
         eventos = query.all()
         
         # Agrupar por difusora
@@ -571,11 +588,13 @@ async def get_estadisticas_politicas(
     fecha_inicio: Optional[date] = Query(None),
     fecha_fin: Optional[date] = Query(None),
     difusora: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtiene estadísticas por política"""
+    """Obtiene estadísticas por política (solo de la organización del usuario)"""
     try:
-        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, None)
+        query = get_base_filters(db, fecha_inicio, fecha_fin, difusora, None, difusoras_allowed=difusoras_allowed, usuario_rol=usuario.rol)
         query = query.filter(ProgramacionModel.politica_id.isnot(None))
         eventos = query.all()
         

@@ -51,8 +51,9 @@ async def generar_programacion_completa(
                 detail="No se proporcionaron días modelo para generar la programación"
             )
         
-        # Verificar que el usuario tenga acceso a la difusora
-        if usuario.rol != "admin" and difusora not in difusoras_allowed:
+        # Verificar que el usuario tenga acceso a la difusora (todos los usuarios, incluyendo admins)
+        # Cada admin solo puede generar programación para sus propias difusoras asignadas
+        if difusora not in difusoras_allowed:
             raise HTTPException(
                 status_code=403,
                 detail=f"No tienes permiso para generar programación para la difusora {difusora}"
@@ -1530,10 +1531,30 @@ async def obtener_programacion_detallada(
     difusora: str = Query(..., description="Difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato DD/MM/YYYY"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Obtener programación detallada para un día específico"""
+    """Obtener programación detallada para un día específico (solo de las difusoras del usuario)"""
     try:
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para acceder a la programación de la difusora {difusora}"
+            )
+        
+        # Verificar que la política pertenece a la difusora del usuario
+        from app.models.programacion import PoliticaProgramacion as PoliticaProgramacionModel
+        politica = db.query(PoliticaProgramacionModel).filter(
+            PoliticaProgramacionModel.id == politica_id,
+            PoliticaProgramacionModel.difusora == difusora
+        ).first()
+        if not politica:
+            raise HTTPException(
+                status_code=404,
+                detail="Política no encontrada o no pertenece a esta difusora"
+            )
         # Convertir fecha
         fecha_dt = datetime.strptime(fecha, "%d/%m/%Y").date()
         
@@ -1626,10 +1647,18 @@ async def generar_logfile(
     difusora: str = Query(..., description="Difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato DD/MM/YYYY"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
-    """Generar log file para un día específico"""
+    """Generar log file para un día específico (solo de las difusoras del usuario)"""
     try:
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para generar logfile de la difusora {difusora}"
+            )
         from app.services.programacion.logfiles_service import LogfilesService
         
         # Crear instancia del servicio
@@ -1669,13 +1698,20 @@ async def eliminar_programacion(
     difusora: str = Query(..., description="Nombre de la difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato YYYY-MM-DD"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
     """
-    Eliminar programación para una fecha específica
+    Eliminar programación para una fecha específica (solo de las difusoras del usuario)
     """
     try:
-
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para eliminar programación de la difusora {difusora}"
+            )
         
         # Buscar la programación a eliminar
         programacion = db.query(ProgramacionModel).filter(
@@ -1707,13 +1743,20 @@ async def generar_carta_tiempo(
     difusora: str = Query(..., description="Nombre de la difusora"),
     politica_id: int = Query(..., description="ID de la política"),
     fecha: str = Query(..., description="Fecha en formato YYYY-MM-DD"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
     """
-    Generar carta de tiempo para una fecha específica
+    Generar carta de tiempo para una fecha específica (solo de las difusoras del usuario)
     """
     try:
-
+        # Verificar que el usuario tenga acceso a la difusora
+        if difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para generar carta de tiempo de la difusora {difusora}"
+            )
         
         # Buscar la programación
         programacion = db.query(ProgramacionModel).filter(
@@ -1747,14 +1790,14 @@ async def generar_carta_tiempo(
 async def actualizar_cancion_programacion(
     programacion_id: int,
     cancion_id: int = Query(..., description="ID de la nueva canción"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_current_user),
+    difusoras_allowed: list = Depends(get_user_difusoras)
 ):
     """
-    Actualizar la canción asignada a una entrada de programación
+    Actualizar la canción asignada a una entrada de programación (solo de las difusoras del usuario)
     """
     try:
-
-        
         # Buscar la entrada de programación
         programacion_entry = db.query(ProgramacionModel).filter(
             ProgramacionModel.id == programacion_id
@@ -1763,11 +1806,28 @@ async def actualizar_cancion_programacion(
         if not programacion_entry:
             raise HTTPException(status_code=404, detail="Entrada de programación no encontrada")
         
-        # Buscar la nueva canción
+        # Verificar que el usuario tenga acceso a la difusora de la programación
+        if programacion_entry.difusora not in difusoras_allowed:
+            raise HTTPException(
+                status_code=403,
+                detail=f"No tienes permiso para actualizar programación de la difusora {programacion_entry.difusora}"
+            )
+        
+        # Buscar la nueva canción y verificar que pertenece a una categoría de las difusoras del usuario
+        from app.models.categorias import Categoria
         cancion = db.query(CancionModel).filter(CancionModel.id == cancion_id).first()
         
         if not cancion:
             raise HTTPException(status_code=404, detail="Canción no encontrada")
+        
+        # Verificar que la categoría de la canción pertenece a una difusora del usuario
+        if cancion.categoria_id:
+            categoria = db.query(Categoria).filter(Categoria.id == cancion.categoria_id).first()
+            if categoria and categoria.difusora not in difusoras_allowed:
+                raise HTTPException(
+                    status_code=403,
+                    detail="No tienes permiso para usar esta canción (pertenece a otra organización)"
+                )
         
         # Actualizar los campos de la programación con los datos de la nueva canción
         programacion_entry.id_media = str(cancion.id)

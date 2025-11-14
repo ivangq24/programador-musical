@@ -231,7 +231,7 @@ export default function Difusoras({ onDifusoraSelect }) {
       {/* Notification Component - Outside main container to ensure it's always on top */}
       {notification && (
         <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 ${
-otification.type === 'success'
+          notification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 text-green-800'
             : 'bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-300 text-red-800'
         }`}>
@@ -593,7 +593,7 @@ const DifusoraForm = React.memo(function DifusoraForm({ difusora, mode, onSave, 
 
   const [formData, setFormData] = useState({
     siglas: difusora?.siglas || '',
-ombre: difusora?.nombre || '',
+    nombre: difusora?.nombre || '',
     slogan: difusora?.slogan || '',
     orden: difusora?.orden?.toString() || '',
     mascaraMedidas: difusora?.mascara_medidas || difusora?.mascaraMedidas || '',
@@ -611,17 +611,17 @@ ombre: difusora?.nombre || '',
     const newErrors = {};
     
     if (!formData.siglas || formData.siglas.trim() === '') {
-ewErrors.siglas = 'Las siglas son obligatorias';
+      newErrors.siglas = 'Las siglas son obligatorias';
     }
     
     if (!formData.nombre || formData.nombre.trim() === '') {
-ewErrors.nombre = 'El nombre es obligatorio';
+      newErrors.nombre = 'El nombre es obligatorio';
     }
     
     if (!formData.orden || formData.orden.trim() === '') {
-ewErrors.orden = 'El orden es obligatorio';
+      newErrors.orden = 'El orden es obligatorio';
     } else if (isNaN(parseInt(formData.orden))) {
-ewErrors.orden = 'El orden debe ser un número';
+      newErrors.orden = 'El orden debe ser un número';
     }
     
     setErrors(newErrors);
@@ -716,7 +716,7 @@ ewErrors.orden = 'El orden debe ser un número';
             <div className="flex items-center space-x-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors shadow-sm">
               <input
                 type="checkbox"
-ame="activa"
+                name="activa"
                 checked={formData.activa}
                 onChange={handleChange}
                 disabled={isReadOnly}
@@ -734,7 +734,7 @@ ame="activa"
                   </label>
                   <input
                     type="text"
-ame="siglas"
+                    name="siglas"
                     value={formData.siglas}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -756,7 +756,7 @@ ame="siglas"
                   </label>
                   <input
                     type="text"
-ame="nombre"
+                    name="nombre"
                     value={formData.nombre}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -778,7 +778,7 @@ ame="nombre"
                   </label>
                   <input
                     type="text"
-ame="slogan"
+                    name="slogan"
                     value={formData.slogan}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -793,7 +793,7 @@ ame="slogan"
                   </label>
                   <input
                     type="number"
-ame="orden"
+                    name="orden"
                     value={formData.orden}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -816,7 +816,7 @@ ame="orden"
                   </label>
                   <input
                     type="text"
-ame="mascaraMedidas"
+                    name="mascaraMedidas"
                     value={formData.mascaraMedidas}
                     onChange={handleChange}
                     readOnly={isReadOnly}
@@ -830,7 +830,7 @@ ame="mascaraMedidas"
                     Descripción
                   </label>
                   <textarea
-ame="descripcion"
+                    name="descripcion"
                     value={formData.descripcion}
                     onChange={handleChange}
                     readOnly={isReadOnly}

@@ -108,7 +108,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class FirstAdminCreate(BaseModel):
-    """Schema para crear el primer administrador"""
+    """Schema para crear una cuenta de administrador"""
     email: EmailStr
     nombre: str
     password: str
@@ -117,4 +117,17 @@ class FirstAdminCreate(BaseModel):
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     ciudad: Optional[str] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Schema para solicitar recuperación de contraseña"""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema para restablecer contraseña con código"""
+    email: EmailStr
+    code: str
+    new_password: str
+    confirm_password: str
 

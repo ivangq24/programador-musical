@@ -10,17 +10,17 @@ import { DateRangePicker } from 'react-date-range'
 import 'react-date-range/dist/styles.css'
 import 'react-date-range/dist/theme/default.css'
 import '../../../../styles/dateRangePicker.css'
-import { 
-  Calendar, 
-  RefreshCw, 
-  Play, 
-  Edit, 
-  Search, 
-  Trash2, 
-  FileText, 
-  Layers, 
-  ChevronUp, 
-  Filter, 
+import {
+  Calendar,
+  RefreshCw,
+  Play,
+  Edit,
+  Search,
+  Trash2,
+  FileText,
+  Layers,
+  ChevronUp,
+  Filter,
   Download,
   Settings,
   Clock,
@@ -99,7 +99,7 @@ export default function GenerarProgramacionComponent() {
   // Auto-hide notification
   useEffect(() => {
     if (!notification) return
-    
+
     const timer = setTimeout(() => {
       setNotification(null)
     }, 5000)
@@ -109,7 +109,7 @@ export default function GenerarProgramacionComponent() {
   // Close date picker when clicking outside
   useEffect(() => {
     if (!showDatePicker) return
-    
+
     const handleClickOutside = (event) => {
       if (datePickerRef.current && !datePickerRef.current.contains(event.target)) {
         setShowDatePicker(false)
@@ -124,7 +124,7 @@ export default function GenerarProgramacionComponent() {
   const handleDateRangeChange = useCallback((ranges) => {
     const { startDate, endDate } = ranges.selection
     setDateRange([ranges.selection])
-    
+
     // Convert to YYYY-MM-DD format
     const formatDate = (date) => {
       const year = date.getFullYear()
@@ -132,7 +132,7 @@ export default function GenerarProgramacionComponent() {
       const day = String(date.getDate()).padStart(2, '0')
       return `${year}-${month}-${day}`
     }
-    
+
     setFechaInicio(formatDate(startDate))
     setFechaFin(formatDate(endDate))
   }, [])
@@ -145,8 +145,8 @@ export default function GenerarProgramacionComponent() {
     if (!difusora) {
       return politicas // Show all if no difusora selected
     }
-    
-    return politicas.filter(p => 
+
+    return politicas.filter(p =>
       p.difusora === difusora || p.difusora === 'TODAS'
     )
   }, [difusora, politicas])
@@ -159,19 +159,19 @@ export default function GenerarProgramacionComponent() {
   // Format date range for display - Memoizado (debe definirse antes de getDateRangeDisplay)
   const dateRangeDisplay = useMemo(() => {
     if (!fechaInicio || !fechaFin) return 'Seleccionar fechas'
-    
+
     const formatDisplayDate = (dateStr) => {
       const [year, month, day] = dateStr.split('-')
       return `${day}/${month}/${year}`
     }
-    
+
     const inicio = formatDisplayDate(fechaInicio)
     const fin = formatDisplayDate(fechaFin)
-    
+
     if (inicio === fin) {
       return inicio
     }
-    
+
     return `${inicio} - ${fin}`
   }, [fechaInicio, fechaFin])
 
@@ -185,28 +185,19 @@ export default function GenerarProgramacionComponent() {
     try {
       setLoadingDifusoras(true)
       setError(null)
-      
+
       // Import the API function dynamically to avoid circular dependencies
       const { getDifusoras } = await import('../../../../api/catalogos/generales/difusorasApi')
       const data = await getDifusoras({ activa: true }) // Only load active difusoras
-      
+
       setDifusoras(data)
-      
-      // Set first difusora as default if none selected - usar callback para evitar dependencia
-      if (data.length > 0) {
-        setDifusora(prev => {
-          // Solo actualizar si no hay una seleccionada
-          if (!prev) {
-            return data[0].siglas
-          }
-          return prev
-        })
-      }
+
+      // No establecer valor por defecto - el usuario debe seleccionar manualmente
     } catch (err) {
 
       setError(`Error al cargar difusoras: ${err.message}`)
       showNotification(`Error al cargar difusoras: ${err.message}`, 'error')
-      
+
       // No usar datos fallback - mantener array vacío en caso de error
       setDifusoras([])
     } finally {
@@ -219,7 +210,7 @@ export default function GenerarProgramacionComponent() {
     try {
       setLoadingPoliticas(true)
       setError(null)
-      
+
       // Usar apiClient que incluye el token de autenticación
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const headers = {
@@ -229,13 +220,13 @@ export default function GenerarProgramacionComponent() {
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
       const url = buildApiUrl('/programacion/politicas/')
       const response = await fetch(url, {
         cache: 'no-store',
         headers: headers
       })
-      
+
       if (!response.ok) {
         if (response.status === 403) {
           throw new Error('No tienes permisos para acceder a las políticas. Por favor, inicia sesión.');
@@ -243,14 +234,14 @@ export default function GenerarProgramacionComponent() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `Error al cargar políticas: ${response.status}`);
       }
-      
+
       const data = await response.json()
       setPoliticas(data)
     } catch (err) {
 
       setError(`Error al cargar políticas: ${err.message}`)
       showNotification(`Error al cargar políticas: ${err.message}`, 'error')
-      
+
       // No usar datos fallback - mantener array vacío en caso de error
       setPoliticas([])
     } finally {
@@ -263,16 +254,11 @@ export default function GenerarProgramacionComponent() {
   const loadDiasModelo = useCallback(async () => {
     try {
       if (!politica) {
-        // Si no hay política seleccionada, usar datos por defecto
-        const defaultDiasModelo = [
-          { id: 1, clave: 'DIA_LABORAL', nombre: 'Día Laboral', descripcion: 'Día modelo para días laborales' },
-          { id: 2, clave: 'FIN_SEMANA', nombre: 'Fin de Semana', descripcion: 'Día modelo para fines de semana' },
-          { id: 3, clave: 'DIA_GENERAL', nombre: 'Día General', descripcion: 'Día modelo general' }
-        ]
-        setDiasModelo(defaultDiasModelo)
+        // Si no hay política seleccionada, limpiar días modelo
+        setDiasModelo([])
         return
       }
-      
+
       // Consultar días modelo de la política seleccionada
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const headers = {
@@ -282,13 +268,13 @@ export default function GenerarProgramacionComponent() {
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
       const url = buildApiUrl(`/programacion/politicas/${politica}/dias-modelo`)
       const response = await fetch(url, {
         cache: 'no-store',
         headers: headers
       })
-      
+
       if (!response.ok) {
         if (response.status === 403) {
           throw new Error('No tienes permisos para acceder a los días modelo. Por favor, inicia sesión.');
@@ -296,7 +282,7 @@ export default function GenerarProgramacionComponent() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `Error al cargar días modelo: ${response.status}`);
       }
-      
+
       const diasModelo = await response.json()
       if (diasModelo && diasModelo.length > 0) {
         setDiasModelo(diasModelo)
@@ -309,27 +295,19 @@ export default function GenerarProgramacionComponent() {
           return prev
         })
       } else {
-        // Si no hay días modelo en la DB, usar datos por defecto
-        const defaultDiasModelo = [
-          { id: 1, clave: 'DIA_LABORAL', nombre: 'Día Laboral', descripcion: 'Día modelo para días laborales' },
-          { id: 2, clave: 'FIN_SEMANA', nombre: 'Fin de Semana', descripcion: 'Día modelo para fines de semana' },
-          { id: 3, clave: 'DIA_GENERAL', nombre: 'Día General', descripcion: 'Día modelo general' }
-        ]
-        setDiasModelo(defaultDiasModelo)
+        // Si no hay días modelo en la DB, mostrar lista vacía
+        // El usuario debe crear días modelo primero
+        setDiasModelo([])
+        showNotification('Esta política no tiene días modelo configurados. Por favor, crea días modelo primero.', 'warning')
       }
-      
+
     } catch (err) {
-
-      // Fallback a datos por defecto en caso de error
-      const defaultDiasModelo = [
-        { id: 1, clave: 'DIA_LABORAL', nombre: 'Día Laboral', descripcion: 'Día modelo para días laborales' },
-        { id: 2, clave: 'FIN_SEMANA', nombre: 'Fin de Semana', descripcion: 'Día modelo para fines de semana' },
-        { id: 3, clave: 'DIA_GENERAL', nombre: 'Día General', descripcion: 'Día modelo general' }
-      ]
-      setDiasModelo(defaultDiasModelo)
-
+      console.error('Error cargando días modelo:', err)
+      // En caso de error, mostrar lista vacía
+      setDiasModelo([])
+      showNotification(err.message || 'Error al cargar días modelo', 'error')
     }
-  }, [politica]) // Removida dependencia de selectedDiaModelo para evitar ciclo infinito
+  }, [politica, showNotification]) // Removida dependencia de selectedDiaModelo para evitar ciclo infinito
 
   // Función para determinar el día modelo por defecto según el día de la semana - Memoizada
   const getDiaModeloPorDefecto = useCallback((diaSemana) => {
@@ -340,7 +318,7 @@ export default function GenerarProgramacionComponent() {
     // Mapeo de días de la semana a días modelo por defecto
     const mapeoDias = {
       'Lunes': 'Día Laboral',
-      'Martes': 'Día Laboral', 
+      'Martes': 'Día Laboral',
       'Miércoles': 'Día Laboral',
       'Jueves': 'Día Laboral',
       'Viernes': 'Día Laboral',
@@ -349,10 +327,10 @@ export default function GenerarProgramacionComponent() {
     }
 
     const diaModeloPorDefecto = mapeoDias[diaSemana]
-    
+
     // Buscar el día modelo que coincida con el nombre por defecto
-    const diaModeloEncontrado = diasModelo.find(dia => 
-      dia.nombre === diaModeloPorDefecto || 
+    const diaModeloEncontrado = diasModelo.find(dia =>
+      dia.nombre === diaModeloPorDefecto ||
       dia.clave === 'DIA_LABORAL' && (diaSemana === 'Lunes' || diaSemana === 'Martes' || diaSemana === 'Miércoles' || diaSemana === 'Jueves' || diaSemana === 'Viernes') ||
       dia.clave === 'FIN_SEMANA' && (diaSemana === 'Sábado' || diaSemana === 'Domingo')
     )
@@ -365,19 +343,19 @@ export default function GenerarProgramacionComponent() {
     try {
       setLoading(true)
       setError(null)
-      
+
       if (!difusora) {
         throw new Error('Debe seleccionar una difusora')
       }
-      
 
-      
+
+
       // Convertir fechas de YYYY-MM-DD a DD/MM/YYYY para el backend
       const convertirFecha = (fechaYYYYMMDD) => {
         const [year, month, day] = fechaYYYYMMDD.split('-')
         return `${day}/${month}/${year}`
       }
-      
+
       // Llamar a la API para obtener días de programación con las fechas seleccionadas
       const params = new URLSearchParams({
         fecha_inicio: convertirFecha(fechaInicio),
@@ -386,7 +364,7 @@ export default function GenerarProgramacionComponent() {
         ...(politica && { politica_id: politica }),
         _t: Date.now() // Timestamp para evitar caché
       })
-      
+
       // Agregar token de autenticación
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const headers = {
@@ -396,13 +374,13 @@ export default function GenerarProgramacionComponent() {
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
       const url = buildApiUrl(`/programacion/dias-simple?${params}`)
       const response = await fetch(url, {
         cache: 'no-store',
         headers: headers
       })
-      
+
       if (!response.ok) {
         if (response.status === 403) {
           throw new Error('No tienes permisos para acceder a los días. Por favor, inicia sesión.');
@@ -410,15 +388,15 @@ export default function GenerarProgramacionComponent() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `Error al cargar días: ${response.status}`);
       }
-      
+
       const data = await response.json()
-      
+
       if (response.ok) {
         // Convertir datos de la API al formato esperado por el componente
         const diasConvertidos = data.dias.map((dia, index) => {
 
 
-          
+
           // Usar el día modelo que viene del backend si ya existe programación
           // Si no hay programación, usar el día modelo por defecto de la política
           let diaModeloAsignado = ''
@@ -434,7 +412,7 @@ export default function GenerarProgramacionComponent() {
           }
           // Si no hay programación, NO asignar automáticamente
           // El usuario debe seleccionar explícitamente el día modelo
-          
+
           return {
             id: index + 1,
             fecha: dia.fecha,
@@ -452,7 +430,7 @@ export default function GenerarProgramacionComponent() {
             genre: 'Mixed'
           };
         })
-        
+
         // Limpiar datos antiguos antes de cargar nuevos para liberar memoria
         setProgramacionData([])
         // Usar setTimeout para permitir que el garbage collector limpie
@@ -463,7 +441,7 @@ export default function GenerarProgramacionComponent() {
           setSelectedDays(0)
           setCurrentPage(1)
         }, 0)
-        
+
         if (showNotificationParam) {
           showNotification(`Días cargados correctamente: ${diasConvertidos.length} días`, 'success')
         }
@@ -474,7 +452,7 @@ export default function GenerarProgramacionComponent() {
       } else {
         throw new Error(data.detail || 'Error al cargar días')
       }
-      
+
     } catch (err) {
 
       setError(err.message)
@@ -519,7 +497,7 @@ export default function GenerarProgramacionComponent() {
   useEffect(() => {
     if (difusora && politica) {
       const currentPoliticaExists = filteredPoliticas.some(p => p.id === parseInt(politica))
-      
+
       if (!currentPoliticaExists) {
 
         setPolitica('')
@@ -579,14 +557,14 @@ export default function GenerarProgramacionComponent() {
   const handleGenerarProgramacion = useCallback(async () => {
     try {
       setLoading(true)
-      
+
       // Verificar que hay filas seleccionadas
       const filasSeleccionadas = programacionData.filter(row => row.selected)
       if (filasSeleccionadas.length === 0) {
         showNotification('Debe seleccionar al menos un día para generar programación', 'warning')
         return
       }
-      
+
       // Verificar que todos los días seleccionados tengan un día modelo asignado
       const diasSinDiaModelo = filasSeleccionadas.filter(row => !row.diaModelo || row.diaModelo.trim() === '')
       if (diasSinDiaModelo.length > 0) {
@@ -595,10 +573,10 @@ export default function GenerarProgramacionComponent() {
         setLoading(false)
         return
       }
-      
+
       // Verificar si hay días con programación existente
       const diasConProgramacionExistente = filasSeleccionadas.filter(row => row.status === 'Con Programación')
-      
+
       if (diasConProgramacionExistente.length > 0) {
         // Mostrar modal de confirmación
         setDiasConProgramacion(diasConProgramacionExistente)
@@ -606,30 +584,30 @@ export default function GenerarProgramacionComponent() {
         setLoading(false)
         return
       }
-      
+
       // Convertir fechas de YYYY-MM-DD a DD/MM/YYYY para el backend
       const convertirFecha = (fechaYYYYMMDD) => {
         const [year, month, day] = fechaYYYYMMDD.split('-')
         return `${day}/${month}/${year}`
       }
-      
+
       const params = new URLSearchParams({
         difusora: difusora,
         politica_id: politica,
         fecha_inicio: convertirFecha(fechaInicio),
         fecha_fin: convertirFecha(fechaFin)
       })
-      
+
       // Preparar los días modelo seleccionados para enviar al backend
       const diasModeloSeleccionados = filasSeleccionadas.map(dia => {
         let diaModeloNombre = dia.diaModelo
-        if ((!diaModeloNombre || diaModeloNombre.trim()==='') && selectedDiaModelo) {
+        if ((!diaModeloNombre || diaModeloNombre.trim() === '') && selectedDiaModelo) {
           const dm = diasModelo.find(d => d.id.toString() === selectedDiaModelo)
           if (dm) diaModeloNombre = dm.nombre
         }
         return { fecha: dia.fecha, dia_modelo: diaModeloNombre }
       })
-      
+
       // Agregar token de autenticación
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const headers = {
@@ -638,7 +616,7 @@ export default function GenerarProgramacionComponent() {
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
       const url = buildApiUrl(`/programacion/generar-programacion-completa?${params}`)
       const response = await fetch(url, {
         method: 'POST',
@@ -647,7 +625,7 @@ export default function GenerarProgramacionComponent() {
           dias_modelo: diasModeloSeleccionados
         })
       })
-      
+
       if (!response.ok) {
         if (response.status === 403) {
           throw new Error('No tienes permisos para generar programación. Por favor, inicia sesión.');
@@ -655,9 +633,9 @@ export default function GenerarProgramacionComponent() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `Error al generar programación: ${response.status}`);
       }
-      
+
       const result = await response.json()
-      
+
       if (result.dias_generados === 0) {
         // Si no se generó ningún día, mostrar detalles de los errores
         const errores = result.dias_procesados?.filter(d => !d.generado) || []
@@ -670,12 +648,12 @@ export default function GenerarProgramacionComponent() {
             }
             erroresResumen[status].push(dia.fecha)
           })
-          
+
           let mensaje = 'No se generó programación para ningún día.\n\n'
           Object.keys(erroresResumen).forEach(status => {
             mensaje += `${status}: ${erroresResumen[status].join(', ')}\n`
           })
-          
+
           showNotification(mensaje, 'error')
         } else {
           showNotification('No se generó programación para ningún día. Verifica que los días seleccionados tengan día modelo asignado.', 'error')
@@ -683,14 +661,14 @@ export default function GenerarProgramacionComponent() {
       } else {
         showNotification(`Programación generada: ${result.dias_generados} días`, 'success')
       }
-      
+
       // Recargar la lista de días para mostrar los cambios
       await handleCargarDias(false)
 
-      
+
       // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
       // await cargarEstadisticasProgramacion()
-      
+
     } catch (err) {
 
       showNotification(`Error al generar programación: ${err.message}`, 'error')
@@ -704,35 +682,35 @@ export default function GenerarProgramacionComponent() {
     try {
       setLoading(true)
       setShowOverwriteModal(false)
-      
+
       // Convertir fechas de YYYY-MM-DD a DD/MM/YYYY para el backend
       const convertirFecha = (fechaYYYYMMDD) => {
         const [year, month, day] = fechaYYYYMMDD.split('-')
         return `${day}/${month}/${year}`
       }
-      
+
       const params = new URLSearchParams({
         difusora: difusora,
         politica_id: politica,
         fecha_inicio: convertirFecha(fechaInicio),
         fecha_fin: convertirFecha(fechaFin)
       })
-      
+
       // Obtener las filas seleccionadas
       const filasSeleccionadas = programacionData.filter(row => row.selected)
-      
+
       // Preparar los días modelo seleccionados para enviar al backend
 
 
 
-      
+
       const diasModeloSeleccionados = filasSeleccionadas.map(dia => {
         // Si se seleccionó un día modelo diferente en el modal, usar ese
         // Si no, usar el día modelo actual de la fila
         let diaModeloNombre = dia.diaModelo
-        
 
-        
+
+
         if (selectedDiaModelo && selectedDiaModelo !== '') {
 
           const diaModeloSeleccionado = diasModelo.find(dm => dm.id.toString() === selectedDiaModelo)
@@ -744,16 +722,16 @@ export default function GenerarProgramacionComponent() {
         } else {
 
         }
-        
+
         return {
           fecha: dia.fecha,
           dia_modelo: diaModeloNombre
         }
       })
-      
 
 
-      
+
+
       // Agregar token de autenticación
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       const headers = {
@@ -762,7 +740,7 @@ export default function GenerarProgramacionComponent() {
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
       const url = buildApiUrl(`/programacion/generar-programacion-completa?${params}`)
       const response = await fetch(url, {
         method: 'POST',
@@ -771,23 +749,23 @@ export default function GenerarProgramacionComponent() {
           dias_modelo: diasModeloSeleccionados
         })
       })
-      
+
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`)
       }
-      
+
       const result = await response.json()
-      
+
       showNotification(`Programación regenerada: ${result.dias_generados} días`, 'success')
-      
+
       // Recargar la lista de días para mostrar los cambios
 
       await handleCargarDias(false)
 
-      
+
       // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
       // await cargarEstadisticasProgramacion()
-      
+
     } catch (err) {
 
       showNotification(`Error al regenerar programación: ${err.message}`, 'error')
@@ -822,7 +800,7 @@ export default function GenerarProgramacionComponent() {
     }
 
     const filaSeleccionada = filasSeleccionadas[0]
-    
+
     // Verificar que el día tiene programación
     if (filaSeleccionada.status !== 'Con Programación') {
       showNotification('Solo se pueden editar días que ya tienen programación', 'warning')
@@ -830,11 +808,11 @@ export default function GenerarProgramacionComponent() {
     }
 
 
-    
+
     // Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para la consulta
     const [dia, mes, año] = filaSeleccionada.fecha.split('/')
     const fechaParaEdicion = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
-    
+
 
     setFechaConsultar(fechaParaEdicion)
     setShowConsultarModal(true)
@@ -847,16 +825,16 @@ export default function GenerarProgramacionComponent() {
       showNotification('Debe seleccionar al menos un día para consultar', 'warning')
       return
     }
-    
+
     if (filasSeleccionadas.length > 1) {
       showNotification('Solo puede consultar un día a la vez', 'warning')
       return
     }
-    
+
     const filaSeleccionada = filasSeleccionadas[0]
 
 
-    
+
     // Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para el componente de consulta
     let fechaParaConsulta
     if (filaSeleccionada.fecha && filaSeleccionada.fecha.includes('/')) {
@@ -865,7 +843,7 @@ export default function GenerarProgramacionComponent() {
     } else {
       fechaParaConsulta = filaSeleccionada.fecha
     }
-    
+
 
     setFechaConsultar(fechaParaConsulta)
     setShowConsultarModal(true)
@@ -883,17 +861,17 @@ export default function GenerarProgramacionComponent() {
     const confirmar = window.confirm(
       `¿Está seguro de que desea eliminar la programación de ${filasSeleccionadas.length} día(s)?\n\nEsta acción no se puede deshacer.`
     )
-    
+
     if (!confirmar) return
 
     try {
       setLoading(true)
-      
+
       // Eliminar programación para cada día seleccionado
       for (const fila of filasSeleccionadas) {
         const [dia, mes, año] = fila.fecha.split('/')
         const fechaFormateada = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
-        
+
         // Agregar token de autenticación
         const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
         const headers = {
@@ -902,7 +880,7 @@ export default function GenerarProgramacionComponent() {
         if (accessToken) {
           headers['Authorization'] = `Bearer ${accessToken}`;
         }
-        
+
         const url = buildApiUrl('/programacion/eliminar-programacion')
         const response = await fetch(url, {
           method: 'DELETE',
@@ -924,12 +902,12 @@ export default function GenerarProgramacionComponent() {
       }
 
       showNotification(`Programación eliminada: ${filasSeleccionadas.length} día(s)`, 'success')
-      
+
       // Recargar días
       await handleCargarDias(false)
       // NO cargar estadísticas aquí - handleCargarDias ya actualiza todo correctamente
       // await cargarEstadisticasProgramacion()
-      
+
     } catch (err) {
 
       showNotification(`Error al eliminar programación: ${err.message}`, 'error')
@@ -952,7 +930,7 @@ export default function GenerarProgramacionComponent() {
     }
 
     const filaSeleccionada = filasSeleccionadas[0]
-    
+
     // Verificar que el día tiene programación
     if (filaSeleccionada.status !== 'Con Programación') {
       showNotification('Solo se pueden imprimir días que ya tienen programación', 'warning')
@@ -960,15 +938,15 @@ export default function GenerarProgramacionComponent() {
     }
 
 
-    
+
     // Convertir fecha de DD/MM/YYYY a YYYY-MM-DD para la consulta
     const [dia, mes, año] = filaSeleccionada.fecha.split('/')
     const fechaParaImpresion = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
-    
+
     // Abrir ventana de impresión
     const url = buildApiUrl(`/programacion/carta-tiempo?difusora=${difusora}&politica_id=${politica}&fecha=${fechaParaImpresion}`)
     window.open(url, '_blank')
-    
+
     showNotification('Abriendo carta de tiempo para impresión...', 'info')
   }, [programacionData, difusora, politica, showNotification])
 
@@ -982,20 +960,20 @@ export default function GenerarProgramacionComponent() {
 
     try {
       setLoading(true)
-      
+
       // Generar LogFile para cada día seleccionado
       for (const fila of filasSeleccionadas) {
         const [dia, mes, año] = fila.fecha.split('/')
         const fechaFormateada = `${dia}/${mes}/${año}` // Formato DD/MM/YYYY para el endpoint
-        
+
         const url = buildApiUrl(`/programacion/generar-logfile?difusora=${difusora}&politica_id=${politica}&fecha=${fechaFormateada}`)
-        
+
         // Abrir el log file en una nueva ventana para descarga
         window.open(url, '_blank')
       }
 
       showNotification(`LogFile generado: ${filasSeleccionadas.length} día(s)`, 'success')
-      
+
     } catch (err) {
 
       showNotification(`Error al generar LogFile: ${err.message}`, 'error')
@@ -1006,8 +984,8 @@ export default function GenerarProgramacionComponent() {
 
   // Memoizar handleRowSelect para evitar re-renders innecesarios
   const handleRowSelect = useCallback((id) => {
-    setProgramacionData(prev => 
-      prev.map(row => 
+    setProgramacionData(prev =>
+      prev.map(row =>
         row.id === id ? { ...row, selected: !row.selected } : row
       )
     )
@@ -1032,7 +1010,7 @@ export default function GenerarProgramacionComponent() {
     errors: programacionData.filter(row => row.status === 'Error').length,
     totalEvents: programacionData.reduce((sum, row) => sum + row.eventos, 0),
     totalSongs: programacionData.reduce((sum, row) => sum + row.canciones, 0),
-    avgPercentage: programacionData.length > 0 ? 
+    avgPercentage: programacionData.length > 0 ?
       (programacionData.reduce((sum, row) => sum + row.porcentaje, 0) / programacionData.length).toFixed(2) : 0
   }), [programacionData])
 
@@ -1042,7 +1020,7 @@ export default function GenerarProgramacionComponent() {
     setSelectedDays(selected)
     setTotalDays(programacionData.length)
   }, [programacionData])
-  
+
   // Limpiar datos cuando se cambia de difusora o política para liberar memoria
   useEffect(() => {
     if (difusora || politica) {
@@ -1100,10 +1078,10 @@ export default function GenerarProgramacionComponent() {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const paginatedData = programacionData.slice(startIndex, endIndex)
-    
+
     // Limitar estrictamente el número de elementos renderizados
     if (paginatedData.length === 0) return null
-    
+
     return paginatedData.map((row, index) => {
       const actualIndex = startIndex + index
       // Crear objeto ligero solo con las propiedades necesarias para render
@@ -1121,8 +1099,8 @@ export default function GenerarProgramacionComponent() {
         selected: row.selected
       }
       return (
-        <tr 
-          key={`${rowData.id}-${rowData.fecha}-v${dataVersion}`} 
+        <tr
+          key={`${rowData.id}-${rowData.fecha}-v${dataVersion}`}
           className={`hover:bg-blue-50/50 transition-colors cursor-pointer ${actualIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} ${rowData.selected ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}
           onClick={(e) => {
             // Prevenir la selección si se hace clic en el checkbox o en un select
@@ -1133,9 +1111,9 @@ export default function GenerarProgramacionComponent() {
           }}
         >
           <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-            <input 
-              type="checkbox" 
-              className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+            <input
+              type="checkbox"
+              className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
               checked={rowData.selected}
               onChange={(e) => {
                 e.stopPropagation()
@@ -1155,8 +1133,8 @@ export default function GenerarProgramacionComponent() {
                 value={rowData.diaModelo || ''}
                 onChange={(e) => {
                   e.stopPropagation()
-                  const newData = programacionData.map(item => 
-                    item.id === rowData.id 
+                  const newData = programacionData.map(item =>
+                    item.id === rowData.id
                       ? { ...item, diaModelo: e.target.value }
                       : item
                   )
@@ -1166,19 +1144,17 @@ export default function GenerarProgramacionComponent() {
                 onClick={(e) => e.stopPropagation()}
                 className="w-full px-3 py-2 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
               >
-                <option value="">Seleccionar...</option>
                 {diasModelo && diasModelo.length > 0 ? (
-                  diasModelo.slice(0, 20).map((dia) => (
-                    <option key={dia.id} value={dia.nombre}>
-                      {dia.nombre}
-                    </option>
-                  ))
-                ) : (
                   <>
-                    <option value="DIA_LABORAL">Día Laboral</option>
-                    <option value="FIN_SEMANA">Fin de Semana</option>
-                    <option value="DIA_GENERAL">Día General</option>
+                    <option value="">Seleccionar...</option>
+                    {diasModelo.slice(0, 20).map((dia) => (
+                      <option key={dia.id} value={dia.nombre}>
+                        {dia.nombre}
+                      </option>
+                    ))}
                   </>
+                ) : (
+                  <option value="" disabled>N/A - Crea días modelo primero</option>
                 )}
               </select>
             )}
@@ -1186,12 +1162,11 @@ export default function GenerarProgramacionComponent() {
           <td className="px-6 py-4 whitespace-nowrap">
             <div className="flex items-center space-x-2">
               {getStatusIcon(rowData.status)}
-              <span className={`inline-flex px-3 py-1.5 text-xs font-bold rounded-full border ${
-                rowData.status === 'Con Programación' ? 'bg-green-100 text-green-800 border-green-300' :
-                rowData.status === 'Sin Configuración' ? 'bg-orange-100 text-orange-800 border-orange-300' :
-                rowData.status === 'Pendiente' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                'bg-red-100 text-red-800 border-red-300'
-              }`}>
+              <span className={`inline-flex px-3 py-1.5 text-xs font-bold rounded-full border ${rowData.status === 'Con Programación' ? 'bg-green-100 text-green-800 border-green-300' :
+                  rowData.status === 'Sin Configuración' ? 'bg-orange-100 text-orange-800 border-orange-300' :
+                    rowData.status === 'Pendiente' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                      'bg-red-100 text-red-800 border-red-300'
+                }`}>
                 {rowData.status}
               </span>
             </div>
@@ -1202,12 +1177,11 @@ export default function GenerarProgramacionComponent() {
           <td className="px-6 py-4 whitespace-nowrap">
             <div className="flex items-center space-x-2">
               <div className="w-16 bg-gray-200 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full ${
-                    rowData.porcentaje >= 90 ? 'bg-green-500' :
-                    rowData.porcentaje >= 70 ? 'bg-yellow-500' :
-                    'bg-red-500'
-                  }`}
+                <div
+                  className={`h-2 rounded-full ${rowData.porcentaje >= 90 ? 'bg-green-500' :
+                      rowData.porcentaje >= 70 ? 'bg-yellow-500' :
+                        'bg-red-500'
+                    }`}
                   style={{ width: `${Math.min(rowData.porcentaje, 100)}%` }}
                 ></div>
               </div>
@@ -1240,13 +1214,12 @@ export default function GenerarProgramacionComponent() {
     <>
       {/* Enhanced Notification Component - Outside main container */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 border-2 ${
-          notification.type === 'success'
+        <div className={`fixed top-4 right-4 z-[10000] p-4 rounded-xl shadow-2xl max-w-md transition-all duration-300 border-2 ${notification.type === 'success'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 text-green-800'
             : notification.type === 'info'
-            ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-300 text-blue-800'
-            : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-300 text-red-800'
-        }`}>
+              ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-300 text-blue-800'
+              : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-300 text-red-800'
+          }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               {notification.type === 'success' ? (
@@ -1291,7 +1264,7 @@ export default function GenerarProgramacionComponent() {
                     <p className="text-blue-100 text-sm">Configura y genera la programación musical para tus difusoras</p>
                   </div>
                 </div>
-                
+
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
@@ -1328,73 +1301,73 @@ export default function GenerarProgramacionComponent() {
             {/* Enhanced Action Buttons */}
             <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50/30 border-b border-gray-200">
               <div className="flex flex-wrap gap-3">
-            <button
-              onClick={cargarHoy}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <Calendar className="w-5 h-5" />
-              <span>Hoy</span>
-            </button>
-            
-            
-            <button
-              onClick={handleGenerarProgramacion}
-              disabled={loading || selectedDays === 0}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none"
-            >
-              <Play className="w-5 h-5" />
-              <span>Generar Programación</span>
-            </button>
+                <button
+                  onClick={cargarHoy}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Calendar className="w-5 h-5" />
+                  <span>Hoy</span>
+                </button>
 
-            <button
-              onClick={handleEditarProgramacion}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <Edit className="w-5 h-5" />
-              <span>Editar</span>
-            </button>
 
-            <button
-              onClick={handleConsultarProgramacion}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <Search className="w-5 h-5" />
-              <span>Consultar</span>
-            </button>
+                <button
+                  onClick={handleGenerarProgramacion}
+                  disabled={loading || selectedDays === 0}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none"
+                >
+                  <Play className="w-5 h-5" />
+                  <span>Generar Programación</span>
+                </button>
 
-            <button
-              onClick={handleEliminarProgramacion}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <Trash2 className="w-5 h-5" />
-              <span>Eliminar</span>
-            </button>
+                <button
+                  onClick={handleEditarProgramacion}
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Edit className="w-5 h-5" />
+                  <span>Editar</span>
+                </button>
 
-            <button
-              onClick={handleImprimirCarta}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <FileText className="w-5 h-5" />
-              <span>Imprimir</span>
-            </button>
+                <button
+                  onClick={handleConsultarProgramacion}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Search className="w-5 h-5" />
+                  <span>Consultar</span>
+                </button>
 
-            <button
-              onClick={handleGenerarLogFile}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <Layers className="w-5 h-5" />
-              <span>LogFile</span>
-            </button>
+                <button
+                  onClick={handleEliminarProgramacion}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  <span>Eliminar</span>
+                </button>
 
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
-            >
-              <Filter className="w-5 h-5" />
-              <span>{showFilters ? 'Ocultar' : 'Mostrar'} Filtros</span>
-            </button>
-          </div>
-        </div>
+                <button
+                  onClick={handleImprimirCarta}
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <FileText className="w-5 h-5" />
+                  <span>Imprimir</span>
+                </button>
+
+                <button
+                  onClick={handleGenerarLogFile}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Layers className="w-5 h-5" />
+                  <span>LogFile</span>
+                </button>
+
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl transition-all duration-300 flex items-center space-x-2 shadow-lg font-medium hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  <Filter className="w-5 h-5" />
+                  <span>{showFilters ? 'Ocultar' : 'Mostrar'} Filtros</span>
+                </button>
+              </div>
+            </div>
 
             {/* Enhanced Collapsible Filters */}
             {showFilters && (
@@ -1403,411 +1376,409 @@ export default function GenerarProgramacionComponent() {
                   <Settings className="w-5 h-5 text-blue-600" />
                   <h2 className="text-lg font-bold text-gray-900">Filtros de Programación</h2>
                 </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Difusora</label>
-                <div className="relative">
-                  <select 
-                    value={difusora} 
-                    onChange={(e) => setDifusora(e.target.value)}
-                    disabled={loadingDifusoras}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed hover:border-gray-400"
-                  >
-                    {loadingDifusoras ? (
-                      <option value="">Cargando difusoras...</option>
-                    ) : difusoras.length === 0 ? (
-                      <option value="">No hay difusoras disponibles</option>
-                    ) : (
-                      <>
-                        <option value="">Seleccionar difusora...</option>
-                        {difusoras.map(d => (
-                          <option key={d.id} value={d.siglas}>
-                            {d.siglas} - {d.nombre}
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
-                  {loadingDifusoras && (
-                    <div className="absolute right-10 top-3.5">
-                      <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Política
-                  {difusora && (
-                    <span className="ml-2 text-xs text-gray-500">
-                      ({getFilteredPoliticas().length} disponible{getFilteredPoliticas().length !== 1 ? 's' : ''})
-                    </span>
-                  )}
-                </label>
-                <div className="relative">
-                  <select 
-                    value={politica} 
-                    onChange={(e) => setPolitica(e.target.value)}
-                    disabled={loadingPoliticas}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed hover:border-gray-400"
-                  >
-                    {loadingPoliticas ? (
-                      <option value="">Cargando políticas...</option>
-                    ) : getFilteredPoliticas().length === 0 ? (
-                      <option value="">No hay políticas disponibles para esta difusora</option>
-                    ) : (
-                      <>
-                        <option value="">Seleccionar política...</option>
-                        {getFilteredPoliticas().map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.clave} ({p.difusora})
-                          </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
-                  {loadingPoliticas && (
-                    <div className="absolute right-10 top-3.5">
-                      <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              
-              <div className="col-span-2">
-                <label className="block text-sm font-bold mb-2">
-                  <span className={!isDatePickerEnabled ? 'text-gray-400' : 'text-gray-700'}>
-                    Rango de Fechas
-                  </span>
-                  {!isDatePickerEnabled && (
-                    <span className="ml-2 text-xs text-amber-600 font-normal">
-                      (Requiere difusora y política)
-                    </span>
-                  )}
-                </label>
-                <div className="relative" ref={datePickerRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Validar que difusora y política estén seleccionadas
-                      if (!isDatePickerEnabled) {
-                        showNotification('Debe seleccionar primero la difusora y la política', 'error')
-                        return
-                      }
 
-                      setShowDatePicker(!showDatePicker)
-                    }}
-                    disabled={!isDatePickerEnabled}
-                    className={`w-full px-4 py-3 pr-10 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-left ${
-                      !isDatePickerEnabled
-                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                        : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-900 hover:border-gray-400'
-                    }`}
-                  >
-                    <span className={!isDatePickerEnabled ? 'text-gray-400' : 'text-gray-900'}>
-                      {!isDatePickerEnabled ? 'Seleccione difusora y política primero' : getDateRangeDisplay()}
-                    </span>
-                  </button>
-                  <Calendar className={`absolute right-3 top-3.5 w-5 h-5 pointer-events-none transition-colors ${
-                    !isDatePickerEnabled ? 'text-gray-400' : 'text-gray-600'
-                  }`} />
-                  
-                  {/* Backdrop */}
-                  {showDatePicker && (
-                    <div 
-                      className="fixed inset-0 bg-black bg-opacity-40 z-[9998] animate-in fade-in duration-300"
-                      onClick={() => setShowDatePicker(false)}
-                    />
-                  )}
-                  
-                  {/* Modal estilo Airbnb */}
-                  {showDatePicker && (
-                    <div 
-                      className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-white rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300 shadow-2xl"
-                      style={{ 
-                        width: '650px',
-                        maxHeight: '90vh',
-                        overflowY: 'auto'
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Header */}
-                      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-gray-900">Seleccionar fechas</h3>
-                          <button
-                            type="button"
-                            onClick={() => setShowDatePicker(false)}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                          >
-                            <X className="w-5 h-5 text-gray-500" />
-                          </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Difusora</label>
+                    <div className="relative">
+                      <select
+                        value={difusora}
+                        onChange={(e) => setDifusora(e.target.value)}
+                        disabled={loadingDifusoras}
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed hover:border-gray-400"
+                      >
+                        {loadingDifusoras ? (
+                          <option value="">Cargando difusoras...</option>
+                        ) : difusoras.length === 0 ? (
+                          <option value="">No hay difusoras disponibles</option>
+                        ) : (
+                          <>
+                            <option value="">Seleccionar difusora...</option>
+                            {difusoras.map(d => (
+                              <option key={d.id} value={d.siglas}>
+                                {d.siglas} - {d.nombre}
+                              </option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
+                      {loadingDifusoras && (
+                        <div className="absolute right-10 top-3.5">
+                          <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                         </div>
-                      </div>
+                      )}
+                    </div>
+                  </div>
 
-                      {/* Tabs */}
-                      <div className="px-6 pt-4">
-                        <div className="flex gap-4 border-b border-gray-200">
-                          <button className="pb-3 px-4 border-b-2 border-gray-900 font-semibold text-gray-900 text-sm">
-                            Fechas
-                          </button>
-                          <button className="pb-3 px-4 text-gray-500 hover:text-gray-900 text-sm">
-                            Flexible
-                          </button>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Política
+                      {difusora && (
+                        <span className="ml-2 text-xs text-gray-500">
+                          ({getFilteredPoliticas().length} disponible{getFilteredPoliticas().length !== 1 ? 's' : ''})
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={politica}
+                        onChange={(e) => setPolitica(e.target.value)}
+                        disabled={loadingPoliticas}
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 appearance-none bg-white disabled:bg-gray-100 disabled:cursor-not-allowed hover:border-gray-400"
+                      >
+                        {loadingPoliticas ? (
+                          <option value="">Cargando políticas...</option>
+                        ) : getFilteredPoliticas().length === 0 ? (
+                          <option value="">No hay políticas disponibles para esta difusora</option>
+                        ) : (
+                          <>
+                            <option value="">Seleccionar política...</option>
+                            {getFilteredPoliticas().map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.clave} ({p.difusora})
+                              </option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
+                      {loadingPoliticas && (
+                        <div className="absolute right-10 top-3.5">
+                          <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                         </div>
-                      </div>
+                      )}
+                    </div>
+                  </div>
 
-                      {/* Calendar */}
-                      <div className="flex justify-center py-6">
-                        <DateRangePicker
-                          ranges={dateRange}
-                          onChange={handleDateRangeChange}
-                          locale={es}
-                          dateDisplayFormat="dd/MM/yyyy"
-                          showSelectionPreview={true}
-                          moveRangeOnFirstSelection={false}
-                          months={2}
-                          direction="horizontal"
-                          rangeColors={['#10b981']}
-                          showDateDisplay={false}
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-bold mb-2">
+                      <span className={!isDatePickerEnabled ? 'text-gray-400' : 'text-gray-700'}>
+                        Rango de Fechas
+                      </span>
+                      {!isDatePickerEnabled && (
+                        <span className="ml-2 text-xs text-amber-600 font-normal">
+                          (Requiere difusora y política)
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative" ref={datePickerRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Validar que difusora y política estén seleccionadas
+                          if (!isDatePickerEnabled) {
+                            showNotification('Debe seleccionar primero la difusora y la política', 'error')
+                            return
+                          }
+
+                          setShowDatePicker(!showDatePicker)
+                        }}
+                        disabled={!isDatePickerEnabled}
+                        className={`w-full px-4 py-3 pr-10 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-left ${!isDatePickerEnabled
+                            ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                            : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-900 hover:border-gray-400'
+                          }`}
+                      >
+                        <span className={!isDatePickerEnabled ? 'text-gray-400' : 'text-gray-900'}>
+                          {!isDatePickerEnabled ? 'Seleccione difusora y política primero' : getDateRangeDisplay()}
+                        </span>
+                      </button>
+                      <Calendar className={`absolute right-3 top-3.5 w-5 h-5 pointer-events-none transition-colors ${!isDatePickerEnabled ? 'text-gray-400' : 'text-gray-600'
+                        }`} />
+
+                      {/* Backdrop */}
+                      {showDatePicker && (
+                        <div
+                          className="fixed inset-0 bg-black bg-opacity-40 z-[9998] animate-in fade-in duration-300"
+                          onClick={() => setShowDatePicker(false)}
                         />
-                      </div>
+                      )}
 
-                      {/* Footer */}
-                      <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDateRange([{
-                              startDate: new Date(),
-                              endDate: new Date(),
-                              key: 'selection'
-                            }])
-                            setFechaInicio(getTodayDate())
-                            setFechaFin(getTodayDate())
+                      {/* Modal estilo Airbnb */}
+                      {showDatePicker && (
+                        <div
+                          className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-white rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300 shadow-2xl"
+                          style={{
+                            width: '650px',
+                            maxHeight: '90vh',
+                            overflowY: 'auto'
                           }}
-                          className="text-sm font-semibold text-gray-900 underline hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          Borrar fechas
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
+                          {/* Header */}
+                          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-lg font-semibold text-gray-900">Seleccionar fechas</h3>
+                              <button
+                                type="button"
+                                onClick={() => setShowDatePicker(false)}
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                              >
+                                <X className="w-5 h-5 text-gray-500" />
+                              </button>
+                            </div>
+                          </div>
 
-                            setShowDatePicker(false)
-                          }}
-                          className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-semibold shadow-lg shadow-green-500/20"
-                        >
-                          Aplicar
-                        </button>
-                      </div>
+                          {/* Tabs */}
+                          <div className="px-6 pt-4">
+                            <div className="flex gap-4 border-b border-gray-200">
+                              <button className="pb-3 px-4 border-b-2 border-gray-900 font-semibold text-gray-900 text-sm">
+                                Fechas
+                              </button>
+                              <button className="pb-3 px-4 text-gray-500 hover:text-gray-900 text-sm">
+                                Flexible
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Calendar */}
+                          <div className="flex justify-center py-6">
+                            <DateRangePicker
+                              ranges={dateRange}
+                              onChange={handleDateRangeChange}
+                              locale={es}
+                              dateDisplayFormat="dd/MM/yyyy"
+                              showSelectionPreview={true}
+                              moveRangeOnFirstSelection={false}
+                              months={2}
+                              direction="horizontal"
+                              rangeColors={['#10b981']}
+                              showDateDisplay={false}
+                            />
+                          </div>
+
+                          {/* Footer */}
+                          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDateRange([{
+                                  startDate: new Date(),
+                                  endDate: new Date(),
+                                  key: 'selection'
+                                }])
+                                setFechaInicio(getTodayDate())
+                                setFechaFin(getTodayDate())
+                              }}
+                              className="text-sm font-semibold text-gray-900 underline hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors"
+                            >
+                              Borrar fechas
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+
+                                setShowDatePicker(false)
+                              }}
+                              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-semibold shadow-lg shadow-green-500/20"
+                            >
+                              Aplicar
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Enhanced Filter Status */}
+            {error && (
+              <div className="px-8 py-4 bg-gradient-to-r from-red-50 via-pink-50 to-red-50 border-b border-red-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                    <p className="text-red-800 text-sm font-medium">
+                      Error: {error}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        loadDifusoras()
+                        loadPoliticas()
+                      }}
+                      disabled={loadingDifusoras || loadingPoliticas}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline transition-colors disabled:opacity-50"
+                    >
+                      Recargar datos
+                    </button>
+                    <button
+                      onClick={() => setError(null)}
+                      className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline transition-colors"
+                    >
+                      Limpiar error
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Enhanced Table */}
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
+            <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50/30 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900">Días de Programación</h3>
+                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <span className="flex items-center space-x-1">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span>{stats.completed} Completados</span>
+                  </span>
+                  <span className="flex items-center space-x-1">
+                    <Clock className="w-4 h-4 text-yellow-500" />
+                    <span>{stats.pending} Pendientes</span>
+                  </span>
+                  <span className="flex items-center space-x-1">
+                    <AlertCircle className="w-4 h-4 text-red-500" />
+                    <span>{stats.errors} Errores</span>
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Enhanced Filter Status */}
-        {error && (
-          <div className="px-8 py-4 bg-gradient-to-r from-red-50 via-pink-50 to-red-50 border-b border-red-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="w-5 h-5 text-red-600" />
-                <p className="text-red-800 text-sm font-medium">
-                  Error: {error}
-                </p>
+            {/* Loading indicator for auto-loading */}
+            {loading && (
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-blue-700">
+                      Actualizando días del período seleccionado...
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => {
-                    loadDifusoras()
-                    loadPoliticas()
-                  }}
-                  disabled={loadingDifusoras || loadingPoliticas}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline transition-colors disabled:opacity-50"
-                >
-                  Recargar datos
-                </button>
-                <button
-                  onClick={() => setError(null)}
-                  className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline transition-colors"
-                >
-                  Limpiar error
-                </button>
-              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-gray-100 to-gray-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        checked={programacionData.every(row => row.selected)}
+                        onChange={handleSelectAll}
+                      />
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Fecha</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Día</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Día Modelo</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"># Eventos</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"># Canciones</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Asignadas</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">%</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">MC</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tableRows}
+                </tbody>
+              </table>
+
+              {/* Paginación - Solo mostrar si hay más de itemsPerPage elementos */}
+              {programacionData.length > itemsPerPage && (
+                <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
+                  <div className="text-sm text-gray-700">
+                    Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, programacionData.length)} de {programacionData.length} días
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Anterior
+                    </button>
+                    <span className="px-4 py-2 text-sm font-medium text-gray-700">
+                      Página {currentPage} de {Math.ceil(programacionData.length / itemsPerPage)}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(Math.ceil(programacionData.length / itemsPerPage), prev + 1))}
+                      disabled={currentPage >= Math.ceil(programacionData.length / itemsPerPage)}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        )}
-        </div>
 
-        {/* Enhanced Table */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
-          <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50/30 border-b border-gray-200">
+            {/* Enhanced Empty State - Only show when no data and not loading */}
+            {programacionData.length === 0 && !loading && (
+              <div className="text-center py-20 px-6">
+                <div className="mx-auto w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6 shadow-lg">
+                  <Radio className="w-12 h-12 text-gray-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                  No hay días de programación
+                </h3>
+                <p className="text-gray-600 mb-8 max-w-md mx-auto text-base">
+                  {!difusora ?
+                    'Selecciona una difusora para comenzar.' :
+                    !politica ?
+                      'Selecciona una política para cargar los días.' :
+                      'Configura el rango de fechas y los días se cargarán automáticamente.'
+                  }
+                </p>
+                {difusora && politica && fechaInicio && fechaFin && (
+                  <div className="mt-6 flex flex-col items-center space-y-3">
+                    <p className="text-sm text-gray-600">
+                      Los días se cargan automáticamente cuando seleccionas difusora y política.
+                    </p>
+                    <button
+                      onClick={() => handleCargarDias(true)}
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-xl transition-all duration-300 font-semibold hover:shadow-xl transform hover:scale-105 hover:-translate-y-1 flex items-center space-x-2"
+                    >
+                      <Calendar className="w-5 h-5" />
+                      <span>Cargar Días del Período</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Enhanced Selection Counter */}
+          <div className="mt-6 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-900">Días de Programación</h3>
-              <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <span className="flex items-center space-x-1">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-4 h-4 bg-blue-500 rounded-full shadow-md animate-pulse"></div>
+                  <span className="text-sm font-bold text-gray-700">Días Seleccionados</span>
+                </div>
+                <div className="text-2xl font-bold text-blue-600">{selectedDays}</div>
+                <span className="text-gray-500 font-medium">de</span>
+                <div className="text-2xl font-bold text-gray-600">{totalDays}</div>
+                <span className="text-gray-500 font-medium">días totales</span>
+              </div>
+
+              <div className="flex items-center space-x-4 text-sm font-semibold">
+                <span className="flex items-center space-x-1 text-green-700">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
                   <span>{stats.completed} Completados</span>
                 </span>
-                <span className="flex items-center space-x-1">
-                  <Clock className="w-4 h-4 text-yellow-500" />
+                <span className="flex items-center space-x-1 text-yellow-700">
+                  <Clock className="w-5 h-5 text-yellow-600" />
                   <span>{stats.pending} Pendientes</span>
                 </span>
-                <span className="flex items-center space-x-1">
-                  <AlertCircle className="w-4 h-4 text-red-500" />
+                <span className="flex items-center space-x-1 text-red-700">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
                   <span>{stats.errors} Errores</span>
                 </span>
               </div>
             </div>
           </div>
-
-        {/* Loading indicator for auto-loading */}
-        {loading && (
-          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-blue-700">
-                  Actualizando días del período seleccionado...
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gradient-to-r from-gray-100 to-gray-50 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  <input 
-                    type="checkbox" 
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
-                    checked={programacionData.every(row => row.selected)}
-                    onChange={handleSelectAll}
-                  />
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Fecha</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Día</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Día Modelo</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"># Eventos</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"># Canciones</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Asignadas</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">%</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">MC</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {tableRows}
-            </tbody>
-          </table>
-          
-          {/* Paginación - Solo mostrar si hay más de itemsPerPage elementos */}
-          {programacionData.length > itemsPerPage && (
-            <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
-              <div className="text-sm text-gray-700">
-                Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, programacionData.length)} de {programacionData.length} días
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Anterior
-                </button>
-                <span className="px-4 py-2 text-sm font-medium text-gray-700">
-                  Página {currentPage} de {Math.ceil(programacionData.length / itemsPerPage)}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(programacionData.length / itemsPerPage), prev + 1))}
-                  disabled={currentPage >= Math.ceil(programacionData.length / itemsPerPage)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Siguiente
-                </button>
-              </div>
-            </div>
-          )}
         </div>
-        
-        {/* Enhanced Empty State - Only show when no data and not loading */}
-        {programacionData.length === 0 && !loading && (
-          <div className="text-center py-20 px-6">
-            <div className="mx-auto w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6 shadow-lg">
-              <Radio className="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-3">
-              No hay días de programación
-            </h3>
-            <p className="text-gray-600 mb-8 max-w-md mx-auto text-base">
-              {!difusora ? 
-                'Selecciona una difusora para comenzar.' : 
-                !politica ? 
-                'Selecciona una política para cargar los días.' :
-                'Configura el rango de fechas y los días se cargarán automáticamente.'
-              }
-            </p>
-            {difusora && politica && fechaInicio && fechaFin && (
-              <div className="mt-6 flex flex-col items-center space-y-3">
-                <p className="text-sm text-gray-600">
-                  Los días se cargan automáticamente cuando seleccionas difusora y política.
-                </p>
-                <button
-                  onClick={() => handleCargarDias(true)}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-xl transition-all duration-300 font-semibold hover:shadow-xl transform hover:scale-105 hover:-translate-y-1 flex items-center space-x-2"
-                >
-                  <Calendar className="w-5 h-5" />
-                  <span>Cargar Días del Período</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Enhanced Selection Counter */}
-      <div className="mt-6 bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 p-6">
-        <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-blue-500 rounded-full shadow-md animate-pulse"></div>
-                <span className="text-sm font-bold text-gray-700">Días Seleccionados</span>
-              </div>
-              <div className="text-2xl font-bold text-blue-600">{selectedDays}</div>
-              <span className="text-gray-500 font-medium">de</span>
-              <div className="text-2xl font-bold text-gray-600">{totalDays}</div>
-              <span className="text-gray-500 font-medium">días totales</span>
-            </div>
-            
-            <div className="flex items-center space-x-4 text-sm font-semibold">
-              <span className="flex items-center space-x-1 text-green-700">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span>{stats.completed} Completados</span>
-              </span>
-              <span className="flex items-center space-x-1 text-yellow-700">
-                <Clock className="w-5 h-5 text-yellow-600" />
-                <span>{stats.pending} Pendientes</span>
-              </span>
-              <span className="flex items-center space-x-1 text-red-700">
-                <AlertCircle className="w-5 h-5 text-red-600" />
-                <span>{stats.errors} Errores</span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
       </div>
 
       {/* Modal de Consultar Programación - Lazy loaded */}
@@ -1902,12 +1873,18 @@ export default function GenerarProgramacionComponent() {
                   onChange={(e) => setSelectedDiaModelo(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                 >
-                  <option value="">Mantener día modelo actual</option>
-                  {diasModelo.map((dia) => (
-                    <option key={dia.id} value={dia.id}>
-                      {dia.nombre} - {dia.descripcion}
-                    </option>
-                  ))}
+                  {diasModelo && diasModelo.length > 0 ? (
+                    <>
+                      <option value="">Mantener día modelo actual</option>
+                      {diasModelo.map((dia) => (
+                        <option key={dia.id} value={dia.id}>
+                          {dia.nombre} - {dia.descripcion}
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    <option value="" disabled>N/A - No hay días modelo</option>
+                  )}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
                   Si selecciona un día modelo diferente, se aplicará a todos los días seleccionados

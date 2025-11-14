@@ -1,39 +1,32 @@
 # AWS Configuration
-aws_region = "us-east-1"
-environment = "production"
+aws_region   = "us-east-1"
+environment  = "production"
 project_name = "programador-musical"
 
 # Domain Configuration (optional - leave empty for ALB DNS)
-domain_name = ""  # e.g., "yourdomain.com"
+domain_name = "" # e.g., "yourdomain.com"
 
 # Database Configuration
-database_name = "programador_musical"
+database_name     = "programador_musical"
 database_username = "programador_user"
-database_password = "your_secure_database_password_here"  # Change this!
+database_password = "CHANGE_THIS_PASSWORD" # Change this to a secure password!
 
 # Application Configuration
-jwt_secret_key = "your_very_secure_jwt_secret_key_at_least_32_characters_long"  # Change this!
-backend_cors_origins = ["*"]  # Update with your domain: ["https://yourdomain.com"]
+jwt_secret_key       = "CHANGE_THIS_JWT_SECRET" # Change this to a secure JWT secret!
+backend_cors_origins = ["*"]                   # Update with your domain: ["https://yourdomain.com"]
 
 # ECS Configuration (optimized for 20 users)
 ecs_desired_count = 1
-ecs_min_capacity = 1
-ecs_max_capacity = 2  # Sufficient for 20 users
+ecs_min_capacity  = 1
+ecs_max_capacity  = 2 # Sufficient for 20 users
 
 # RDS Configuration (cost-optimized)
-db_instance_class = "db.t3.micro"  # Smallest instance
-db_allocated_storage = 20  # Minimum storage
+db_instance_class    = "db.t3.micro" # Smallest instance
+db_allocated_storage = 20            # Minimum storage for PostgreSQL
 
 # Security Configuration
-enable_deletion_protection = false  # Set to true for production
+enable_deletion_protection = false # Set to true for production
 
 # IP Access Restriction
-restrict_to_ip = true
-allowed_ip_addresses = ["YOUR_IP_ADDRESS/32"]  # Replace with your actual IP address
-
-# Cognito OAuth Providers (opcional)
-# Para habilitar Google/Apple login, configura estos valores
-google_client_id = ""
-google_client_secret = ""
-apple_client_id = ""
-apple_client_secret = ""
+restrict_to_ip       = true
+allowed_ip_addresses = ["YOUR_IP_ADDRESS/32"] # Replace with your actual IP address

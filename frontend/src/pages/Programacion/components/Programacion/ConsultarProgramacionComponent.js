@@ -111,12 +111,19 @@ otas_operador: '#fbbf24',
       
       const url = buildApiUrl(`/programacion/programacion-detallada?${params}`)
 
+      // Obtener token de autenticación
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
       
       const response = await fetch(url, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
+        headers: headers
       })
       
 
@@ -189,11 +196,17 @@ otas_operador: '#fbbf24',
       try {
         // Cargar todas las categorías primero
         const categoriasUrl = buildApiUrl('/categorias/categorias/items')
+        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+        const categoriasHeaders = {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        };
+        if (accessToken) {
+          categoriasHeaders['Authorization'] = `Bearer ${accessToken}`;
+        }
         const categoriasResponse = await fetch(categoriasUrl, {
           cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
+          headers: categoriasHeaders
         })
         if (categoriasResponse.ok) {
           const categoriasData = await categoriasResponse.json()
@@ -206,11 +219,17 @@ otas_operador: '#fbbf24',
           const promesasCanciones = categoriasData.map(async (cat) => {
             try {
               const url = buildApiUrl(`/categorias/canciones/?categoria_id=${cat.id}&activa=true`)
+              const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+              const headers = {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+              };
+              if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+              }
               const response = await fetch(url, {
                 cache: 'no-store',
-                headers: {
-                  'Cache-Control': 'no-cache'
-                }
+                headers: headers
               })
               if (response.ok) {
                 const data = await response.json()
@@ -238,11 +257,17 @@ otas_operador: '#fbbf24',
         // Fallback: cargar canciones sin filtro de categoría
         try {
           const url = buildApiUrl('/categorias/canciones/?activa=true')
+          const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+          const headers = {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          };
+          if (accessToken) {
+            headers['Authorization'] = `Bearer ${accessToken}`;
+          }
           const response = await fetch(url, {
             cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache'
-            }
+            headers: headers
           })
           if (response.ok) {
             const data = await response.json()
@@ -281,11 +306,16 @@ otas_operador: '#fbbf24',
       
       // Actualizar en la base de datos
       const url = buildApiUrl(`/programacion/programacion/${editingEvent.id}/cancion?cancion_id=${nuevaCancion.id}`)
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
       const response = await fetch(url, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: headers
       })
       
       if (!response.ok) {

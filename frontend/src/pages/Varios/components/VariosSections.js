@@ -7,7 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 // Sección Varios
 export const VariosSection = ({ onSectionClick }) => {
   const { user } = useAuth();
-  const isAdmin = user?.rol === 'admin' || user?.is_admin;
+  // Verificar si es admin - considerar tanto rol como is_admin
+  const isAdmin = user?.rol === 'admin' || user?.is_admin === true || user?.groups?.includes('admin');
   
   const items = [
     { 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { ArrowRightLeft, ChevronRight, Search, Shuffle, CheckCircle, AlertTriangle, Music2, X, FolderTree, Clock, Music } from 'lucide-react'
+import { ArrowRightLeft, ChevronRight, Search, Shuffle, CheckCircle, AlertTriangle, Music2, X, FolderTree, Clock, Music, ChevronDown } from 'lucide-react'
 import { listCategoriasStats, getElementosCategoria, moverCancionesCategoria } from '../../../../api'
 
 export default function MovimientosCategorias() {
@@ -273,10 +273,17 @@ otification.type === 'success'
                     <FolderTree className="w-5 h-5 inline-block mr-2 text-blue-600" />
                     Categoría Origen
                   </label>
-                  <select value={origenId} onChange={e=>setOrigenId(e.target.value)} className={selectClass}>
-                    <option value="">Seleccionar categoría origen</option>
-                    {categorias.map(c=> <option key={c.id} value={c.id}>{c.nombre} ({c.num_elementos||0} elementos)</option>)}
-                  </select>
+                  <div className="relative">
+                    <select 
+                      value={origenId} 
+                      onChange={e=>setOrigenId(e.target.value)} 
+                      className={`${selectClass} appearance-none pr-10 cursor-pointer`}
+                    >
+                      <option value="">Seleccionar categoría origen</option>
+                      {categorias.map(c=> <option key={c.id} value={c.id}>{c.nombre} ({c.num_elementos||0} elementos)</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  </div>
                   {origenId && (
                     <div className="mt-4 grid grid-cols-3 gap-3">
                       <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-md">
@@ -310,10 +317,17 @@ otification.type === 'success'
                     <FolderTree className="w-5 h-5 inline-block mr-2 text-green-600" />
                     Categoría Destino
                   </label>
-                  <select value={destinoId} onChange={e => setDestinoId(e.target.value)} className={selectClass}>
-                    <option value="">Seleccionar categoría destino</option>
-                    {categoriasDestino.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.num_elementos || 0} elementos)</option>)}
-                  </select>
+                  <div className="relative">
+                    <select 
+                      value={destinoId} 
+                      onChange={e => setDestinoId(e.target.value)} 
+                      className={`${selectClass} appearance-none pr-10 cursor-pointer`}
+                    >
+                      <option value="">Seleccionar categoría destino</option>
+                      {categoriasDestino.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.num_elementos || 0} elementos)</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  </div>
                   {destinoId && (
                     <div className="mt-4 grid grid-cols-3 gap-3">
                       <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl shadow-md">

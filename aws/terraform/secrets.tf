@@ -17,7 +17,8 @@ resource "aws_secretsmanager_secret_version" "app_secrets" {
   secret_string = jsonencode({
     jwt_secret_key        = var.jwt_secret_key
     database_url          = "postgresql://${var.database_username}:${var.database_password}@${aws_db_instance.main.endpoint}/${var.database_name}"
-    database_host         = aws_db_instance.main.endpoint
+    database_host         = aws_db_instance.main.address
+    database_port         = aws_db_instance.main.port
     database_name         = var.database_name
     database_username     = var.database_username
     database_password     = var.database_password

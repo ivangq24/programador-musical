@@ -8,7 +8,7 @@ from typing import List, Optional
 
 from app.core.database import get_db
 from app.core.auth import get_current_user, require_role, get_user_difusoras
-from app.models.auth import Usuario, UsuarioDifusora
+from app.models.auth import Usuario, UsuarioDifusora, Organizacion
 from app.models.catalogos import Difusora
 from app.schemas.auth import (
     Usuario as UsuarioSchema,
@@ -21,7 +21,9 @@ from app.schemas.auth import (
     UsuarioInviteResponse,
     PerfilUpdate,
     ChangePasswordRequest,
-    FirstAdminCreate
+    FirstAdminCreate,
+    ForgotPasswordRequest,
+    ResetPasswordRequest
 )
 from app.core.auth import cognito_auth
 
@@ -74,6 +76,7 @@ async def update_my_profile(
     if update_data:
         cognito_attributes = {}
         if "nombre" in update_data:
+            # Cognito usa 'name' como atributo estándar
             cognito_attributes["name"] = update_data["nombre"]
         if "email" in update_data:
             cognito_attributes["email"] = update_data["email"]
@@ -85,14 +88,15 @@ async def update_my_profile(
                     attributes=cognito_attributes
                 )
             except Exception as e:
-                # Continuar aunque falle Cognito, la BD ya está actualizada
-                pass
+                # Log el error pero continuar, la BD ya está actualizada
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error actualizando Cognito: {str(e)}")
     
     db.commit()
     db.refresh(usuario)
     
-
-    
+    # Retornar información actualizada del usuario
     return UserInfo(
         id=usuario.id,
         email=usuario.email,
@@ -132,7 +136,7 @@ async def change_my_password(
     try:
         cognito_auth.change_user_password(
             cognito_user_id=usuario.cognito_user_id,
-ew_password=password_request.new_password,
+            new_password=password_request.new_password,
             permanent=True
         )
         
@@ -158,9 +162,25 @@ async def delete_my_account(
     email = usuario.email
     nombre = usuario.nombre
     
+    # Guardar nombre y email antes de desactivar
+    usuario_nombre = usuario.nombre
+    usuario_email = usuario.email
+    was_active = usuario.activo
+    
     # Desactivar usuario en BD
     usuario.activo = False
     db.commit()
+    
+    # Enviar email de notificación de desactivación
+    if was_active:
+        try:
+            cognito_auth.send_account_deactivation_email(
+                email=usuario_email,
+                nombre=usuario_nombre
+            )
+        except Exception as e:
+            # No fallar la eliminación si el email falla
+            pass
     
     # Enviar email de confirmación de eliminación
     try:
@@ -194,14 +214,22 @@ async def get_usuarios(
     usuario: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Obtiene lista de usuarios con sus difusoras (solo admin)"""
+    """Obtiene lista de usuarios con sus difusoras (solo admin) - Solo usuarios de la misma organización"""
     if usuario.rol != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo administradores pueden ver usuarios"
         )
     
-    query = db.query(Usuario)
+    # Verificar que organizacion_id existe
+    if not hasattr(usuario, 'organizacion_id') or not usuario.organizacion_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Error de configuración: La migración de base de datos no se ha ejecutado. Contacta al administrador."
+        )
+    
+    # Filtrar solo usuarios de la misma organización (multi-tenancy)
+    query = db.query(Usuario).filter(Usuario.organizacion_id == usuario.organizacion_id)
     
     if search:
         query = query.filter(
@@ -249,7 +277,10 @@ async def invitar_usuario(
     1. Crea el usuario en Cognito
     2. Asigna al grupo correspondiente según el rol
     3. Crea registro en BD (se sincronizará cuando se autentique)
-    4. Asigna difusoras si se proporcionan
+    4. Asigna difusoras si se proporcionan (NO para admins nuevos)
+    
+    IMPORTANTE: Solo el primer admin puede invitar a otros administradores.
+    Los nuevos administradores deben venir sin difusoras asignadas (datos en blanco).
     """
     if usuario.rol != "admin":
         raise HTTPException(
@@ -263,6 +294,41 @@ async def invitar_usuario(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Rol inválido. Debe ser: admin, manager, o operador"
         )
+    
+    # Si se está intentando invitar a un admin, verificar que el usuario actual sea el primer admin
+    if usuario_invite.rol == "admin":
+        # Contar cuántos admins activos hay
+        admin_count = db.query(Usuario).filter(
+            Usuario.rol == "admin",
+            Usuario.activo == True
+        ).count()
+        
+        # Obtener el primer admin (el más antiguo por ID)
+        primer_admin = db.query(Usuario).filter(
+            Usuario.rol == "admin",
+            Usuario.activo == True
+        ).order_by(Usuario.id.asc()).first()
+        
+        # Solo el primer admin puede invitar a otros admins
+        if not primer_admin or primer_admin.id != usuario.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo el primer administrador puede invitar a otros administradores. Si necesitas agregar otro administrador a tu organización, contacta al primer administrador del sistema."
+            )
+        
+        # Cuando un admin invita a otro admin, el nuevo admin debe heredar las difusoras del admin que lo invita
+        # Obtener las difusoras del admin actual
+        difusoras_admin_actual = db.query(UsuarioDifusora).filter(
+            UsuarioDifusora.usuario_id == usuario.id
+        ).join(Difusora).filter(Difusora.activa == True).all()
+        
+        # Si el admin actual tiene difusoras, asignarlas automáticamente al nuevo admin
+        if difusoras_admin_actual:
+            # Reemplazar las difusoras_ids con las del admin actual
+            usuario_invite.difusoras_ids = [d.difusora_id for d in difusoras_admin_actual]
+        else:
+            # Si el admin actual no tiene difusoras, el nuevo admin tampoco las tendrá
+            usuario_invite.difusoras_ids = []
     
     # Verificar que el email no esté ya en uso en la BD (pero permitir si solo existe en Cognito)
     # Esto permite reenviar códigos de verificación a usuarios que existen en Cognito pero no en BD
@@ -289,13 +355,14 @@ async def invitar_usuario(
         nuevo_usuario = db.query(Usuario).filter(Usuario.email == usuario_invite.email).first()
         
         if not nuevo_usuario:
-            # Crear registro en BD (se creará cuando el usuario se autentique, pero lo pre-creamos)
+            # Crear registro en BD con la organización del admin que invita
             nuevo_usuario = Usuario(
                 cognito_user_id=cognito_user_id,
                 email=usuario_invite.email,
                 nombre=usuario_invite.nombre,
                 rol=usuario_invite.rol,
-                activo=True
+                activo=True,
+                organizacion_id=usuario.organizacion_id  # ← ASIGNAR ORGANIZACIÓN DEL ADMIN QUE INVITA
             )
             db.add(nuevo_usuario)
             db.commit()
@@ -310,16 +377,23 @@ async def invitar_usuario(
                 nuevo_usuario.cognito_user_id = cognito_user_id
             if not nuevo_usuario.activo:
                 nuevo_usuario.activo = True
+            # Asegurar que el usuario pertenece a la organización del admin que invita
+            if nuevo_usuario.organizacion_id != usuario.organizacion_id:
+                nuevo_usuario.organizacion_id = usuario.organizacion_id
             db.commit()
             db.refresh(nuevo_usuario)
         
-        # Asignar difusoras si se proporcionan
+        # Asignar difusoras si se proporcionan (solo difusoras de la misma organización)
+        # Para admins: se asignan automáticamente las difusoras del admin que los invita
+        # Para otros roles: se asignan las difusoras proporcionadas
         if usuario_invite.difusoras_ids:
             for difusora_id in usuario_invite.difusoras_ids:
-                # Verificar que la difusora existe
-                difusora = db.query(Difusora).filter(Difusora.id == difusora_id).first()
+                # Verificar que la difusora existe y pertenece a la misma organización
+                difusora = db.query(Difusora).filter(
+                    Difusora.id == difusora_id,
+                    Difusora.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+                ).first()
                 if not difusora:
-
                     continue
                 
                 # Verificar que no esté ya asignada
@@ -345,13 +419,34 @@ async def invitar_usuario(
         ).join(Difusora).all()
         difusoras_siglas = [a.difusora.siglas for a in asignaciones]
         
+        # Enviar email de bienvenida usando SES (si hay contraseña temporal)
+        email_sent = False
+        email_message = ""
+        if temporary_password:
+            try:
+                email_result = cognito_auth.send_invitation_email(
+                    email=usuario_invite.email,
+                    temporary_password=temporary_password,
+                    nombre=usuario_invite.nombre
+                )
+                email_sent = email_result.get('sent', False)
+                if email_sent:
+                    email_message = "Email de bienvenida enviado exitosamente con credenciales de acceso."
+                else:
+                    email_message = f"Email no enviado: {email_result.get('message', 'Error desconocido')}. Cognito enviará el link de verificación."
+            except Exception as e:
+                email_message = f"Error enviando email de bienvenida: {str(e)}. Cognito enviará el link de verificación."
+        
         # Mensaje según si el usuario ya existía o es nuevo
         if user_exists:
-            message = f"Usuario {usuario_invite.email} ya existe en Cognito pero no está verificado. Se ha establecido una nueva contraseña temporal. El usuario recibirá un email con un link de verificación. Debe hacer clic en el link para verificar su email."
+            message = f"Usuario {usuario_invite.email} ya existe en Cognito pero no está verificado. Se ha establecido una nueva contraseña temporal."
         else:
-            message = f"Usuario {usuario_invite.email} invitado exitosamente. Se ha enviado un email con un link de verificación. El usuario debe hacer clic en el link para verificar su email y luego puede iniciar sesión con la contraseña temporal."
+            message = f"Usuario {usuario_invite.email} invitado exitosamente."
         
-
+        if email_sent:
+            message += " Se ha enviado un email de bienvenida con las credenciales de acceso."
+        else:
+            message += " El usuario recibirá un email de Cognito con un link de verificación."
         
         return UsuarioInviteResponse(
             usuario=UsuarioConDifusoras(
@@ -360,8 +455,8 @@ async def invitar_usuario(
             ),
             temporary_password=temporary_password or "No disponible",
             message=message,
-            email_sent=True,  # Cognito maneja el envío automáticamente
-            email_message="Link de verificación enviado por Cognito. El usuario debe hacer clic en el link del email para verificar su cuenta."
+            email_sent=email_sent,
+            email_message=email_message
         )
         
     except HTTPException:
@@ -381,14 +476,25 @@ async def get_usuario(
     usuario: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Obtiene un usuario específico con sus difusoras"""
+    """Obtiene un usuario específico con sus difusoras (solo de la misma organización)"""
     if usuario.rol != "admin" and usuario.id != usuario_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para ver este usuario"
         )
     
-    usuario_obj = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    # Verificar que organizacion_id existe
+    if not hasattr(usuario, 'organizacion_id') or not usuario.organizacion_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Error de configuración: La migración de base de datos no se ha ejecutado. Contacta al administrador."
+        )
+    
+    # Filtrar por organización (multi-tenancy)
+    usuario_obj = db.query(Usuario).filter(
+        Usuario.id == usuario_id,
+        Usuario.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+    ).first()
     if not usuario_obj:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
@@ -412,14 +518,25 @@ async def update_usuario(
     usuario: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Actualiza un usuario (solo admin). Si cambia el rol, actualiza Cognito también."""
+    """Actualiza un usuario (solo admin, solo de la misma organización). Si cambia el rol, actualiza Cognito también."""
     if usuario.rol != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo administradores pueden actualizar usuarios"
         )
     
-    usuario_obj = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    # Verificar que organizacion_id existe
+    if not hasattr(usuario, 'organizacion_id') or not usuario.organizacion_id:
+        raise HTTPException(
+            status_code=500,
+            detail="Error de configuración: La migración de base de datos no se ha ejecutado. Contacta al administrador."
+        )
+    
+    # Filtrar por organización (multi-tenancy)
+    usuario_obj = db.query(Usuario).filter(
+        Usuario.id == usuario_id,
+        Usuario.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+    ).first()
     if not usuario_obj:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
@@ -450,6 +567,9 @@ async def update_usuario(
                 detail=f"Error actualizando rol en Cognito: {str(e)}"
             )
     
+    # Guardar estado anterior de activo
+    was_active = usuario_obj.activo
+    
     # Actualizar campos en BD
     for field, value in update_data.items():
         setattr(usuario_obj, field, value)
@@ -457,7 +577,55 @@ async def update_usuario(
     db.commit()
     db.refresh(usuario_obj)
     
-
+    # Si el usuario fue desactivado, enviar email de notificación
+    if was_active and not usuario_obj.activo:
+        try:
+            cognito_auth.send_account_deactivation_email(
+                email=usuario_obj.email,
+                nombre=usuario_obj.nombre
+            )
+        except Exception as e:
+            # No fallar la actualización si el email falla
+            pass
+    
+    # Si el usuario cambió a rol ADMIN, asignarle automáticamente TODAS las difusoras de la organización
+    if "rol" in update_data and update_data["rol"] == "admin" and old_rol != "admin":
+        try:
+            # Obtener todas las difusoras activas de la organización
+            todas_difusoras = db.query(Difusora).filter(
+                Difusora.activa == True,
+                Difusora.organizacion_id == usuario.organizacion_id
+            ).all()
+            
+            # Asignar cada difusora al nuevo admin
+            difusoras_asignadas = 0
+            for difusora in todas_difusoras:
+                # Verificar si ya está asignada
+                asignacion_existente = db.query(UsuarioDifusora).filter(
+                    and_(
+                        UsuarioDifusora.usuario_id == usuario_id,
+                        UsuarioDifusora.difusora_id == difusora.id
+                    )
+                ).first()
+                
+                if not asignacion_existente:
+                    nueva_asignacion = UsuarioDifusora(
+                        usuario_id=usuario_id,
+                        difusora_id=difusora.id
+                    )
+                    db.add(nueva_asignacion)
+                    difusoras_asignadas += 1
+            
+            if difusoras_asignadas > 0:
+                db.commit()
+                
+        except Exception as e:
+            # Si falla la asignación automática, loguear pero no fallar la actualización
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error asignando difusoras automáticamente al nuevo admin: {str(e)}")
+            db.rollback()
+            # No lanzar excepción, el usuario ya es admin en RDS
     
     # Obtener difusoras para la respuesta
     asignaciones = db.query(UsuarioDifusora).filter(
@@ -465,8 +633,21 @@ async def update_usuario(
     ).join(Difusora).all()
     difusoras_siglas = [a.difusora.siglas for a in asignaciones]
     
+    # Construir respuesta sin usar __dict__ para evitar campos internos de SQLAlchemy
     return UsuarioConDifusoras(
-        **usuario_obj.__dict__,
+        id=usuario_obj.id,
+        cognito_user_id=usuario_obj.cognito_user_id,
+        email=usuario_obj.email,
+        nombre=usuario_obj.nombre,
+        rol=usuario_obj.rol,
+        activo=usuario_obj.activo,
+        organizacion_id=usuario_obj.organizacion_id,
+        nombre_empresa=usuario_obj.nombre_empresa,
+        telefono=usuario_obj.telefono,
+        direccion=usuario_obj.direccion,
+        ciudad=usuario_obj.ciudad,
+        created_at=usuario_obj.created_at,
+        updated_at=usuario_obj.updated_at,
         difusoras=difusoras_siglas
     )
 
@@ -485,15 +666,21 @@ async def asignar_difusora(
             detail="Solo administradores pueden asignar difusoras"
         )
     
-    # Verificar que el usuario existe
-    usuario_obj = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    # Verificar que el usuario existe y pertenece a la misma organización
+    usuario_obj = db.query(Usuario).filter(
+        Usuario.id == usuario_id,
+        Usuario.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+    ).first()
     if not usuario_obj:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    # Verificar que la difusora existe
-    difusora_obj = db.query(Difusora).filter(Difusora.id == difusora_id).first()
+    # Verificar que la difusora existe y pertenece a la misma organización
+    difusora_obj = db.query(Difusora).filter(
+        Difusora.id == difusora_id,
+        Difusora.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+    ).first()
     if not difusora_obj:
-        raise HTTPException(status_code=404, detail="Difusora no encontrada")
+        raise HTTPException(status_code=404, detail="Difusora no encontrada o no pertenece a tu organización")
     
     # Verificar que no esté ya asignada
     asignacion = db.query(UsuarioDifusora).filter(
@@ -546,17 +733,22 @@ async def asignar_difusoras_multiple(
             detail="Solo administradores pueden asignar difusoras"
         )
     
-    # Verificar que el usuario existe
-    usuario_obj = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    # Verificar que el usuario existe y pertenece a la misma organización
+    usuario_obj = db.query(Usuario).filter(
+        Usuario.id == usuario_id,
+        Usuario.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+    ).first()
     if not usuario_obj:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    # Asignar cada difusora
+    # Asignar cada difusora (solo de la misma organización)
     for difusora_id in difusoras_ids:
-        # Verificar que la difusora existe
-        difusora_obj = db.query(Difusora).filter(Difusora.id == difusora_id).first()
+        # Verificar que la difusora existe y pertenece a la misma organización
+        difusora_obj = db.query(Difusora).filter(
+            Difusora.id == difusora_id,
+            Difusora.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+        ).first()
         if not difusora_obj:
-
             continue
         
         # Verificar que no esté ya asignada
@@ -597,12 +789,28 @@ async def remover_difusora(
     usuario: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Remueve una difusora de un usuario (solo admin)"""
+    """Remueve una difusora de un usuario (solo admin, solo de la misma organización)"""
     if usuario.rol != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo administradores pueden remover difusoras"
         )
+    
+    # Verificar que el usuario pertenece a la misma organización
+    usuario_obj = db.query(Usuario).filter(
+        Usuario.id == usuario_id,
+        Usuario.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+    ).first()
+    if not usuario_obj:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Verificar que la difusora pertenece a la misma organización
+    difusora_obj = db.query(Difusora).filter(
+        Difusora.id == difusora_id,
+        Difusora.organizacion_id == usuario.organizacion_id  # ← FILTRO POR ORGANIZACIÓN
+    ).first()
+    if not difusora_obj:
+        raise HTTPException(status_code=404, detail="Difusora no encontrada o no pertenece a tu organización")
     
     asignacion = db.query(UsuarioDifusora).filter(
         and_(
@@ -706,19 +914,9 @@ async def create_first_admin(
     db: Session = Depends(get_db)
 ):
     """
-    Crea el primer administrador del sistema (solo si no existe ningún admin)
+    Crea una cuenta de administrador. Permite múltiples administradores,
+    cada uno puede ser dueño de su propio grupo de radiodifusoras.
     """
-    # Verificar que no exista ningún admin
-    existing_admin = db.query(Usuario).filter(
-        Usuario.rol == "admin",
-        Usuario.activo == True
-    ).first()
-    
-    if existing_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Ya existe un administrador en el sistema. Usa el login para acceder."
-        )
     
     # Validar contraseñas
     if admin_data.password != admin_data.confirm_password:
@@ -734,19 +932,56 @@ async def create_first_admin(
             detail="La contraseña debe tener al menos 12 caracteres"
         )
     
-    # Verificar que el email no esté en uso
+    # Verificar que Cognito esté configurado y tenga credenciales
+    if not cognito_auth.enabled or not cognito_auth.cognito_client:
+        error_detail = "Cognito no está configurado correctamente."
+        
+        if cognito_auth.init_error:
+            error_detail += f"\n\nDetalles del error: {cognito_auth.init_error}"
+        else:
+            error_detail += "\n\nPosibles causas:"
+            error_detail += "\n1. Variables de entorno faltantes: COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, COGNITO_REGION"
+            error_detail += "\n2. El IAM role del task ECS no tiene permisos para Cognito"
+            error_detail += "\n3. Las credenciales de AWS no están disponibles (en ECS, esto se maneja automáticamente con IAM roles)"
+        
+        error_detail += "\n\nSolución:"
+        error_detail += "\n- Verifica que las variables de entorno estén configuradas en el task definition de ECS"
+        error_detail += "\n- Asegúrate de que el IAM role del task tenga permisos para:"
+        error_detail += "\n  * cognito-idp:AdminCreateUser"
+        error_detail += "\n  * cognito-idp:AdminSetUserPassword"
+        error_detail += "\n  * cognito-idp:AdminConfirmSignUp"
+        error_detail += "\n  * cognito-idp:ListUsers"
+        error_detail += "\n  * cognito-idp:DescribeUserPool"
+        
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=error_detail
+        )
+    
+    # Verificar que el email no esté en uso en Cognito primero
+    try:
+        cognito_users = cognito_auth.cognito_client.list_users(
+            UserPoolId=cognito_auth.user_pool_id,
+            Filter=f'email = "{admin_data.email}"'
+        )
+        if cognito_users.get('Users'):
+            # El usuario existe en Cognito
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El email ya está registrado en Cognito. Si olvidaste tu contraseña, usa la opción '¿Olvidaste tu contraseña?' en la página de login."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Si falla la verificación de Cognito, continuar (puede ser un problema temporal)
+        pass
+    
+    # Verificar que el email no esté en uso en RDS
     existing_user = db.query(Usuario).filter(Usuario.email == admin_data.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El email ya está registrado"
-        )
-    
-    # Verificar que Cognito esté configurado y tenga credenciales
-    if not cognito_auth.enabled or not cognito_auth.cognito_client:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Cognito no está configurado o no hay credenciales de AWS. Para crear el primer administrador, necesitas configurar:\n1. Variables de entorno: COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, COGNITO_REGION\n2. Credenciales de AWS: AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY (o configura el perfil de AWS con 'aws configure')"
+            detail="El email ya está registrado en la base de datos"
         )
     
     try:
@@ -758,33 +993,96 @@ async def create_first_admin(
             temporary_password=admin_data.password
         )
         
-        # Establecer contraseña permanente
-        cognito_auth.change_user_password(
-            cognito_user_id=cognito_result['cognito_user_id'],
-ew_password=admin_data.password,
-            permanent=True
-        )
+        cognito_user_id = cognito_result['cognito_user_id']
+        user_exists = cognito_result.get('user_exists', False)
         
-        # Confirmar usuario en Cognito
+        # Si el usuario ya existía, verificar su estado
+        if user_exists:
+            # El usuario ya existía en Cognito, establecer la contraseña directamente
+            try:
+                cognito_auth.change_user_password(
+                    cognito_user_id=cognito_user_id,
+                    new_password=admin_data.password,
+                    permanent=True
+                )
+            except Exception as e:
+                # Si falla, intentar establecer la contraseña con admin_set_user_password
+                try:
+                    import boto3
+                    cognito_client = boto3.client('cognito-idp', region_name=cognito_auth.region)
+                    cognito_client.admin_set_user_password(
+                        UserPoolId=cognito_auth.user_pool_id,
+                        Username=cognito_user_id,
+                        Password=admin_data.password,
+                        Permanent=True
+                    )
+                except Exception:
+                    pass
+        else:
+            # Usuario nuevo, establecer contraseña permanente
+            cognito_auth.change_user_password(
+                cognito_user_id=cognito_user_id,
+                new_password=admin_data.password,
+                permanent=True
+            )
+        
+        # Confirmar usuario en Cognito y cambiar estado de FORCE_CHANGE_PASSWORD a CONFIRMED
         try:
             import boto3
             cognito_client = boto3.client('cognito-idp', region_name=cognito_auth.region)
-            cognito_client.admin_confirm_sign_up(
+            
+            # Confirmar usuario
+            try:
+                cognito_client.admin_confirm_sign_up(
+                    UserPoolId=cognito_auth.user_pool_id,
+                    Username=cognito_user_id
+                )
+            except Exception as e:
+                # Si el usuario ya está confirmado, está bien
+                if "already confirmed" not in str(e).lower():
+                    pass
+            
+            # Verificar estado del usuario
+            user_info = cognito_client.admin_get_user(
                 UserPoolId=cognito_auth.user_pool_id,
-                Username=cognito_result['cognito_user_id']
+                Username=cognito_user_id
             )
+            
+            # Si el usuario está en FORCE_CHANGE_PASSWORD, establecer la contraseña como permanente
+            # Esto cambiará el estado a CONFIRMED
+            if user_info.get('UserStatus') == 'FORCE_CHANGE_PASSWORD':
+                cognito_client.admin_set_user_password(
+                    UserPoolId=cognito_auth.user_pool_id,
+                    Username=cognito_user_id,
+                    Password=admin_data.password,
+                    Permanent=True
+                )
         except Exception as e:
-            # Continuar aunque falle la asignación de grupo
+            # Continuar aunque falle la confirmación
             pass
         
-        # Crear registro en BD
+        # Crear organización nueva para este administrador
+        nueva_organizacion = Organizacion(
+            nombre=admin_data.nombre_empresa or f"Organización de {admin_data.nombre}",
+            nombre_empresa=admin_data.nombre_empresa,
+            telefono=admin_data.telefono,
+            direccion=admin_data.direccion,
+            ciudad=admin_data.ciudad,
+            activa=True
+        )
+        db.add(nueva_organizacion)
+        db.commit()
+        db.refresh(nueva_organizacion)
+        
+        # Crear registro en BD con organizacion_id
         usuario = Usuario(
             cognito_user_id=cognito_result['cognito_user_id'],
             email=admin_data.email,
             nombre=admin_data.nombre,
             rol="admin",
             activo=True,
-            nombre_empresa=admin_data.nombre_empresa,
+            organizacion_id=nueva_organizacion.id,
+            nombre_empresa=admin_data.nombre_empresa,  # Mantener por compatibilidad
             telefono=admin_data.telefono,
             direccion=admin_data.direccion,
             ciudad=admin_data.ciudad
@@ -792,6 +1090,23 @@ ew_password=admin_data.password,
         db.add(usuario)
         db.commit()
         db.refresh(usuario)
+        
+        # Asignar automáticamente TODAS las difusoras de la organización al nuevo admin
+        # Esto asegura que el admin tenga acceso completo desde el inicio
+        todas_difusoras = db.query(Difusora).filter(
+            Difusora.activa == True,
+            Difusora.organizacion_id == nueva_organizacion.id
+        ).all()
+        
+        for difusora in todas_difusoras:
+            nueva_asignacion = UsuarioDifusora(
+                usuario_id=usuario.id,
+                difusora_id=difusora.id
+            )
+            db.add(nueva_asignacion)
+        
+        if todas_difusoras:
+            db.commit()
         
         # Enviar email de bienvenida
         try:
@@ -818,5 +1133,181 @@ ew_password=admin_data.password,
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creando administrador: {str(e)}"
+        )
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Solicita recuperación de contraseña. Envía un código por email usando SES.
+    """
+    try:
+        # Buscar usuario en BD
+        usuario = db.query(Usuario).filter(Usuario.email == request.email).first()
+        
+        # Por seguridad, siempre devolvemos éxito aunque el usuario no exista
+        # Esto previene user enumeration attacks
+        if not usuario:
+            return {
+                "message": "Si el email está registrado, recibirás un código de recuperación por email.",
+                "email_sent": False
+            }
+        
+        # Verificar que el usuario esté activo
+        if not usuario.activo:
+            return {
+                "message": "Si el email está registrado, recibirás un código de recuperación por email.",
+                "email_sent": False
+            }
+        
+        # Generar código de verificación usando Cognito
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+            
+            cognito_client = boto3.client('cognito-idp', region_name=cognito_auth.region)
+            
+            # Iniciar el flujo de forgot password en Cognito
+            # Cognito enviará el código automáticamente por email
+            response = cognito_client.forgot_password(
+                ClientId=cognito_auth.client_id,
+                Username=request.email
+            )
+            
+            # Cognito ya envió el código por email
+            # También intentamos enviar un email informativo adicional con SES
+            # (aunque el código real viene de Cognito)
+            try:
+                # Enviar email informativo adicional (sin código, solo instrucciones)
+                # Nota: El código real viene en el email de Cognito
+                email_result = cognito_auth.send_password_reset_email(
+                    email=usuario.email,
+                    nombre=usuario.nombre,
+                    reset_code="XXXXXX"  # Placeholder, el código real viene de Cognito
+                )
+            except Exception:
+                # Si falla SES, no es crítico, Cognito ya envió el código
+                pass
+            
+            return {
+                "message": "Se ha enviado un código de recuperación a tu email. Revisa tu bandeja de entrada y spam.",
+                "email_sent": True
+            }
+                
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            
+            if error_code == 'UserNotFoundException':
+                # Por seguridad, no revelamos si el usuario existe
+                return {
+                    "message": "Si el email está registrado, recibirás un código de recuperación por email.",
+                    "email_sent": False
+                }
+            elif error_code == 'LimitExceededException':
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Has excedido el límite de intentos. Espera unos minutos e intenta nuevamente."
+                )
+            elif error_code == 'TooManyRequestsException':
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Demasiadas solicitudes. Por favor, espera unos minutos."
+                )
+            else:
+                # Por seguridad, siempre devolvemos éxito
+                return {
+                    "message": "Si el email está registrado, recibirás un código de recuperación por email.",
+                    "email_sent": False
+                }
+        except Exception as e:
+            # Por seguridad, siempre devolvemos éxito
+            return {
+                "message": "Si el email está registrado, recibirás un código de recuperación por email.",
+                "email_sent": False
+            }
+            
+    except Exception as e:
+        # Por seguridad, siempre devolvemos éxito
+        return {
+            "message": "Si el email está registrado, recibirás un código de recuperación por email.",
+            "email_sent": False
+        }
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Restablece la contraseña usando el código de verificación.
+    """
+    # Validar contraseñas
+    if request.new_password != request.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Las contraseñas no coinciden"
+        )
+    
+    # Validar longitud mínima
+    if len(request.new_password) < 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña debe tener al menos 12 caracteres"
+        )
+    
+    try:
+        import boto3
+        from botocore.exceptions import ClientError
+        
+        cognito_client = boto3.client('cognito-idp', region_name=cognito_auth.region)
+        
+        # Confirmar el código y establecer nueva contraseña
+        cognito_client.confirm_forgot_password(
+            ClientId=cognito_auth.client_id,
+            Username=request.email,
+            ConfirmationCode=request.code,
+            Password=request.new_password
+        )
+        
+        return {
+            "message": "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña."
+        }
+        
+    except ClientError as e:
+        error_code = e.response.get('Error', {}).get('Code', '')
+        
+        if error_code == 'CodeMismatchException':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Código de verificación inválido o expirado. Solicita un nuevo código."
+            )
+        elif error_code == 'ExpiredCodeException':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El código de verificación ha expirado. Solicita un nuevo código."
+            )
+        elif error_code == 'UserNotFoundException':
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuario no encontrado"
+            )
+        elif error_code == 'InvalidPasswordException':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña no cumple con los requisitos de seguridad."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al restablecer contraseña: {str(e)}"
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al restablecer contraseña: {str(e)}"
         )
 

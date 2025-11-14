@@ -51,7 +51,7 @@ export default function EventosReloj({ onSave, onCancel, categoriasPolitica = []
   // Usar las categorías de la política en lugar de cargar todas
   const categorias = categoriasPolitica.map((categoria, index) => ({
     id: index + 1,
-ombre: categoria,
+    nombre: categoria,
     activa: true,
     tipo: 'cancion'
   }))

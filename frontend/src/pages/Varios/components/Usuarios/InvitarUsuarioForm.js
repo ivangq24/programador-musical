@@ -40,15 +40,19 @@ ombre: '',
     setError(null)
     setSuccess(null)
     
+    // Si es admin, el backend asignará automáticamente las difusoras del admin que invita
+    // No necesitamos modificar las difusoras_ids aquí
+    const dataToSend = { ...formData }
+    
     try {
-      const response = await usuariosApi.invitarUsuario(formData)
+      const response = await usuariosApi.invitarUsuario(dataToSend)
       setResponse(response)
       setTemporaryPassword(response.temporary_password)
       setSuccess(response.message)
       // No llamar onSuccess inmediatamente, esperar a que el usuario copie la contraseña
     } catch (err) {
-
-      setError(err.response?.data?.detail || err.message || 'Error al invitar usuario')
+      const errorMessage = err.response?.data?.detail || err.message || 'Error al invitar usuario'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -214,7 +218,14 @@ ame="nombre"
                     <button
                       key={rol}
                       type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, rol }))}
+                      onClick={() => {
+                        setFormData(prev => {
+                          const newData = { ...prev, rol }
+                          // Si se selecciona admin, las difusoras se asignarán automáticamente
+                          // No necesitamos limpiarlas aquí, el backend las manejará
+                          return newData
+                        })
+                      }}
                       className={`p-4 rounded-xl border-2 transition-all ${
                         formData.rol === rol
                           ? 'border-indigo-500 bg-indigo-50'
@@ -234,6 +245,15 @@ ame="nombre"
                     </button>
                   ))}
                 </div>
+                {formData.rol === 'admin' && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>ℹ️ Nota:</strong> Los nuevos administradores heredarán automáticamente las difusoras de tu organización. 
+                      Solo el primer administrador puede invitar a otros administradores. 
+                      El nuevo administrador tendrá acceso a las mismas difusoras que tú.
+                    </p>
+                  </div>
+                )}
               </div>
               
               {/* Difusoras (solo para manager y operador) */}

@@ -16,7 +16,8 @@ import {
   Check,
   XCircle,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react'
 import InvitarUsuarioForm from './InvitarUsuarioForm'
 import AsignarDifusorasModal from './AsignarDifusorasModal'
@@ -185,26 +186,32 @@ export default function GestionUsuarios() {
             />
           </div>
           
-          <select
-            value={rolFilter}
-            onChange={(e) => setRolFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            <option value="">Todos los roles</option>
-            <option value="admin">Administrador</option>
-            <option value="manager">Gerente</option>
-            <option value="operador">Operador</option>
-          </select>
+          <div className="relative">
+            <select
+              value={rolFilter}
+              onChange={(e) => setRolFilter(e.target.value)}
+              className="w-full px-4 py-2 pr-10 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all hover:border-gray-400 bg-white cursor-pointer appearance-none"
+            >
+              <option value="">Todos los roles</option>
+              <option value="admin">Administrador</option>
+              <option value="manager">Gerente</option>
+              <option value="operador">Operador</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          </div>
           
-          <select
-            value={activoFilter}
-            onChange={(e) => setActivoFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            <option value="">Todos los estados</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
-          </select>
+          <div className="relative">
+            <select
+              value={activoFilter}
+              onChange={(e) => setActivoFilter(e.target.value)}
+              className="w-full px-4 py-2 pr-10 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all hover:border-gray-400 bg-white cursor-pointer appearance-none"
+            >
+              <option value="">Todos los estados</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          </div>
         </div>
       </div>
       
@@ -295,16 +302,19 @@ export default function GestionUsuarios() {
                       <Building className="w-5 h-5" />
                     </button>
                     
-                    <select
-                      value={usuario.rol}
-                      onChange={(e) => handleChangeRol(usuario, e.target.value)}
-                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      title="Cambiar rol"
-                    >
-                      <option value="operador">Operador</option>
-                      <option value="manager">Gerente</option>
-                      <option value="admin">Administrador</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={usuario.rol}
+                        onChange={(e) => handleChangeRol(usuario, e.target.value)}
+                        className="px-3 py-1 pr-8 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all hover:border-gray-400 bg-white cursor-pointer appearance-none"
+                        title="Cambiar rol"
+                      >
+                        <option value="operador">Operador</option>
+                        <option value="manager">Gerente</option>
+                        <option value="admin">Administrador</option>
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
                     
                     <button
                       onClick={() => handleToggleActivo(usuario)}

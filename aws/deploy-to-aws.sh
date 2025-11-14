@@ -67,22 +67,31 @@ check_requirements() {
 setup_ip_restriction() {
     log_info "Setting up IP restriction..."
     
-    # Auto-detect and set IP address
-    ../get-my-ip.sh update
-    
-    log_success "IP restriction configured"
+    # Auto-detect and set IP address using the simple script
+    if [ -f "update-ip-simple.sh" ]; then
+        chmod +x update-ip-simple.sh
+        ./update-ip-simple.sh update
+        log_success "IP restriction configured"
+    else
+        log_warning "update-ip-simple.sh not found, skipping IP restriction setup"
+    fi
 }
 
 setup_terraform() {
     log_info "Setting up Terraform..."
     
-    cd aws/terraform
+    # Save current directory and change to terraform directory
+    local original_dir=$(pwd)
+    cd terraform
     
     # Initialize Terraform
     terraform init
     
     # Validate configuration
     terraform validate
+    
+    # Return to original directory
+    cd "$original_dir"
     
     log_success "Terraform setup completed"
 }
@@ -116,22 +125,40 @@ build_and_push_images() {
     ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
     aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
     
-    cd ../..  # Go back to project root
+    # Save current directory and go to project root
+    local original_dir=$(pwd)
+    cd ..
     
-    # Build and push frontend
-    log_info "Building frontend image..."
-    docker build -f frontend/Dockerfile.prod -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/frontend:latest ./frontend
+    # Get Cognito configuration from Terraform
+    COGNITO_USER_POOL_ID=$(cd "$original_dir/terraform" && terraform output -raw cognito_user_pool_id 2>/dev/null || echo "")
+    COGNITO_CLIENT_ID=$(cd "$original_dir/terraform" && terraform output -raw cognito_client_id 2>/dev/null || echo "")
+    
+    # Build and push frontend (ARM64 for cost savings)
+    log_info "Building frontend image for ARM64 with Cognito config..."
+    log_info "Cognito User Pool ID: $COGNITO_USER_POOL_ID"
+    log_info "Cognito Client ID: $COGNITO_CLIENT_ID"
+    docker build --platform linux/arm64 \
+        --build-arg NEXT_PUBLIC_COGNITO_USER_POOL_ID="$COGNITO_USER_POOL_ID" \
+        --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID="$COGNITO_CLIENT_ID" \
+        --build-arg NEXT_PUBLIC_COGNITO_REGION="$AWS_REGION" \
+        --build-arg NEXT_PUBLIC_API_URL="/api/v1" \
+        -f frontend/Dockerfile.prod \
+        -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/frontend:latest \
+        ./frontend
     docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/frontend:latest
     
-    # Build and push backend
-    log_info "Building backend image..."
-    docker build -f backend/Dockerfile.prod -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/backend:latest ./backend
+    # Build and push backend (ARM64 for cost savings)
+    log_info "Building backend image for ARM64..."
+    docker build --platform linux/arm64 -f backend/Dockerfile.prod -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/backend:latest ./backend
     docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/backend:latest
     
-    # Build and push nginx
-    log_info "Building nginx image..."
-    docker build -f nginx/Dockerfile.prod -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/nginx:latest ./nginx
+    # Build and push nginx (ARM64 for cost savings)
+    log_info "Building nginx image for ARM64..."
+    docker build --platform linux/arm64 -f nginx/Dockerfile.prod -t $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/nginx:latest ./nginx
     docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/${PROJECT_NAME}/nginx:latest
+    
+    # Return to original directory
+    cd "$original_dir"
     
     log_success "Images built and pushed successfully"
 }
@@ -140,7 +167,7 @@ create_secrets() {
     log_info "Creating application secrets..."
     
     # Create secrets using the management script
-    ../manage-secrets.sh create
+    ./manage-secrets.sh create
     
     log_success "Application secrets created"
 }
@@ -148,7 +175,9 @@ create_secrets() {
 deploy_infrastructure() {
     log_info "Deploying infrastructure with Terraform..."
     
-    cd aws/terraform
+    # Save current directory and change to terraform directory
+    local original_dir=$(pwd)
+    cd terraform
     
     # Check if terraform.tfvars exists
     if [ ! -f "terraform.tfvars" ]; then
@@ -163,23 +192,35 @@ deploy_infrastructure() {
     # Apply deployment
     terraform apply tfplan
     
+    # Return to original directory
+    cd "$original_dir"
+    
     log_success "Infrastructure deployed successfully"
 }
 
 update_ecs_service() {
     log_info "Updating ECS service..."
     
+    # Get the actual cluster and service names from terraform
+    local original_dir=$(pwd)
+    cd terraform
+    
+    CLUSTER_NAME=$(terraform output -raw ecs_cluster_name 2>/dev/null || echo "pm-prod-v2-cluster")
+    SERVICE_NAME=$(terraform output -raw ecs_service_name 2>/dev/null || echo "pm-prod-v2-app")
+    
+    cd "$original_dir"
+    
     # Force new deployment to pick up new images
     aws ecs update-service \
-        --cluster "${PROJECT_NAME}-${ENVIRONMENT}-cluster" \
-        --service "${PROJECT_NAME}-${ENVIRONMENT}-app" \
+        --cluster "$CLUSTER_NAME" \
+        --service "$SERVICE_NAME" \
         --force-new-deployment \
         --region $AWS_REGION
     
     log_info "Waiting for service to stabilize..."
     aws ecs wait services-stable \
-        --cluster "${PROJECT_NAME}-${ENVIRONMENT}-cluster" \
-        --services "${PROJECT_NAME}-${ENVIRONMENT}-app" \
+        --cluster "$CLUSTER_NAME" \
+        --services "$SERVICE_NAME" \
         --region $AWS_REGION
     
     log_success "ECS service updated successfully"
@@ -188,27 +229,43 @@ update_ecs_service() {
 check_deployment() {
     log_info "Checking deployment health..."
     
+    # Save current directory and change to terraform directory
+    local original_dir=$(pwd)
+    cd terraform
+    
     # Get ALB DNS name
-    ALB_DNS=$(terraform output -raw alb_dns_name)
+    ALB_DNS=$(terraform output -raw alb_dns_name 2>/dev/null)
+    
+    cd "$original_dir"
+    
+    if [ -z "$ALB_DNS" ]; then
+        log_warning "Could not get ALB DNS name from terraform output"
+        return
+    fi
     
     # Wait a bit for the service to be ready
     sleep 30
     
-    # Check health endpoint
-    if curl -f -k "https://$ALB_DNS/health" &> /dev/null; then
+    # Check health endpoint (try HTTP first, then HTTPS)
+    if curl -f "http://$ALB_DNS/" &> /dev/null; then
+        log_success "Application is healthy"
+        log_success "Application URL: http://$ALB_DNS"
+    elif curl -f -k "https://$ALB_DNS/" &> /dev/null; then
         log_success "Application is healthy"
         log_success "Application URL: https://$ALB_DNS"
     else
         log_warning "Health check failed, but deployment may still be starting"
-        log_info "Application URL: https://$ALB_DNS"
+        log_info "Application URL: http://$ALB_DNS"
         log_info "Please check the ECS service logs if issues persist"
     fi
 }
 
 show_outputs() {
     log_info "Deployment outputs:"
-    cd aws/terraform
+    local original_dir=$(pwd)
+    cd terraform
     terraform output
+    cd "$original_dir"
 }
 
 cleanup_old_images() {
@@ -227,10 +284,8 @@ deploy() {
     check_requirements
     setup_ip_restriction
     setup_terraform
-    create_ecr_repositories
-    create_secrets
+    deploy_infrastructure  # Terraform crea ECR y secretos
     build_and_push_images
-    deploy_infrastructure
     update_ecs_service
     check_deployment
     show_outputs
@@ -256,7 +311,13 @@ case "${1:-deploy}" in
         create_secrets
         ;;
     "ip")
-        setup_ip_restriction
+        if [ -f "update-ip-simple.sh" ]; then
+            chmod +x update-ip-simple.sh
+            ./update-ip-simple.sh update
+        else
+            log_error "update-ip-simple.sh not found"
+            exit 1
+        fi
         ;;
     "deploy")
         deploy
@@ -267,15 +328,16 @@ case "${1:-deploy}" in
         check_deployment
         ;;
     "status")
-        cd aws/terraform
         show_outputs
         ;;
     "destroy")
         log_warning "This will destroy all AWS resources!"
         read -p "Are you sure? (yes/no): " confirm
         if [ "$confirm" = "yes" ]; then
-            cd aws/terraform
+            original_dir=$(pwd)
+            cd terraform
             terraform destroy
+            cd "$original_dir"
             log_success "Resources destroyed"
         else
             log_info "Destruction cancelled"

@@ -17,8 +17,20 @@ export function useAuth() {
       const cognitoEnabled = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && 
                             process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID !== '';
       
-      // Si Cognito no está configurado, permitir acceso (modo desarrollo)
+      // Detectar si estamos en producción
+      const isProduction = process.env.NODE_ENV === 'production' || 
+                          process.env.NEXT_PUBLIC_ENVIRONMENT === 'production';
+      
+      // Si Cognito no está configurado
       if (!cognitoEnabled) {
+        // En producción, NO permitir acceso sin Cognito configurado
+        if (isProduction) {
+          setAuthenticated(false);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        // En desarrollo, permitir acceso sin autenticación
         setAuthenticated(true);
         setUser({ name: 'Usuario Desarrollo', email: 'dev@example.com', rol: 'admin' });
         setLoading(false);
